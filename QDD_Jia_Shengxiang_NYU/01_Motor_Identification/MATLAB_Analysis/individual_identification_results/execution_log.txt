@@ -1,0 +1,63 @@
+                  File                  EstimatedFs    MaxTimestampGap_ms    Duration_s    NonzeroErrors    NonmonotonicTimes    ChirpAmplitude_Nm    OneSecondCountMin    OneSecondCountMedian    OneSecondCountMax    BestLagSamples    InferredKp    InferredKd    PDRMSE_Nm     NominalPDRMSE_Nm    InferredTarget_deg
+    ________________________________    ___________    __________________    __________    _____________    _________________    _________________    _________________    ____________________    _________________    ______________    __________    __________    __________    ________________    __________________
+
+    "motor_data_20260703_172605.csv"      1977.1               1                304              0                  0                    2                  1975                   1977                  1990                 1              0.04          0.2        3.1571e-06       3.1846e-06            -89.646      
+
+    LagSamples    Kp_Nm_per_deg      Kd       Target_deg     RMSE_Nm      NominalTargetMedian_deg    NominalRMSE_Nm
+    __________    _____________    _______    __________    __________    _______________________    ______________
+
+        0           0.040302       0.19857     -89.647        0.043659            -89.646                0.044452  
+        1               0.04           0.2     -89.646      3.1571e-06            -89.646              3.1846e-06  
+        2           0.039696       0.20091     -89.645        0.043909            -89.646                0.044452  
+        3            0.03939       0.20212     -89.644        0.039504            -89.646                0.042122  
+        4           0.039083       0.20314     -89.643        0.050097             -89.65                0.054664  
+        5           0.038774       0.20422     -89.642         0.05427            -89.645                0.061679  
+        6           0.038463       0.20522     -89.641        0.063084            -89.649                0.072903  
+
+                  File                  EstimatedFs    MaxTimestampGap_ms    Duration_s    NonzeroErrors    NonmonotonicTimes    ChirpAmplitude_Nm    OneSecondCountMin    OneSecondCountMedian    OneSecondCountMax    BestLagSamples    InferredKp    InferredKd    PDRMSE_Nm     NominalPDRMSE_Nm    InferredTarget_deg
+    ________________________________    ___________    __________________    __________    _____________    _________________    _________________    _________________    ____________________    _________________    ______________    __________    __________    __________    ________________    __________________
+
+    "motor_data_20260703_170331.csv"      1975.9               4                114              0                  0                    5                  1971                   1976                  1979                 1              0.04          0.2        3.1631e-06       3.2873e-06            -32.774      
+
+    LagSamples    Kp_Nm_per_deg      Kd       Target_deg     RMSE_Nm      NominalTargetMedian_deg    NominalRMSE_Nm
+    __________    _____________    _______    __________    __________    _______________________    ______________
+
+        0             0.05311      0.19731     -32.822        0.036052            -32.792                0.041164  
+        1                0.04          0.2     -32.774      3.1631e-06            -32.774              3.2873e-06  
+        2            0.026811      0.20101     -32.678        0.036251            -32.757                0.041164  
+        3            0.013617      0.20157     -32.395        0.052331            -32.744                0.065258  
+        4          0.00046657      0.20112     -16.152        0.073774            -32.731                0.094133  
+        5           -0.012578       0.1999     -33.596        0.094143            -32.719                 0.12225  
+        6            -0.02547      0.19785      -33.28         0.11451            -32.714                 0.15045  
+
+    FileIndex              Input               BandType    Fmin_Hz    Fmax_Hz    Points    J_apparent    D_apparent      Td_ms       MagnitudeRMSE_dB    PhaseRMSE_deg      Cost       ExitFlag    NearBoundary    DhalfCost    DdoubleCost
+    _________    __________________________    ________    _______    _______    ______    __________    __________    __________    ________________    _____________    _________    ________    ____________    _________    ___________
+
+        1        "1: Chirp cmd only input"        1          1.2         19        295      0.011318       0.02782         1.1071         0.18408            0.7207         0.10923       1           false          0.25425       0.61279 
+        1        "1: Chirp cmd only input"        2           12         19        116      0.011578      0.052967         1.3539        0.045077          0.044153        0.002168       1           false        0.0090948      0.029444 
+        1        "2: PD + chirp cmd input"        1          1.2         19        295      0.011913      0.026583         1.0428          0.2655            0.5749         0.27432       1           false          0.82058        2.1736 
+        1        "2: PD + chirp cmd input"        2           12         19        116       0.01177      0.049858         1.2948         0.04151          0.036427       0.0018256       1           false        0.0076037      0.024861 
+        1        "3: Measured torque input"       1          1.2         19        295     0.0074682      0.032417     6.6408e-16         0.24727             7.679          1.7772       1           true            3.8797         7.526 
+        1        "3: Measured torque input"       2           12         19        116     0.0071339       0.14869     1.1477e-15        0.063935            2.1198         0.22091       1           true            2.1727        6.3414 
+        2        "1: Chirp cmd only input"        1           12        110       1625      0.011943      0.034735         1.3701         0.51252           0.68692         0.17765       1           false          0.18854       0.22047 
+        2        "1: Chirp cmd only input"        2           12         19        116      0.011618      0.020115         1.2661        0.045632          0.052644        0.002053       1           false        0.0030425      0.005991 
+        2        "2: PD + chirp cmd input"        1           12        110       1625      0.012076      0.034219         1.3414         0.45285           0.60629         0.13766       1           false          0.14755       0.17711 
+        2        "2: PD + chirp cmd input"        2           12         19        116      0.011809      0.018682         1.2169        0.042783          0.032918         0.00175       1           false        0.0025421     0.0049171 
+        2        "3: Measured torque input"       1           12        110       1625     0.0067763       0.20171     2.1861e-16          1.0141            16.311          8.7906       1           true            10.021        12.617 
+        2        "3: Measured torque input"       2           12         19        116     0.0073921      0.094799     1.7886e-15        0.058567            1.6568         0.13583       1           true           0.89332        2.8529 
+
+              Input               Points    MagnitudeRMS_dB    PhaseRMS_deg    MagnitudeMedian_dB    PhaseMedian_deg
+    __________________________    ______    _______________    ____________    __________________    _______________
+
+    "1: Chirp cmd only input"      141         0.060182           1.2901           0.0057601             -1.1639    
+    "2: PD + chirp cmd input"      141         0.060451           1.1861            -0.02913              -1.155    
+    "3: Measured torque input"     141          0.20085           4.8067            -0.20003             -4.7515    
+
+              Input               OverlapPass    JRelativeDifference    DRelativeDifference    FitQualityPass    ViscosityResolved    MergeAllowed
+    __________________________    ___________    ___________________    ___________________    ______________    _________________    ____________
+
+    "1: Chirp cmd only input"        true              0.05377                0.22107              true                false             false    
+    "2: PD + chirp cmd input"        true             0.013615                0.25117              true                false             false    
+    "3: Measured torque input"       false            0.097148                 1.4462              false               true              false    
+
+Complete. Files were merged ONLY for inputs with MergeAllowed=true.

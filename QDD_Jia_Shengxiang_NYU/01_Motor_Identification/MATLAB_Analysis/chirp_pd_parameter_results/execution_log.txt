@@ -1,0 +1,17 @@
+             Stage                     Input             J_apparent    D_apparent    Td_ms     MagnitudeRMSE_dB    PhaseRMSE_deg     Cost      Points    ExitFlag    DelayAtBoundary
+    _______________________    ______________________    __________    __________    ______    ________________    _____________    _______    ______    ________    _______________
+
+    "Low band (1.2-19 Hz)"     "Chirp cmd only input"    0.0075536       0.28561     2.8245          2.053             21.533        27.399     308         1             false     
+    "Low band (1.2-19 Hz)"     "PD + chirp cmd input"     0.011894      0.026459      1.043        0.47156            0.68704       0.24597     308         1             false     
+    "High band (12-110 Hz)"    "Chirp cmd only input"     0.011499       0.23152     1.3985        0.46046            0.53201       0.22618     247         1             false     
+    "High band (12-110 Hz)"    "PD + chirp cmd input"     0.012074      0.034124     1.3415        0.35504            0.46242       0.13674     247         1             false     
+    "Merged (1.2-110 Hz)"      "Chirp cmd only input"    0.0095266       0.29412     1.4852         1.8685              17.87        19.458     502         1             false     
+    "Merged (1.2-110 Hz)"      "PD + chirp cmd input"     0.011988      0.027695     1.3313        0.44524            0.87155       0.23622     502         1             false     
+
+             Stage             ChirpVsPD_J_percent    ChirpVsPD_D_percent
+    _______________________    ___________________    ___________________
+
+    "Low band (1.2-19 Hz)"           -36.494                979.45       
+    "High band (12-110 Hz)"          -4.7635                578.48       
+    "Merged (1.2-110 Hz)"            -20.534                961.98       
+

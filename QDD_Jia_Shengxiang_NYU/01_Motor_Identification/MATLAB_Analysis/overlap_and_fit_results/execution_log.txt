@@ -1,0 +1,51 @@
+
+motor_data_20260703_172605.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1977.105 Hz
+Command != PD + chirp: 0 / 601039 rows (tolerance 0.001 Nm)
+Band 1.0--10.0 Hz; mean coherence [chirp command feedback]:
+    0.9808    0.9752    0.9749
+
+
+motor_data_20260703_170331.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1975.921 Hz
+Command != PD + chirp: 0 / 225254 rows (tolerance 0.001 Nm)
+Band 10.0--100.0 Hz; mean coherence [chirp command feedback]:
+    0.9940    0.9943    0.9961
+
+
+Diagnostic comparison only: no physical J/D estimates.
+Feedback torque scaling/timing and actual sampling remain unverified.
+              Input               Points    MagnitudeDifferenceMedian_dB    MagnitudeDifferenceRms_dB    MagnitudeDifferenceMaxAbs_dB    PhaseDifferenceMedian_deg    PhaseDifferenceRms_deg    PhaseDifferenceMaxAbs_deg    MinCoherenceLow    MinCoherenceHigh
+    __________________________    ______    ____________________________    _________________________    ____________________________    _________________________    ______________________    _________________________    _______________    ________________
+
+    "1: Chirp cmd only input"      164                0.010903                       0.27649                        1.4755                        -1.2658                     1.9247                     5.8761                  0.99298            0.94333     
+    "2: PD + chirp cmd input"      164               -0.036441                       0.30557                        1.4789                        -1.2633                     1.6726                     4.8979                  0.99359            0.94861     
+    "3: Measured torque input"     163                -0.19394                       0.36313                        1.4648                        -4.8279                     5.0368                      7.729                  0.99103             0.8954     
+
+                File                OverlapStart_s    OverlapEnd_s    ZoomCenter_s    ZoomEstimatedFrequency_Hz    OverlapRows    PositionSpan_deg    ChirpRms_Nm    CommandRms_Nm    FeedbackRms_Nm    PDRms_Nm    MaxTimestampGap_ms    NonzeroErrorRows    SumResidualMax_Nm
+    ____________________________    ______________    ____________    ____________    _________________________    ___________    ________________    ___________    _____________    ______________    ________    __________________    ________________    _________________
+
+    "motor_data_20260703_172605"        232.51           301.98          273.09                14.996              1.3738e+05          5.8358           1.4143          1.4793           0.91963        0.30156             1                    0                  1e-05      
+    "motor_data_20260703_170331"        2.1494           32.675          20.026                14.969                   60332          20.305           3.5357          3.7173            2.3549        0.75219             1                    0                  1e-05      
+
+              Input                 b         a         Td_ms       ApparentJ    ApparentD    WeightedCost    ExitFlag    DelayNearBoundary    FitPoints
+    __________________________    ______    ______    __________    _________    _________    ____________    ________    _________________    _________
+
+    "1: Chirp cmd only input"     87.612    22.889        1.4071     0.011414     0.26126       0.85122          1              false            1605   
+    "2: PD + chirp cmd input"     83.587    2.5124        1.3297     0.011964    0.030057       0.21882          1              false            1605   
+    "3: Measured torque input"    154.76    34.265    5.1011e-17    0.0064617     0.22141        12.597          1              true             1605   
+
+              Input               BandIndex    Points    MagnitudeRMSE_dB    PhaseRMSE_deg    MaxMagnitudeError_dB    MaxPhaseError_deg
+    __________________________    _________    ______    ________________    _____________    ____________________    _________________
+
+    "1: Chirp cmd only input"         1          139           2.102             21.994                 3.4                57.908      
+    "1: Chirp cmd only input"         2         1466         0.54455            0.75336              1.2966                4.2157      
+    "1: Chirp cmd only input"         3         1605         0.80839             6.5125                 3.4                57.908      
+    "2: PD + chirp cmd input"         1          139          0.6559             1.2035              3.4857                 2.676      
+    "2: PD + chirp cmd input"         2         1466         0.44337            0.58064              1.1134                2.2772      
+    "2: PD + chirp cmd input"         3         1605         0.46563            0.65831              3.4857                 2.676      
+    "3: Measured torque input"        1          139          4.2312             38.472               9.098                53.956      
+    "3: Measured torque input"        2         1466         0.66658             14.593              2.0836                23.936      
+    "3: Measured torque input"        3         1605          1.3987             17.964               9.098                53.956      
+
+Completed. Output: C:\0Telepalpation_control\QDD_Haptic_Robot_for_Remote_Palpation_Jia_Shengxiang_NYU\01_Motor_Identification\MATLAB_Analysis\overlap_and_fit_results

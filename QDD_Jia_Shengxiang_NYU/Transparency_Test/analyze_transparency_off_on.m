@@ -1,0 +1,249 @@
+clear; clc; close all;
+
+%% ============================================================
+%  Transparency OFF vs ON analysis
+%  Reconstructed to match the previous figure as closely as possible
+%
+%  Input:
+%    20260821_190035_trans_off1.csv
+%    20260821_190258_trans_on1.csv
+%
+%  Output:
+%    transparency_resistive_torque_1_to_15s_MATLAB.png
+%% ============================================================
+
+%% -------- FILE PATHS --------
+fileOff = 'C:\0Telepalpation_control\QDD_Haptic_Robot_for_Remote_Palpation_Jia_Shengxiang_NYU\Transparency_Test\20260821_190035_trans_off1.csv';
+fileOn  = 'C:\0Telepalpation_control\QDD_Haptic_Robot_for_Remote_Palpation_Jia_Shengxiang_NYU\Transparency_Test\20260821_190258_trans_on1.csv';
+
+%% -------- PARAMETERS --------
+% These start times were chosen to reproduce the previous alignment
+startOff = 4.50;   % raw OFF time corresponding to aligned time = 1 s
+startOn  = 2.30;   % raw ON time corresponding to aligned time = 1 s
+
+alignedStart = 1.0;
+alignedEnd   = 15.0;
+
+% Mild smoothing only
+smoothSamples = 52;
+
+%% -------- READ CSV --------
+[tOff, mzOffRaw] = readCFSLGR_Mz(fileOff);
+[tOn,  mzOnRaw]  = readCFSLGR_Mz(fileOn);
+
+%% -------- REMOVE INVALID DATA --------
+validOff = isfinite(tOff) & isfinite(mzOffRaw);
+tOff = tOff(validOff);
+mzOffRaw = mzOffRaw(validOff);
+
+validOn = isfinite(tOn) & isfinite(mzOnRaw);
+tOn = tOn(validOn);
+mzOnRaw = mzOnRaw(validOn);
+
+%% -------- SORT BY TIME --------
+[tOff, idx] = sort(tOff);
+mzOffRaw = mzOffRaw(idx);
+
+[tOn, idx] = sort(tOn);
+mzOnRaw = mzOnRaw(idx);
+
+%% -------- ZERO OFFSET CORRECTION --------
+% Use early samples before active motion to estimate offset.
+% If your files start already in motion, this still usually gives a small
+% correction only.
+
+nBaseOff = min(round(1.0 / median(diff(tOff))), length(mzOffRaw));
+nBaseOn  = min(round(1.0 / median(diff(tOn))),  length(mzOnRaw));
+
+offsetOff = median(mzOffRaw(1:nBaseOff), 'omitnan');
+offsetOn  = median(mzOnRaw(1:nBaseOn),  'omitnan');
+
+mzOff = mzOffRaw - offsetOff;
+mzOn  = mzOnRaw  - offsetOn;
+
+%% -------- LIGHT SMOOTHING --------
+% Use movmean rather than heavy filtering so the waveform remains jagged,
+% matching the previous figure more closely.
+
+mzOffSm = movmean(mzOff, smoothSamples, 'omitnan');
+mzOnSm  = movmean(mzOn,  smoothSamples, 'omitnan');
+
+%% -------- ALIGN TIME --------
+% Raw startOff/startOn are mapped to aligned time = 1 s.
+
+tOffAligned = tOff - startOff + alignedStart;
+tOnAligned  = tOn  - startOn  + alignedStart;
+
+%% -------- CROP TO 1-15 s --------
+maskOff = tOffAligned >= alignedStart & tOffAligned <= alignedEnd;
+maskOn  = tOnAligned  >= alignedStart & tOnAligned  <= alignedEnd;
+
+tOffPlot = tOffAligned(maskOff);
+mzOffPlot = mzOffSm(maskOff);
+
+tOnPlot = tOnAligned(maskOn);
+mzOnPlot = mzOnSm(maskOn);
+
+%% -------- OPTIONAL SMALL AMPLITUDE OFFSET CORRECTION --------
+% Remove residual mean inside plotted interval.
+mzOffPlot = mzOffPlot - mean(mzOffPlot, 'omitnan');
+mzOnPlot  = mzOnPlot  - mean(mzOnPlot,  'omitnan');
+
+%% -------- METRICS --------
+rmsOff = sqrt(mean(mzOffPlot.^2, 'omitnan'));
+rmsOn  = sqrt(mean(mzOnPlot.^2,  'omitnan'));
+
+reduction = (rmsOff - rmsOn) / rmsOff * 100;
+
+p95Off = prctile(abs(mzOffPlot), 95);
+p95On  = prctile(abs(mzOnPlot), 95);
+
+fprintf('\n========================================\n');
+fprintf('Transparency Analysis\n');
+fprintf('========================================\n');
+fprintf('OFF RMS = %.6f Nm\n', rmsOff);
+fprintf('ON  RMS = %.6f Nm\n', rmsOn);
+fprintf('RMS reduction = %.2f %%\n', reduction);
+fprintf('OFF 95th percentile |Mz| = %.6f Nm\n', p95Off);
+fprintf('ON  95th percentile |Mz| = %.6f Nm\n', p95On);
+fprintf('========================================\n\n');
+
+%% -------- FIGURE --------
+figure('Color','w','Position',[100 100 1150 430]);
+
+plot(tOffPlot, mzOffPlot, ...
+    'LineWidth', 2, ...
+    'Color', [0.5 0.5 0.5], ...
+    'LineStyle', ':');
+hold on;
+
+plot(tOnPlot, mzOnPlot, ...
+    'LineWidth', 1.5, ...
+    'Color', [0 0 0], ...
+    'LineStyle', '-');
+
+yline(0, 'k-', 'LineWidth', 0.9);
+
+grid on;
+box on;
+
+xlim([1 15]);
+ylim([-1.05 1.15]);
+
+xticks(1:2:15);
+yticks(-1:0.5:1);
+
+xlabel('Time [s]', ...
+    'FontSize', 20);
+
+ylabel('Resistive torque [Nm]', ...
+    'FontSize', 20);
+
+% title('Resistive Torque during Manual Tracking Motion', 'FontSize', 16, 'FontWeight', 'bold');
+
+legend({'Powered off','With transparent control'}, ...
+    'Location','northeast', ...
+    'FontSize', 18);
+
+set(gca, ...
+    'FontSize', 20, ...
+    'LineWidth', 1.0);
+
+%% -------- SAVE --------
+outputName = 'transparency_resistive_torque_1_to_15s_MATLAB.png';
+
+exportgraphics(gcf, outputName, 'Resolution', 300);
+
+fprintf('Saved figure: %s\n', outputName);
+
+
+%% ============================================================
+% Local function
+%% ============================================================
+function [t, mz] = readCFSLGR_Mz(filename)
+
+    if ~isfile(filename)
+        error('File not found: %s', filename);
+    end
+
+    %% First try readtable
+    try
+        T = readtable(filename, ...
+            'VariableNamingRule','preserve');
+
+        % Try to identify numeric columns
+        numericMask = varfun(@isnumeric, T, ...
+            'OutputFormat','uniform');
+
+        Tnum = T(:, numericMask);
+
+        if width(Tnum) < 2
+            error('Not enough numeric columns detected.');
+        end
+
+        A = table2array(Tnum);
+
+        % Time is assumed to be first numeric column
+        t = A(:,1);
+
+        % For CFSLGR format used in this project,
+        % Mz was stored as the last numeric column.
+        mz = A(:,end);
+
+        if sum(isfinite(t)) < 10 || sum(isfinite(mz)) < 10
+            error('Numeric data insufficient.');
+        end
+
+        return;
+
+    catch
+        % Continue to textscan fallback
+    end
+
+    %% Fallback: manual text parsing
+    fid = fopen(filename,'r');
+
+    if fid == -1
+        error('Cannot open file: %s', filename);
+    end
+
+    cleaner = onCleanup(@() fclose(fid));
+
+    % Skip non-numeric header lines automatically
+    lines = {};
+    while ~feof(fid)
+        pos = ftell(fid);
+        line = fgetl(fid);
+
+        if ~ischar(line)
+            break;
+        end
+
+        nums = sscanf(strrep(line, ',', ' '), '%f');
+
+        if numel(nums) >= 2
+            fseek(fid, pos, 'bof');
+            break;
+        end
+    end
+
+    % Read numeric CSV body
+    C = textscan(fid, ...
+        '%f%f%f%f%f%f%f', ...
+        'Delimiter', ',', ...
+        'CollectOutput', true);
+
+    if isempty(C) || isempty(C{1})
+        error('Could not read numeric CSV data from: %s', filename);
+    end
+
+    A = C{1};
+
+    if size(A,2) < 2
+        error('Not enough numeric columns in CSV.');
+    end
+
+    t = A(:,1);
+    mz = A(:,end);
+
+end

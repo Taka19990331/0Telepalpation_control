@@ -1,0 +1,141 @@
+
+motor_data_20260703_172605.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1977.105 Hz
+Command != PD + chirp: 0 / 601039 rows (tolerance 0.001 Nm)
+Band 1.0--10.0 Hz; mean coherence [chirp command feedback]:
+    0.9808    0.9752    0.9749
+
+
+motor_data_20260703_170331.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1975.921 Hz
+Command != PD + chirp: 0 / 225254 rows (tolerance 0.001 Nm)
+Band 10.0--100.0 Hz; mean coherence [chirp command feedback]:
+    0.9940    0.9943    0.9961
+
+
+Diagnostic comparison only: no physical J/D estimates.
+Feedback torque scaling/timing and actual sampling remain unverified.
+
+DIAGNOSTICS motor_data_20260703_172605
+                File                   Rows       Duration_s    TimestampAverage_Hz    Assumed2000HzDuration_s    ZeroDtRows    NegativeDtRows    MaxGap_ms    MaxGapAt_s    ChirpStart_s    ChirpEnd_s    ChirpAmplitude_Nm    CommandMaxAbs_Nm    TorqueFeedbackMaxAbs_Nm    SumMismatchRows    SumResidualMax_Nm    NonzeroErrorRows    PositionMin_deg    PositionMax_deg    MaxPositionStep_deg    MaxPositionStepAt_s    MaxSpeed_rad_s    MaxTemperature_C    InferredKp_Nm_per_deg    InferredKd_Nm_per_rad_s    PDRegressionRms_Nm
+    ____________________________    __________    __________    ___________________    _______________________    __________    ______________    _________    __________    ____________    __________    _________________    ________________    _______________________    _______________    _________________    ________________    _______________    _______________    ___________________    ___________________    ______________    ________________    _____________________    _______________________    __________________
+
+    "motor_data_20260703_172605"    6.0104e+05       304              1977.1                   300.52             2.9704e+05          0               1           256             2             302                2                 2.1658                 1.4769                    0                 1e-05                 0                -137.62            -42.151              0.3498                 83.027               9.7711               32                 0.040302                   0.19857                 0.043654     
+
+
+motor_data_20260703_172605.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1977.105 Hz
+Command != PD + chirp: 0 / 601039 rows (tolerance 0.001 Nm)
+Band 1.0--10.0 Hz; mean coherence [chirp command feedback]:
+    0.9808    0.9752    0.9749
+
+
+motor_data_20260703_170331.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1975.921 Hz
+Command != PD + chirp: 0 / 225254 rows (tolerance 0.001 Nm)
+Band 10.0--100.0 Hz; mean coherence [chirp command feedback]:
+    0.9940    0.9943    0.9961
+
+
+Diagnostic comparison only: no physical J/D estimates.
+Feedback torque scaling/timing and actual sampling remain unverified.
+
+DIAGNOSTICS motor_data_20260703_172605
+                File                   Rows       Duration_s    TimestampAverage_Hz    Assumed2000HzDuration_s    ZeroDtRows    NegativeDtRows    MaxGap_ms    MaxGapAt_s    ChirpStart_s    ChirpEnd_s    ChirpAmplitude_Nm    CommandMaxAbs_Nm    TorqueFeedbackMaxAbs_Nm    SumMismatchRows    SumResidualMax_Nm    NonzeroErrorRows    PositionMin_deg    PositionMax_deg    MaxPositionStep_deg    MaxPositionStepAt_s    MaxSpeed_rad_s    MaxTemperature_C    InferredKp_Nm_per_deg    InferredKd_Nm_per_rad_s    PDRegressionRms_Nm
+    ____________________________    __________    __________    ___________________    _______________________    __________    ______________    _________    __________    ____________    __________    _________________    ________________    _______________________    _______________    _________________    ________________    _______________    _______________    ___________________    ___________________    ______________    ________________    _____________________    _______________________    __________________
+
+    "motor_data_20260703_172605"    6.0104e+05       304              1977.1                   300.52             2.9704e+05          0               1           256             2             302                2                 2.1658                 1.4769                    0                 1e-05                 0                -137.62            -42.151              0.3498                 83.027               9.7711               32                 0.040302                   0.19857                 0.043654     
+
+
+DIAGNOSTICS motor_data_20260703_170331
+                File                   Rows       Duration_s    TimestampAverage_Hz    Assumed2000HzDuration_s    ZeroDtRows    NegativeDtRows    MaxGap_ms    MaxGapAt_s    ChirpStart_s    ChirpEnd_s    ChirpAmplitude_Nm    CommandMaxAbs_Nm    TorqueFeedbackMaxAbs_Nm    SumMismatchRows    SumResidualMax_Nm    NonzeroErrorRows    PositionMin_deg    PositionMax_deg    MaxPositionStep_deg    MaxPositionStepAt_s    MaxSpeed_rad_s    MaxTemperature_C    InferredKp_Nm_per_deg    InferredKd_Nm_per_rad_s    PDRegressionRms_Nm    IntegratedVelocityResidualEnd_rad    IntegratedVelocityResidualMax_rad
+    ____________________________    __________    __________    ___________________    _______________________    __________    ______________    _________    __________    ____________    __________    _________________    ________________    _______________________    _______________    _________________    ________________    _______________    _______________    ___________________    ___________________    ______________    ________________    _____________________    _______________________    __________________    _________________________________    _________________________________
+
+    "motor_data_20260703_170331"    2.2525e+05       114              1975.9                   112.63             1.1126e+05          0               4          70.945           2             112                5                 5.8501                  3.79                     0                 1e-05                 0                -39.856            -13.213              0.2842                  2.045               9.2582               34                 0.053103                   0.19731                 0.03605                       2.9086                               2.9087              
+
+                File                     Input         From_Hz    To_Hz     RawJump_deg    ContinuousStep_deg    MinCoherence
+    ____________________________    _______________    _______    ______    ___________    __________________    ____________
+
+    "motor_data_20260703_172605"    "Total command"    8.4839     8.5449      359.97           -0.034029           0.99259   
+    "motor_data_20260703_170331"    "Chirp"            19.531     19.592      359.95           -0.053716           0.99906   
+
+Outputs: C:\0Telepalpation_control\QDD_Haptic_Robot_for_Remote_Palpation_Jia_Shengxiang_NYU\01_Motor_Identification\MATLAB_Analysis\diagnostics
+No physical model fitting performed.
+
+motor_data_20260703_172605.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1977.105 Hz
+Command != PD + chirp: 0 / 601039 rows (tolerance 0.001 Nm)
+Band 1.0--10.0 Hz; mean coherence [chirp command feedback]:
+    0.9808    0.9752    0.9749
+
+
+motor_data_20260703_170331.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1975.921 Hz
+Command != PD + chirp: 0 / 225254 rows (tolerance 0.001 Nm)
+Band 10.0--100.0 Hz; mean coherence [chirp command feedback]:
+    0.9940    0.9943    0.9961
+
+
+Diagnostic comparison only: no physical J/D estimates.
+Feedback torque scaling/timing and actual sampling remain unverified.
+
+DIAGNOSTICS motor_data_20260703_172605
+                File                   Rows       Duration_s    TimestampAverage_Hz    Assumed2000HzDuration_s    ZeroDtRows    NegativeDtRows    MaxGap_ms    MaxGapAt_s    ChirpStart_s    ChirpEnd_s    ChirpAmplitude_Nm    CommandMaxAbs_Nm    TorqueFeedbackMaxAbs_Nm    SumMismatchRows    SumResidualMax_Nm    NonzeroErrorRows    PositionMin_deg    PositionMax_deg    MaxPositionStep_deg    MaxPositionStepAt_s    MaxSpeed_rad_s    MaxTemperature_C    InferredKp_Nm_per_deg    InferredKd_Nm_per_rad_s    PDRegressionRms_Nm
+    ____________________________    __________    __________    ___________________    _______________________    __________    ______________    _________    __________    ____________    __________    _________________    ________________    _______________________    _______________    _________________    ________________    _______________    _______________    ___________________    ___________________    ______________    ________________    _____________________    _______________________    __________________
+
+    "motor_data_20260703_172605"    6.0104e+05       304              1977.1                   300.52             2.9704e+05          0               1           256             2             302                2                 2.1658                 1.4769                    0                 1e-05                 0                -137.62            -42.151              0.3498                 83.027               9.7711               32                 0.040302                   0.19857                 0.043654     
+
+
+DIAGNOSTICS motor_data_20260703_170331
+                File                   Rows       Duration_s    TimestampAverage_Hz    Assumed2000HzDuration_s    ZeroDtRows    NegativeDtRows    MaxGap_ms    MaxGapAt_s    ChirpStart_s    ChirpEnd_s    ChirpAmplitude_Nm    CommandMaxAbs_Nm    TorqueFeedbackMaxAbs_Nm    SumMismatchRows    SumResidualMax_Nm    NonzeroErrorRows    PositionMin_deg    PositionMax_deg    MaxPositionStep_deg    MaxPositionStepAt_s    MaxSpeed_rad_s    MaxTemperature_C    InferredKp_Nm_per_deg    InferredKd_Nm_per_rad_s    PDRegressionRms_Nm
+    ____________________________    __________    __________    ___________________    _______________________    __________    ______________    _________    __________    ____________    __________    _________________    ________________    _______________________    _______________    _________________    ________________    _______________    _______________    ___________________    ___________________    ______________    ________________    _____________________    _______________________    __________________
+
+    "motor_data_20260703_170331"    2.2525e+05       114              1975.9                   112.63             1.1126e+05          0               4          70.945           2             112                5                 5.8501                  3.79                     0                 1e-05                 0                -39.856            -13.213              0.2842                  2.045               9.2582               34                 0.053103                   0.19731                 0.03605      
+
+                File                     Input         From_Hz    To_Hz     RawJump_deg    ContinuousStep_deg    MinCoherence
+    ____________________________    _______________    _______    ______    ___________    __________________    ____________
+
+    "motor_data_20260703_172605"    "Total command"    8.4839     8.5449      359.97           -0.034029           0.99259   
+    "motor_data_20260703_170331"    "Chirp"            19.531     19.592      359.95           -0.053716           0.99906   
+
+Outputs: C:\0Telepalpation_control\QDD_Haptic_Robot_for_Remote_Palpation_Jia_Shengxiang_NYU\01_Motor_Identification\MATLAB_Analysis\diagnostics
+No physical model fitting performed.
+
+motor_data_20260703_172605.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1977.105 Hz
+Command != PD + chirp: 0 / 601039 rows (tolerance 0.001 Nm)
+Band 1.0--10.0 Hz; mean coherence [chirp command feedback]:
+    0.9808    0.9752    0.9749
+
+
+motor_data_20260703_170331.csv
+Assumed Fs: 2000.0 Hz; timestamp-average rate: 1975.921 Hz
+Command != PD + chirp: 0 / 225254 rows (tolerance 0.001 Nm)
+Band 10.0--100.0 Hz; mean coherence [chirp command feedback]:
+    0.9940    0.9943    0.9961
+
+
+Diagnostic comparison only: no physical J/D estimates.
+Feedback torque scaling/timing and actual sampling remain unverified.
+
+DIAGNOSTICS motor_data_20260703_172605
+                File                   Rows       Duration_s    TimestampAverage_Hz    Assumed2000HzDuration_s    ZeroDtRows    NegativeDtRows    MaxGap_ms    MaxGapAt_s    ChirpStart_s    ChirpEnd_s    ChirpAmplitude_Nm    CommandMaxAbs_Nm    TorqueFeedbackMaxAbs_Nm    SumMismatchRows    SumResidualMax_Nm    NonzeroErrorRows    PositionMin_deg    PositionMax_deg    MaxPositionStep_deg    MaxPositionStepAt_s    MaxSpeed_rad_s    MaxTemperature_C    InferredKp_Nm_per_deg    InferredKd_Nm_per_rad_s    PDRegressionRms_Nm
+    ____________________________    __________    __________    ___________________    _______________________    __________    ______________    _________    __________    ____________    __________    _________________    ________________    _______________________    _______________    _________________    ________________    _______________    _______________    ___________________    ___________________    ______________    ________________    _____________________    _______________________    __________________
+
+    "motor_data_20260703_172605"    6.0104e+05       304              1977.1                   300.52             2.9704e+05          0               1           256             2             302                2                 2.1658                 1.4769                    0                 1e-05                 0                -137.62            -42.151              0.3498                 83.027               9.7711               32                 0.040302                   0.19857                 0.043654     
+
+
+DIAGNOSTICS motor_data_20260703_170331
+                File                   Rows       Duration_s    TimestampAverage_Hz    Assumed2000HzDuration_s    ZeroDtRows    NegativeDtRows    MaxGap_ms    MaxGapAt_s    ChirpStart_s    ChirpEnd_s    ChirpAmplitude_Nm    CommandMaxAbs_Nm    TorqueFeedbackMaxAbs_Nm    SumMismatchRows    SumResidualMax_Nm    NonzeroErrorRows    PositionMin_deg    PositionMax_deg    MaxPositionStep_deg    MaxPositionStepAt_s    MaxSpeed_rad_s    MaxTemperature_C    InferredKp_Nm_per_deg    InferredKd_Nm_per_rad_s    PDRegressionRms_Nm
+    ____________________________    __________    __________    ___________________    _______________________    __________    ______________    _________    __________    ____________    __________    _________________    ________________    _______________________    _______________    _________________    ________________    _______________    _______________    ___________________    ___________________    ______________    ________________    _____________________    _______________________    __________________
+
+    "motor_data_20260703_170331"    2.2525e+05       114              1975.9                   112.63             1.1126e+05          0               4          70.945           2             112                5                 5.8501                  3.79                     0                 1e-05                 0                -39.856            -13.213              0.2842                  2.045               9.2582               34                 0.053103                   0.19731                 0.03605      
+
+                File                          Input              From_Hz    To_Hz     RawJump_deg    ContinuousStep_deg    MinCoherence
+    ____________________________    _________________________    _______    ______    ___________    __________________    ____________
+
+    "motor_data_20260703_172605"    "2: PD + chirp cmd input"    8.4839     8.5449      359.97           -0.034029           0.99259   
+    "motor_data_20260703_170331"    "1: Chirp cmd only input"    19.531     19.592      359.95           -0.053716           0.99906   
+
+Outputs: C:\0Telepalpation_control\QDD_Haptic_Robot_for_Remote_Palpation_Jia_Shengxiang_NYU\01_Motor_Identification\MATLAB_Analysis\diagnostics
+No physical model fitting performed.

@@ -1,0 +1,14 @@
+                  File                     Rows       Duration_s    MeanRate_Hz    MeanPeriod_us    FixedClockEndError_s    FrequencyScaleError_pct    MaxMeanClockResidual_ms    MeanClockResidualRange_ms    DuplicateTimestampRows    GapsOver1ms    MaxGap_ms    OneSecondCountMin    OneSecondCountMax
+    ________________________________    __________    __________    ___________    _____________    ____________________    _______________________    _______________________    _________________________    ______________________    ___________    _________    _________________    _________________
+
+    "motor_data_20260703_172605.csv"    6.0104e+05       304          1977.1          505.79                 3.48                    1.158                     23.586                      38.624                    2.9704e+05               0             1              1975                 1990       
+    "motor_data_20260703_170331.csv"    2.2525e+05       114          1975.9          506.09               1.3725                   1.2186                     12.819                      17.357                    1.1126e+05               1             4              1971                 1979       
+
+    FileIndex                  Method                  Points    MagnitudeDifferenceRMS_dB    PhaseDifferenceRMS_deg    MagnitudeDifferenceMax_dB    PhaseDifferenceMax_deg
+    _________    __________________________________    ______    _________________________    ______________________    _________________________    ______________________
+
+        1        "Fixed 2000 Hz"                        350                0.19064                    0.10946                    0.23311                     0.21663       
+        1        "Timestamp grid 1000 Hz (approx.)"     350              0.0043168                  0.0037441                   0.013951                    0.013693       
+        2        "Fixed 2000 Hz"                        350                0.22555                    0.46248                    0.43519                      1.6145       
+        2        "Timestamp grid 1000 Hz (approx.)"     339               0.028926                    0.28666                    0.18056                      1.4479       
+

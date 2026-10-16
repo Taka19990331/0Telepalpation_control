@@ -1,0 +1,4 @@
+Input,OverlapPass,JRelativeDifference,DRelativeDifference,FitQualityPass,ViscosityResolved,MergeAllowed
+1: Chirp cmd only input,1,0.0537696704351913,0.221072229388725,1,0,0
+2: PD + chirp cmd input,1,0.0136151780927477,0.251167756642718,1,0,0
+3: Measured torque input,0,0.0971476008408036,1.44616494340694,0,1,0
