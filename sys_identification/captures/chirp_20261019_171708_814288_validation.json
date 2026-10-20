@@ -1,0 +1,17 @@
+{
+  "valid": true,
+  "rows": 80001,
+  "reason": "COMPLETE",
+  "errors": [],
+  "config": {
+    "Hz": 2000.0,
+    "Duration_s": 40.0,
+    "F0_Hz": 1.0,
+    "F1_Hz": 100.0,
+    "A0_Nm": 1.0,
+    "A1_Nm": 2.5,
+    "AmplitudeExponent": 1.0,
+    "Period_us": 500.0,
+    "ExpectedRows": 80001.0
+  }
+}

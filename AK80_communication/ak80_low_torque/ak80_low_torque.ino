@@ -17,7 +17,7 @@ const float P_MIN=IS_60 ? -12.56f : -12.5f, P_MAX=-P_MIN;
 const float V_MIN=IS_60 ? -60.0f : -45.0f, V_MAX=-V_MIN;
 const float T_MIN=IS_60 ? -12.0f : -32.0f, T_MAX=-T_MIN;
 const float KP_MIN=0, KP_MAX=500, KD_MIN=0, KD_MAX=5;
-const float TEST_TORQUE_NM = 0.4f;
+const float TEST_TORQUE_NM = 1.0f;
 const float SPEED_STOP_RAD_S = 40.0f;
 const uint32_t RUN_MS = 5000, FEEDBACK_TIMEOUT_MS = 100;
 uint32_t txCount=0, startedMs=0, lastRxMs=0, runMs=0;
@@ -27,6 +27,22 @@ elapsedMicros txTimer;
 elapsedMillis logTimer;
 bool active=false, running=false, received=false;
 float speedRadS=0, positionRad=0;
+float feedbackTorqueNm=NAN, feedbackCurrentA=NAN, feedbackTempC=NAN;
+int feedbackRaw=0, feedbackError=-1;
+float queuedCommandNm=0, queuedEncodedNm=0;
+// queued = accepted by FlexCAN, not an acknowledgement from the motor.
+void printLogHeader() {
+  Serial.println("DATA,Time_ms,Position_rad,Speed_rad_s,QueuedCommand_Nm,EncodedCommand_Nm,FeedbackRaw,FeedbackTorque_Nm,FeedbackCurrent_A,Temperature_C,ErrorCode,FeedbackAge_ms");
+}
+void printFeedbackLog() {
+  char line[256];
+  int n=snprintf(line,sizeof(line),"DATA,%lu,%.5f,%.5f,%.5f,%.5f,%d,%.5f,%.5f,%.1f,%d,%lu\n",
+      (unsigned long)millis(),positionRad,speedRadS,queuedCommandNm,queuedEncodedNm,
+      feedbackRaw,feedbackTorqueNm,feedbackCurrentA,feedbackTempC,feedbackError,
+      (unsigned long)(millis()-lastRxMs));
+  // Drop a log row rather than delay CAN servicing when USB is congested.
+  if (n>0 && n<(int)sizeof(line) && Serial.availableForWrite()>=n) Serial.write(line,n);
+}
 int float_to_uint(float x, float x_min, float x_max, int bits) {
   float span = x_max - x_min;
 
@@ -126,6 +142,10 @@ void sendMitCommand(float p_des, float v_des, float kp, float kd, float t_ff) {
   }
 
   if (!Can0.write(msg)) txFailed++;
+  else {
+    queuedCommandNm=t_ff;
+    queuedEncodedNm=uint_to_float(t_int,T_MIN,T_MAX,12);
+  }
   txCount++;
 }
 
@@ -136,6 +156,12 @@ void stopMotor(const char *reason) {
   sendMitCommand(0,0,0,0,0);
   exitMotorMode();
   Serial.print("STOP,"); Serial.println(reason);
+  if (received) {
+    Serial.print("LAST_FEEDBACK,RAW,"); Serial.print(feedbackRaw);
+    Serial.print(",TORQUE_NM,"); Serial.print(feedbackTorqueNm,5);
+    Serial.print(",CURRENT_A,"); Serial.print(feedbackCurrentA,5);
+    Serial.print(",ERROR,"); Serial.println(feedbackError);
+  }
   Serial.print("CAN_DIAG,TX_ATTEMPTS,"); Serial.print(txCount);
   Serial.print(",TX_QUEUE_FAILED,"); Serial.print(txFailed);
   Serial.print(",RX_ALL,"); Serial.print(rxFrames);
@@ -161,7 +187,7 @@ void setup() {
   exitMotorMode();
   const uint32_t serialWaitMs = millis();
   while (!Serial && millis()-serialWaitMs < 5000) {}
-  Serial.print("LOW_PROTOCOL_V2,MOTOR,"); Serial.print(MOTOR_SELECT);
+  Serial.print("LOW_PROTOCOL_V3,MOTOR,"); Serial.print(MOTOR_SELECT);
   Serial.print(",CAN,"); Serial.print(IS_60 ? 3 : (IS_80A ? 1 : 2));
   Serial.print(",ID,"); Serial.println(MOTOR_ID);
   Serial.print("READY: s=start ");
@@ -169,6 +195,7 @@ void setup() {
   Serial.print(" Nm for ");
   Serial.print(RUN_MS / 1000.0f, 3);
   Serial.println(" s, x=stop; no newline needed");
+  printLogHeader();
 }
 void loop() {
   if (IS_60) Can0.events(); // Integrated Controller Motor3 service sequence.
@@ -178,6 +205,8 @@ void loop() {
     if ((c=='s' || c=='S') && !active) {
       CAN_message_t stale;
       while (Can0.read(stale)) {} // Discard frames from a previous run.
+      printLogHeader();
+      feedbackTorqueNm=NAN; feedbackCurrentA=NAN; feedbackTempC=NAN; feedbackError=-1;
       received=false; running=false; active=true; startedMs=millis();
       txCount=0; txFailed=0; rxFrames=0; rxAccepted=0;
       txTimer=0; logTimer=0;
@@ -198,14 +227,24 @@ void loop() {
       positionRad=p*0.1f*PI/180.0f;
       // Integrated controller: 14 pole pairs, 6:1 gear ratio.
       speedRadS=v*10.0f/14.0f/6.0f*(2.0f*PI/60.0f);
+      feedbackRaw=(int16_t)(((uint16_t)m.buf[4]<<8)|m.buf[5]);
+      feedbackCurrentA=feedbackRaw*0.01f;
+      feedbackTorqueNm=0.5994f*feedbackCurrentA; // Mode1_Motor3.h KT_NOMINAL
+      feedbackTempC=m.buf[6];
       error=m.buf[7];
     } else {
       // Same length/ID acceptance as Integrated Controller Mode1 Motor1/2.
       if (m.len < 6 || (m.id != MOTOR_ID && m.buf[0] != MOTOR_ID)) continue;
       positionRad=uint_to_float((m.buf[1]<<8)|m.buf[2],P_MIN,P_MAX,16);
       speedRadS=uint_to_float((m.buf[3]<<4)|(m.buf[4]>>4),V_MIN,V_MAX,12);
+      feedbackRaw=((m.buf[4]&0x0F)<<8)|m.buf[5];
+      feedbackTorqueNm=uint_to_float(feedbackRaw,T_MIN,T_MAX,12);
+      // Same torque interpretation as Mode1_Motor1/2; no verified AK80 Nm/A conversion.
+      feedbackCurrentA=NAN;
+      feedbackTempC=m.len>=7 ? (float)m.buf[6] : NAN;
       error=m.len>=8 ? m.buf[7] : 0;
     }
+    feedbackError=m.len>=8 ? error : -1; // -1: error field absent, not confirmed healthy.
     rxAccepted++; received=true; lastRxMs=millis();
     if (error) stopMotor("MOTOR_ERROR");
     else if (fabsf(speedRadS)>=SPEED_STOP_RAD_S) stopMotor("SPEED_LIMIT");
@@ -222,10 +261,9 @@ void loop() {
     txTimer=0;
     sendMitCommand(0,0,0,0,(active && running) ? TEST_TORQUE_NM : 0);
   }
-  if (active && received && logTimer>=50 && Serial.availableForWrite()>=64) {
+  if (active && received && logTimer>=50) {
     logTimer=0;
-    Serial.print(millis()); Serial.print(',');
-    Serial.print(positionRad,5); Serial.print(','); Serial.println(speedRadS,5);
+    printFeedbackLog();
   }
 }
 

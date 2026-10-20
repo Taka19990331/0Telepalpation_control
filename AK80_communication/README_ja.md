@@ -72,3 +72,20 @@ AK80応答の長さ・ID判定を統合版Mode1_Motor1/2.hと合わせた（6バ
 停止時のCAN_DIAGにはTX_ATTEMPTS（送信要求）、TX_QUEUE_FAILED（ドライバ書込み失敗）、RX_ALL（試験中の全受信）、RX_ACCEPTED（有効応答）を表示。送信要求の成功は相手への到達を保証しない。
 RX_ALL=0なら受信なし、RX_ALL>0かつRX_ACCEPTED=0なら受信したフレームが条件不一致。LAST_RXに最後のフレームを表示する。
 USB Serialの接続を最大5秒待ってLOW_PROTOCOL_V2とREADYを表示する。
+
+## LOW_PROTOCOL_V3 診断ログ
+
+READYおよびRUNの数値は設定変数を参照する。DATA行の列名は起動時と各試験開始時に表示する。
+
+- Time_ms、Position_rad、Speed_rad_s：時刻・位置・速度。
+- QueuedCommand_Nm：FlexCANが最後に受け付けた通常指令。モータへの到達確認ではない。
+- EncodedCommand_Nm：その指令の12bit量子化後の復号値。
+- FeedbackRaw：AK80は受信DATA[4]下位4bitとDATA[5]の12bit値。AK60はDATA[4:5]の符号付き16bit電流値。
+- FeedbackTorque_Nm：AK80は統合Mode1_Motor1/2と同じ±32 N·m換算。AK60は電流×0.5994 N·m/A。外部センサで測った実トルクではなく、既存コードの換算であり実機仕様の検証は未完了。
+- FeedbackCurrent_A：AK60は生値×0.01 A。AK80は換算未確認なのでnan。
+- Temperature_C：統合コードと同様に温度バイトの値。フィールドがない場合nan。
+- ErrorCode：応答のエラーコード。フィールドがない場合-1。
+- FeedbackAge_ms：最後の有効応答からの経過時間。表示の指令と応答は厳密に1対1対応していない。
+
+ログは20 Hz。USB送信バッファに空きがなければ行を省略してCAN処理の遅延を避ける。
+停止時はLAST_FEEDBACKにも最後の生値・換算値・エラーを表示する。
