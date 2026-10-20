@@ -33,12 +33,12 @@ constexpr double POST_HOLD_DURATION_S = 1.0;
 // 0.00834 Nm/deg gives 3.0024 Nm at 360 deg, 1.5012 Nm at 180 deg,
 // and about 0.478 Nm/rad. Do not mix deg and rad.
 // About +/- one turn is intended; this gain does NOT enforce a rotation range.
-constexpr float KP_PD = 0.00278f *8.0f; // [Nm/deg]
+constexpr float KP_PD = 0.00834; // [Nm/deg] (initially 0.00278f *3.0f)
 // D: virtual damper opposing measured rotation; fixed target => target velocity 0.
 // 0.1 Nm/(rad/s): 0.1 Nm at 1 rad/s, 1 Nm at 10 rad/s,
 // about 0.628 Nm at one revolution/s. Initial tuning value only:
 // neither optimal tuning nor stability on the real machine is guaranteed.
-constexpr float KD_PD = 0.025f; // [Nm/(rad/s)]
+constexpr float KD_PD = 0.1f; // [Nm/(rad/s)]
 constexpr float TORQUE_LIMIT_NM = 15.0f; // Experiment limit; exceeding it ABORTS.
 
 // AK80 profiles retain the requested legacy AK80-8 KV60 ranges;

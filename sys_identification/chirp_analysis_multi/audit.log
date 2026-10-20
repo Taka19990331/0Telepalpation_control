@@ -1,0 +1,102 @@
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.25 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.25 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.25 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.25 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; no delay parameter is fitted.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)] 
+Selected 13 / 25 CSVs; excluded 12.
+                   file                        recordedAt         reference_deg    valid     complete      status      selected                                                                                                                                   reason                                                                                                                               
+    __________________________________    ____________________    _____________    ______    ________    __________    ________    ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+    "chirp_20261019_161700_870225.csv"    19-Oct-2026 16:17:00           NaN       ""         ""         ""             false      "older than cutoff; health: Missing/ambiguous CSV condition: FORMAT"                                                                                                                                                                                                
+    "chirp_20261019_165124_090293.csv"    19-Oct-2026 16:51:24           NaN       ""         ""         ""             false      "older than cutoff; health: Missing/ambiguous CSV condition: FORMAT"                                                                                                                                                                                                
+    "chirp_20261019_171708_814288.csv"    19-Oct-2026 17:17:08           NaN       ""         ""         ""             false      "older than cutoff; health: Missing/ambiguous CSV condition: FORMAT"                                                                                                                                                                                                
+    "chirp_20261019_184209_899455.csv"    19-Oct-2026 18:42:09           NaN       ""         ""         ""             false      "older than cutoff; health: Missing/ambiguous CSV condition: FORMAT"                                                                                                                                                                                                
+    "chirp_20261019_192101_980819.csv"    19-Oct-2026 19:21:01           NaN       ""         ""         ""             false      "older than cutoff; health: Missing/ambiguous CSV condition: FORMAT"                                                                                                                                                                                                
+    "chirp_20261019_194723_627641.csv"    19-Oct-2026 19:47:23           NaN       ""         ""         ""             false      "older than cutoff; health: Missing/ambiguous CSV condition: FORMAT"                                                                                                                                                                                                
+    "chirp_20261020_095442_375617.csv"    20-Oct-2026 09:54:42           NaN       ""         ""         ""             false      "older than cutoff; health: Missing/ambiguous CSV condition: FORMAT"                                                                                                                                                                                                
+    "chirp_20261020_101838_880284.csv"    20-Oct-2026 10:18:38       -33.823       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_102301_899188.csv"    20-Oct-2026 10:23:01       -37.561       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_102443_952638.csv"    20-Oct-2026 10:24:43       -40.053       "True"     "True"     "COMPLETE"     false      "condition mismatch: CONFIG.A1_Nm (6.0 vs 10.0); condition mismatch: END_AMPLITUDE_NM (A1) (6.0 vs 10.0)"                                                                                                                                                           
+    "chirp_20261020_102553_615592.csv"    20-Oct-2026 10:25:53       -42.697       "True"     "True"     "COMPLETE"     false      "condition mismatch: CONFIG.A1_Nm (6.0 vs 10.0); condition mismatch: END_AMPLITUDE_NM (A1) (6.0 vs 10.0)"                                                                                                                                                           
+    "chirp_20261020_104529_506076.csv"    20-Oct-2026 10:45:29       -44.839       "True"     "True"     "COMPLETE"     false      "condition mismatch: CONFIG.KD_Nm_per_rad_s (0.050000001 vs 0.100000001); condition mismatch: KD_PD (Kd) [Nm/(rad/s)] (0.050000001 vs 0.100000001)"                                                                                                                 
+    "chirp_20261020_105431_225209.csv"    20-Oct-2026 10:54:31       -46.626       "True"     "True"     "COMPLETE"     false      "condition mismatch: CONFIG.KD_Nm_per_rad_s (0.025 vs 0.100000001); condition mismatch: CONFIG.KP_Nm_per_deg (0.0139 vs 0.00834); condition mismatch: KD_PD (Kd) [Nm/(rad/s)] (0.025 vs 0.100000001); condition mismatch: KP_PD (Kp) [Nm/deg] (0.0139 vs 0.00834)"  
+    "chirp_20261020_105609_463171.csv"    20-Oct-2026 10:56:09       -48.597       "True"     "True"     "COMPLETE"     false      "condition mismatch: CONFIG.KD_Nm_per_rad_s (0.025 vs 0.100000001); condition mismatch: CONFIG.KP_Nm_per_deg (0.02224 vs 0.00834); condition mismatch: KD_PD (Kd) [Nm/(rad/s)] (0.025 vs 0.100000001); condition mismatch: KP_PD (Kp) [Nm/deg] (0.02224 vs 0.00834)"
+    "chirp_20261020_185802_708485.csv"    20-Oct-2026 18:58:02       -50.894       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_185851_641852.csv"    20-Oct-2026 18:58:51       -52.511       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_185942_933397.csv"    20-Oct-2026 18:59:42       -54.641       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_190027_691769.csv"    20-Oct-2026 19:00:27       -56.969       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_190127_942750.csv"    20-Oct-2026 19:01:27       -58.194       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_190209_744371.csv"    20-Oct-2026 19:02:09       -60.333       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_190347_463263.csv"    20-Oct-2026 19:03:47       -64.227       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_190506_836625.csv"    20-Oct-2026 19:05:06       -67.438       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_190618_156677.csv"    20-Oct-2026 19:06:18        -70.63       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_190653_297455.csv"    20-Oct-2026 19:06:53       -73.632       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+    "chirp_20261020_192353_697723.csv"    20-Oct-2026 19:23:53       -76.139       "True"     "True"     "COMPLETE"     true       ""                                                                                                                                                                                                                                                                  
+

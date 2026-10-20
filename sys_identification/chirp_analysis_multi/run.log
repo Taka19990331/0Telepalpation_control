@@ -1,0 +1,135 @@
+Running test_qdd_chirp_multi
+.[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In test_qdd_chirp_multi>testRelativeAngleAndMetadata (line 14)]
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In test_qdd_chirp_multi>testRelativeAngleAndMetadata (line 19)]
+......
+Done test_qdd_chirp_multi
+__________
+
+  1×7 TestResult array with properties:
+
+    Name
+    Passed
+    Failed
+    Incomplete
+    Duration
+    Details
+
+Totals:
+   7 Passed, 0 Failed, 0 Incomplete.
+   6.7257 seconds testing time.
+
+Output: C:\0Telepalpation_control\sys_identification\chirp_analysis_multi\results\20261020_193931_161
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.18 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.25 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.25 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.25 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.25 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+[Warning: Feedback age alone allows 9.22 deg phase uncertainty at f1; effective delay does not identify its cause.] 
+[> In qm.prepare (line 77)
+In qm.validate (line 38)
+In qm.select (line 58)
+In qdd_chirp_multi (line 13)] 
+Selected 13 / 25 CSVs; excluded 12.
+Individual fit 1/13: chirp_20261020_101838_880284.csv
+Individual fit 2/13: chirp_20261020_102301_899188.csv
+Individual fit 3/13: chirp_20261020_185802_708485.csv
+Individual fit 4/13: chirp_20261020_185851_641852.csv
+Individual fit 5/13: chirp_20261020_185942_933397.csv
+Individual fit 6/13: chirp_20261020_190027_691769.csv
+Individual fit 7/13: chirp_20261020_190127_942750.csv
+Individual fit 8/13: chirp_20261020_190209_744371.csv
+Individual fit 9/13: chirp_20261020_190347_463263.csv
+Individual fit 10/13: chirp_20261020_190506_836625.csv
+Individual fit 11/13: chirp_20261020_190618_156677.csv
+Individual fit 12/13: chirp_20261020_190653_297455.csv
+Individual fit 13/13: chirp_20261020_192353_697723.csv
+All-trial common J/B fit
+All-trial effective-delay analysis
+Training-only J/B and delay fit (9 trials); holdout 4 trials
+Finished. Results: C:\0Telepalpation_control\sys_identification\chirp_analysis_multi\results\20261020_193931_161

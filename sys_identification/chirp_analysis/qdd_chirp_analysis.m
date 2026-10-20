@@ -4,7 +4,7 @@ function r = qdd_chirp_analysis(dataName, opt)
 % No Control, Signal, Optimization or System Identification Toolbox required.
 if nargin < 2, opt = struct; end
 defaults = struct('makeFigures',true,'saveResults',true,'frfCycles',4, ...
-    'frfMaxRelativeBandwidth',0.35,'frfPoints',100,'maxIterations',500);
+    'frfPoints',100,'maxIterations',500);
 names = fieldnames(defaults);
 for k=1:numel(names)
     if ~isfield(opt,names{k}), opt.(names{k})=defaults.(names{k}); end
@@ -40,6 +40,15 @@ hh=1./(c.Kp-fit.J*ww.^2+1i*(fit.B+c.Kd)*ww);
 frf.modelGain_dB=20*log10(abs(hh));
 frf.modelPhase_deg=angle(hh)*180/pi;
 frf.phaseUnwrapped_deg=phaseForPlot(frf.real_rad_per_Nm+1i*frf.imag_rad_per_Nm);
+% One monotonic sweep supplies no independent realizations at a fixed frequency.
+% Do not manufacture a Welch coherence curve from nonstationary segments.
+coherence=struct('available',false,'threshold',0.9,'method','not estimated', ...
+    'sweepRepetitions',1,'independentAveragesPerFrequency',0, ...
+    'welchWindowLength_samples',NaN,'welchSegmentCount',0, ...
+    'welchOverlap_samples',NaN,'lowCoherenceBand_Hz',zeros(0,2), ...
+    'assessment','Unresolvable: one nonstationary logarithmic sweep; independent averages at a fixed frequency are unavailable.', ...
+    'reason','Welch segments from one swept chirp cover different instantaneous frequencies. Their estimates are not repeat realizations of a fixed-frequency transfer function; the result would depend on arbitrary segment length, overlap, and frequency drift.');
+frf.coherence=nan(height(frf),1);
 validation = frequencyValidation(frf,fit,c);
 % Dimensionless sensitivity columns: relative J, B changes on damping scale.
 h = 1e-3;
@@ -81,7 +90,8 @@ disp(starts); disp(profile);
 r = struct('sourceCSV',file,'metadata',meta,'conditions',c,'options',opt, ...
     'checks',checks,'fit',fit,'starts',starts,'BProfile',profile, ...
     'data',d,'prediction',pred,'residual',residual,'frf',frf, ...
-    'frequencyValidation',validation,'products',products,'matlabVersion',version);
+    'frequencyValidation',validation,'coherence',coherence, ...
+    'products',products,'matlabVersion',version);
 figs = [];
 if opt.makeFigures, figs = figuresFor(r,raw); end
 if opt.saveResults
@@ -333,6 +343,7 @@ function F = localFRF(d,c,pred,opt)
 f=logspace(log10(c.f0),log10(c.f1),opt.frfPoints).';
 n=numel(f); H=complex(nan(n,1)); Hlocal=H;
 valid=false(n,1); bandwidth=nan(n,1); cycles=bandwidth; quality=bandwidth;
+status=repmat("no-window",n,1);
 ts=d.nominalChirpTime;
 phi=2*pi*c.f0*expm1(c.k*ts)/c.k;
 for i=1:n
@@ -345,7 +356,10 @@ for i=1:n
     w=0.5*(1+cos(pi*z));
     X=[cos(phi(ix)),sin(phi(ix)),ones(numel(ix),1),z];
     Xw=X.*sqrt(w);
-    if rcond(Xw.'*Xw)<1e-10, continue; end
+    if rcond(Xw.'*Xw)<1e-10
+        status(i)="ill-conditioned";
+        continue
+    end
     Y=[d.u(ix),d.x(ix),pred(ix,1)];
     coef=Xw\(Y.*sqrt(w));
     C=coef(1,:)-1i*coef(2,:);
@@ -355,14 +369,24 @@ for i=1:n
     cycles(i)=(phi(ix(end))-phi(ix(1)))/(2*pi);
     err=Y(:,2)-X*coef(:,2);
     quality(i)=1-sum(w.*err.^2)/max(sum(w.*(Y(:,2)-sum(w.*Y(:,2))/sum(w)).^2),eps);
-    valid(i)=center-width/2>=0 && center+width/2<=c.T && ...
-        bandwidth(i)<=opt.frfMaxRelativeBandwidth && cycles(i)>=0.9*opt.frfCycles;
+    % The regression uses the exact instantaneous chirp phase, so a wide
+    % instantaneous-frequency span is not itself a rejection reason.
+    % Retain truncated edge windows when they still contain >=2 cycles and
+    % pass the design-matrix conditioning check; flag them for interpretation.
+    valid(i)=cycles(i)>=2;
+    if cycles(i)<2
+        status(i)="under-2-cycles";
+    elseif center-width/2<0 || center+width/2>c.T
+        status(i)="edge-truncated";
+    else
+        status(i)="eligible";
+    end
 end
 
-F=table(f,real(H),imag(H),20*log10(abs(H)),angle(H)*180/pi,valid, ...
+F=table(f,real(H),imag(H),20*log10(abs(H)),angle(H)*180/pi,valid,status, ...
     bandwidth,cycles,quality,real(Hlocal),imag(Hlocal), ...
     'VariableNames',{'frequency_Hz','real_rad_per_Nm','imag_rad_per_Nm','gain_dB', ...
-    'phase_deg','usableWindow','relativeBandwidth','cycles','localRegressionR2', ...
+    'phase_deg','usableWindow','windowStatus','relativeBandwidth','cycles','localRegressionR2', ...
     'modelLocalReal','modelLocalImag'});
 end
 
@@ -370,10 +394,12 @@ function v = frequencyValidation(F,fit,c)
 f=F.frequency_Hz; w=2*pi*f;
 H=1./(c.Kp-fit.J*w.^2+1i*(fit.B+c.Kd)*w);
 E=F.real_rad_per_Nm+1i*F.imag_rad_per_Nm;
-ok=F.usableWindow & isfinite(E);
+ok=F.usableWindow & F.windowStatus=="eligible" & isfinite(E);
 v=struct('usableMin_Hz',NaN,'usableMax_Hz',NaN,'medianGainError_dB',NaN, ...
     'medianAbsPhaseError_deg',NaN,'experimentalPeak_Hz',NaN, ...
-    'modelResonance_Hz',NaN,'upperBandSlope_dB_decade',NaN);
+    'modelResonance_Hz',NaN,'upperBandSlope_dB_decade',NaN, ...
+    'fullWindowPointCount',sum(ok),'edgeTruncatedPointCount',sum(F.windowStatus=="edge-truncated"), ...
+    'underTwoCyclePointCount',sum(F.windowStatus=="under-2-cycles"));
 if fit.zeta<1/sqrt(2), v.modelResonance_Hz=fit.fn*sqrt(1-2*fit.zeta^2); end
 if any(ok)
     ff=f(ok); ee=E(ok);
@@ -386,6 +412,28 @@ if any(ok)
         slope=polyfit(log10(ff(upper)),20*log10(abs(ee(upper))),1);
         v.upperBandSlope_dB_decade=slope(1);
     end
+    k=find(ok,1,'last');
+    v.highestFullWindow_Hz=f(k);
+    v.highFrequencyMeasuredPhase_deg=F.phaseUnwrapped_deg(k);
+    v.highFrequencyAnalyticModelPhase_deg=F.modelPhase_deg(k);
+    modelLocal=complex(F.modelLocalReal(k),F.modelLocalImag(k));
+    v.highFrequencySameEstimatorModelPhase_deg=angle(modelLocal)*180/pi;
+    if v.highFrequencySameEstimatorModelPhase_deg>0
+        v.highFrequencySameEstimatorModelPhase_deg=v.highFrequencySameEstimatorModelPhase_deg-360;
+    end
+    v.highFrequencyExcessLagVsSameEstimator_deg= ...
+        v.highFrequencyMeasuredPhase_deg-v.highFrequencySameEstimatorModelPhase_deg;
+    v.highFrequencyEquivalentAdditionalDelay_s= ...
+        -v.highFrequencyExcessLagVsSameEstimator_deg/(360*v.highestFullWindow_Hz);
+    % AK80 standard MIT feedback decoder: uint16 maps [-12.5,+12.5] rad.
+    v.AK80PositionStep_rad=25/(2^16-1);
+    v.AK80PositionStep_deg=v.AK80PositionStep_rad*180/pi;
+    v.highFrequencyChirpAmplitude_Nm=c.A0+(c.A1-c.A0)* ...
+        ((v.highestFullWindow_Hz-c.f0)/(c.f1-c.f0))^c.a;
+    v.highFrequencyEstimatedPositionPeak_deg= ...
+        10^(F.gain_dB(k)/20)*v.highFrequencyChirpAmplitude_Nm*180/pi;
+    v.highFrequencyEstimatedPositionPeak_encoderSteps= ...
+        v.highFrequencyEstimatedPositionPeak_deg/v.AK80PositionStep_deg;
 end
 disp(v);
 end
@@ -404,17 +452,24 @@ f=F.frequency_Hz; w=2*pi*f;
 H=1./(c.Kp-fit.J*w.^2+1i*(fit.B+c.Kd)*w);
 L=F.modelLocalReal+1i*F.modelLocalImag;
 ok=F.usableWindow;
-tiledlayout(2,1);
+tiledlayout(3,1);
 nexttile; semilogx(f,20*log10(abs(H)),'k-',f,20*log10(abs(L)),'b--', ...
     f(ok),F.gain_dB(ok),'ro',f(~ok),F.gain_dB(~ok),'x','Color',[0.65 0.65 0.65]);
 % Set each line color explicitly (the final property applies to all lines).
 ax=gca; ax.Children(1).Color=[0.65 0.65 0.65]; ax.Children(2).Color='r'; ax.Children(3).Color='b'; ax.Children(4).Color='k';
 ylabel('Gain [dB re rad/Nm]'); grid on;
-legend('Analytic model','Model with same local estimator','Experiment usable window','Rejected window','Location','best');
+legend('Analytic model','Model with same local estimator','Window >=2 cycles','Window <2 cycles / invalid','Location','best');
 nexttile; lines=semilogx(f,phaseForPlot(H),'k-',f,phaseForPlot(L),'b--', ...
     f(ok),F.phaseUnwrapped_deg(ok),'ro',f(~ok),F.phaseUnwrapped_deg(~ok),'x');
 lines(4).Color=[0.65 0.65 0.65];
-ylabel('Phase [deg, unwrapped]'); xlabel('Frequency [Hz]'); grid on;
+ylabel('Phase [deg, unwrapped]'); grid on;
+nexttile; semilogx(f,F.coherence,'k.'); hold on; yline(r.coherence.threshold,'r--','0.9 reference');
+ylim([0 1]); xlim([c.f0 c.f1]); yticks(0:0.2:1); grid on;
+ylabel('Coherence'); xlabel('Frequency [Hz]');
+text(0.5,0.5,{'NOT ESTIMABLE','Single sweep; no independent averages at a fixed frequency'}, ...
+    'Units','normalized','HorizontalAlignment','center','VerticalAlignment','middle', ...
+    'FontSize',10,'FontWeight','bold','Color',[0.35 0.35 0.35], ...
+    'BackgroundColor','w','Margin',5);
 figs(3)=figure('Name','3 - Angle response','Color','w');
 plot(d.t+c.start,[d.x+c.q0,p(:,1)+c.q0]); ylabel('q [rad]'); xlabel('Record time [s]');
 legend('Measured','Model'); title(sprintf('Same-record fit %.2f%%; RMSE %.4g rad',fit.fitPercent,fit.RMSE)); mark(c);
@@ -450,9 +505,22 @@ fprintf(fid,'Fit uses sweep + PD-only tail, exact ZOH at actual command times. P
 fprintf(fid,'Only J,B fitted. No delay, offset, gain or initial-state nuisance parameters fitted.\n');
 fprintf(fid,'Same-record comparison is not independent model validation.\n');
 fprintf(fid,'FRF: Hann-weighted local chirp-phase sin/cos + offset/trend regression. Approximate quasi-steady estimate.\n');
-fprintf(fid,'Usable windows: %d/%d. Broad relative bandwidth or truncated windows rejected.\n',sum(r.frf.usableWindow),height(r.frf));
-fprintf(fid,'Low-frequency/edge estimates can be biased by transients. Local model curve shows estimator/sweep bias.\n');
-fprintf(fid,'Local regression R2 is NOT coherence; coherence omitted for lack of independent sweep repetitions.\n');
+fprintf(fid,'FRF windows with at least 2 cycles and a well-conditioned regression: %d/%d.\n',sum(r.frf.usableWindow),height(r.frf));
+fprintf(fid,'Edge-truncated windows are retained when they meet the cycle/conditioning rule and are flagged in frf.csv.\n');
+fprintf(fid,'Full-window validation points: %d; edge-truncated retained points: %d; under-2-cycle unavailable points: %d.\n', ...
+    r.frequencyValidation.fullWindowPointCount,r.frequencyValidation.edgeTruncatedPointCount, ...
+    r.frequencyValidation.underTwoCyclePointCount);
+fprintf(fid,'Local model curve shows estimator/sweep bias. Edge-truncated FRF windows are flagged, not silently dropped.\n');
+fprintf(fid,'Magnitude-squared coherence threshold: %.3g. Coherence status: NOT ESTIMATED.\n',r.coherence.threshold);
+fprintf(fid,'Sweep repetitions: %d. Independent averages per frequency: %d.\n', ...
+    r.coherence.sweepRepetitions,r.coherence.independentAveragesPerFrequency);
+fprintf(fid,'Welch window length: unavailable; segment count: %d; overlap: unavailable.\n',r.coherence.welchSegmentCount);
+fprintf(fid,'Method: coherence panel marks values unavailable; no Welch/segment estimate is presented.\n');
+fprintf(fid,'Reason: %s\n',r.coherence.reason);
+fprintf(fid,'Coherence < %.3g bands: NOT DETERMINABLE; do not interpret NaN as zero.\n',r.coherence.threshold);
+fprintf(fid,'Coherence indicates FRF reliability and was not used to exclude data from time-domain model fitting.\n');
+fprintf(fid,'localRegressionR2 is a regression diagnostic, not coherence.\n');
+fprintf(fid,'Possible causes in a genuinely low-coherence repeated-sweep test include low SNR, nonlinear response, and nonstationarity; current capture cannot distinguish these via coherence.\n');
 fprintf(fid,'Torque Nm convention follows firmware MIT output coordinates; no gear multiplication applied.\n');
 fprintf(fid,'Absolute torque calibration unavailable. Absolute J/B cannot be established independently of torque gain.\n');
 fprintf(fid,'Feedback predates command: median/max age %.9g/%.9g s. No automatic temporal shift.\n',r.checks.feedbackAgeMedian_s,r.checks.feedbackAgeMax_s);
@@ -467,5 +535,14 @@ fprintf(fid,'Usable FRF band %.5g to %.5g Hz; median gain error %.5g dB, median 
 fprintf(fid,'Largest usable experimental magnitude at %.5g Hz (not necessarily a resonance).\n',v.experimentalPeak_Hz);
 fprintf(fid,'Model resonance %.5g Hz (NaN means no displacement resonance); upper-band slope %.5g dB/decade.\n', ...
     v.modelResonance_Hz,v.upperBandSlope_dB_decade);
-fprintf(fid,'Below usable FRF band, low-frequency gain/resonance cannot be validated from this local estimate.\n');
+fprintf(fid,'At %.5g Hz: measured phase %.5g deg; analytic model %.5g deg; same-estimator model %.5g deg.\n', ...
+    v.highestFullWindow_Hz,v.highFrequencyMeasuredPhase_deg, ...
+    v.highFrequencyAnalyticModelPhase_deg,v.highFrequencySameEstimatorModelPhase_deg);
+fprintf(fid,'Measured excess lag versus same-estimator model %.5g deg (equivalent additional delay %.5g ms; diagnostic only, not a fitted delay).\n', ...
+    -v.highFrequencyExcessLagVsSameEstimator_deg, ...
+    1000*v.highFrequencyEquivalentAdditionalDelay_s);
+fprintf(fid,'At that frequency chirp amplitude %.5g Nm and FRF imply angle peak %.5g deg = %.5g AK80 position steps (decoder step %.5g deg).\n', ...
+    v.highFrequencyChirpAmplitude_Nm,v.highFrequencyEstimatedPositionPeak_deg, ...
+    v.highFrequencyEstimatedPositionPeak_encoderSteps,v.AK80PositionStep_deg);
+fprintf(fid,'Relative bandwidth describes within-window frequency drift; it is not used to reject chirp-aware regression points.\n');
 end

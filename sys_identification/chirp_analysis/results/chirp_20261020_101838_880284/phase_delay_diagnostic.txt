@@ -1,0 +1,12 @@
+Diagnostic only; original J/B and model are unchanged.
+Phase difference = experiment FRF phase minus same-local-estimator model phase; negative means additional experimental lag.
+Plots and CSV include the full 1-100 Hz grid; regression uses complete windows only. Edge-truncated values remain plotted and tabulated, but are excluded from delay regression.
+Full complete-window range 1.4508-95.455 Hz (91 points). Full-band delay through zero 1.46358 ms.
+Unconstrained linear fit: delay from slope 1.55909 ms, intercept 1.7036 deg, R2 0.993606, RMSE 1.11161 deg.
+95-Hz nearest bin 95.454846 Hz: phase difference -50.214 deg; gain difference -0.00502558 dB.
+95-Hz pointwise phase-to-delay conversion 1.46125 ms is not a directly identified physical delay.
+AK80 position decode step 25/(2^16-1) rad = 0.000381475547417 rad = 0.0218569388545 deg.
+95-Hz output angle estimated from measured FRF and recorded chirp amplitude: 0.130375123 deg peak = 5.96493 position codes.
+A pure delay has unity magnitude; a first-order lag normally adds frequency-dependent phase lag together with magnitude roll-off. Similar gain and a roughly linear phase trend are consistent with delay, but do not prove it.
+Band fits use full windows and are listed in phase_delay_by_band.csv. Edge windows are retained for display but not used in those fits.
+This phase-derived equivalent delay is distinct from actually identifying and validating a delay in the plant model.

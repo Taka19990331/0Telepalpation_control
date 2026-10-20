@@ -1,0 +1,14 @@
+qdd_chirp_multi.m:11 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.
+test_qdd_chirp_multi.m:26 NOCOMMA Extra comma is unnecessary.
+compareMetadata.m:22 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.
+compareMetadata.m:30 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.
+evaluate.m:71 FNDSB For array or cell array, performance can be improved using logical indexing instead of 'find'.
+figures.m:56 ISCL To improve performance, use 'isscalar' instead of length comparison.
+report.m:61 INUSD Input argument might be unused. Consider replacing the argument with ~ instead.
+select.m:45 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.
+select.m:49 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.
+select.m:53 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.
+select.m:55 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.
+select.m:60 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.
+select.m:63 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.
+select.m:64 AGROW Variable appears to change size on every loop iteration. Consider preallocating for speed.

@@ -14,9 +14,19 @@ Fit uses sweep + PD-only tail, exact ZOH at actual command times. Pre-average ex
 Only J,B fitted. No delay, offset, gain or initial-state nuisance parameters fitted.
 Same-record comparison is not independent model validation.
 FRF: Hann-weighted local chirp-phase sin/cos + offset/trend regression. Approximate quasi-steady estimate.
-Usable windows: 78/100. Broad relative bandwidth or truncated windows rejected.
-Low-frequency/edge estimates can be biased by transients. Local model curve shows estimator/sweep bias.
-Local regression R2 is NOT coherence; coherence omitted for lack of independent sweep repetitions.
+FRF windows with at least 2 cycles and a well-conditioned regression: 99/100.
+Edge-truncated windows are retained when they meet the cycle/conditioning rule and are flagged in frf.csv.
+Full-window validation points: 91; edge-truncated retained points: 8; under-2-cycle unavailable points: 1.
+Local model curve shows estimator/sweep bias. Edge-truncated FRF windows are flagged, not silently dropped.
+Magnitude-squared coherence threshold: 0.9. Coherence status: NOT ESTIMATED.
+Sweep repetitions: 1. Independent averages per frequency: 0.
+Welch window length: unavailable; segment count: 0; overlap: unavailable.
+Method: coherence panel marks values unavailable; no Welch/segment estimate is presented.
+Reason: Welch segments from one swept chirp cover different instantaneous frequencies. Their estimates are not repeat realizations of a fixed-frequency transfer function; the result would depend on arbitrary segment length, overlap, and frequency drift.
+Coherence < 0.9 bands: NOT DETERMINABLE; do not interpret NaN as zero.
+Coherence indicates FRF reliability and was not used to exclude data from time-domain model fitting.
+localRegressionR2 is a regression diagnostic, not coherence.
+Possible causes in a genuinely low-coherence repeated-sweep test include low SNR, nonlinear response, and nonstationarity; current capture cannot distinguish these via coherence.
 Torque Nm convention follows firmware MIT output coordinates; no gear multiplication applied.
 Absolute torque calibration unavailable. Absolute J/B cannot be established independently of torque gain.
 Feedback predates command: median/max age 0.000248/0.000255 s. No automatic temporal shift.
@@ -25,7 +35,14 @@ B near zero, variable multistart estimates, or flat B profile indicate limited i
 B profile is a cost diagnostic, not a statistical confidence interval.
 Poor fits may reflect friction/cogging/backlash, feedback age, command calibration, or driver dynamics.
 Do not interpret a best-fit second-order parameter as independently validated physical inertia/friction.
-Usable FRF band 2.6561 to 95.455 Hz; median gain error 0.20565 dB, median absolute phase error 9.1599 deg.
-Largest usable experimental magnitude at 2.6561 Hz (not necessarily a resonance).
+Usable FRF band 1.4508 to 95.455 Hz; median gain error 0.23836 dB, median absolute phase error 6.3911 deg.
+Largest usable experimental magnitude at 1.4508 Hz (not necessarily a resonance).
 Model resonance NaN Hz (NaN means no displacement resonance); upper-band slope -40.336 dB/decade.
-Below usable FRF band, low-frequency gain/resonance cannot be validated from this local estimate.
+At 95.455 Hz: measured phase -237.83 deg; analytic model -179 deg; same-estimator model -187.62 deg.
+Measured excess lag versus same-estimator model 50.214 deg (equivalent additional delay 1.4612 ms; diagnostic only, not a fitted delay).
+At that frequency chirp amplitude 9.6098 Nm and FRF imply angle peak 0.13038 deg = 5.9649 AK80 position steps (decoder step 0.021857 deg; 16-bit over +/-12.5 rad).
+Relative bandwidth describes within-window frequency drift; it is not used to reject chirp-aware regression points.
+Phase-delay diagnostic (experiment minus same-estimator model): full-band complete-window through-origin delay 1.46358 ms; unconstrained phase-slope delay 1.55909 ms (intercept +1.7036 deg, R2 0.99361, RMSE 1.1116 deg).
+Band slope delays (complete windows): 1-10 Hz 0.75772 ms (R2 0.50365); 10-30 Hz 1.9056 ms (intercept +3.5698 deg, R2 0.99441); 30-60 Hz 1.4048 ms (intercept -2.0403 deg, R2 0.99493); 60-100 Hz 1.4402 ms (intercept -0.5067 deg, R2 0.99299).
+At 95.45485 Hz, experimental-minus-model gain error is -0.00503 dB while phase difference is -50.214 deg. The high-band phase trend and near-zero gain error are delay-like; they are not proof of a physically identified pure delay. See phase_delay_diagnostic.png and phase_delay_by_band.csv.
+The phase-slope delay is a conversion/linear fit of measured phase difference, not an identified delay parameter. No delay was added to or fitted in the plant model.

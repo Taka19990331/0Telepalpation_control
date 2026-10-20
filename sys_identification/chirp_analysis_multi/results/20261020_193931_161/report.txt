@@ -1,0 +1,203 @@
+QDD multi-trial analysis | MATLAB 26.1.0.3346908 (R2026a) Update 5
+Selected 13; excluded 12. Reference pair condition differences: 0
+Chronological split: last ceil(N/4) trials held out; singleton has no holdout.
+All-fit parameters are descriptive; only training-fixed/validation rows measure generalization.
+Objective = mean across trials of angle MSE / within-trial angle variance.
+Initial states are measured separately at PD activation, not optimized.
+ZOH uses actual timestamps; local regression phase uses firmware nominal sample index.
+Model B = delayed zero-state response + unshifted homogeneous initial response.
+Fractional delay is evaluated by exact partial ZOH state propagation, no integer rounding.
+Delay bounds: [0, 0.005] s; grid includes seed 0.00145 s. J/B fixed during delay estimation.
+Model C not implemented: command-path delay is a different feedback hypothesis from B.
+MSC = |mean(conj(U).*Y)|^2/(mean(|U|^2)*mean(|Y|^2)), independent trial coefficients.
+This is local chirp-regression ensemble coherence, NOT stationary Welch MSC.
+Only numerically unestimable coefficients are NaN; no coherence-based exclusion/refit.
+N<2 gives unavailable coherence. High coherence is not evidence of linearity.
+Hmean is complex arithmetic mean; H1 is cross/input autospectrum. Both exported.
+Model FRFs use the same estimator, windows and phase as data; analytic FRFs shown separately.
+Edge/under-two-cycle windows retained with diagnostics; high-frequency encoder quantization matters.
+Command torque gain is uncalibrated: J/B are conditional equivalent parameters.
+Effective delay does not locate communication, driver, sensing or mechanical causes.
+Full-band phase slope is signed diagnostic; model delay constrained nonnegative.
+Position associations are descriptive and confounded with acquisition order; no causal claim.
+
+
+Selected files / split
+    <strong>trial</strong>                   <strong>file</strong>                   <strong>training</strong>    <strong>validation</strong>
+    <strong>_____</strong>    <strong>__________________________________</strong>    <strong>________</strong>    <strong>__________</strong>
+
+      1      "chirp_20261020_101838_880284.csv"     true         false   
+      2      "chirp_20261020_102301_899188.csv"     true         false   
+      3      "chirp_20261020_185802_708485.csv"     true         false   
+      4      "chirp_20261020_185851_641852.csv"     true         false   
+      5      "chirp_20261020_185942_933397.csv"     true         false   
+      6      "chirp_20261020_190027_691769.csv"     true         false   
+      7      "chirp_20261020_190127_942750.csv"     true         false   
+      8      "chirp_20261020_190209_744371.csv"     true         false   
+      9      "chirp_20261020_190347_463263.csv"     true         false   
+     10      "chirp_20261020_190506_836625.csv"     false        true    
+     11      "chirp_20261020_190618_156677.csv"     false        true    
+     12      "chirp_20261020_190653_297455.csv"     false        true    
+     13      "chirp_20261020_192353_697723.csv"     false        true    
+
+
+
+Parameters (J kg*m^2, B Nm*s/rad)
+      <strong>scope</strong>          <strong>J</strong>           <strong>B</strong>        <strong>Td_FRF_s</strong>     <strong>Td_time_s</strong> 
+    <strong>__________</strong>    <strong>________</strong>    <strong>________</strong>    <strong>_________</strong>    <strong>__________</strong>
+
+    "all"         0.011683    0.022112    0.0014633    0.00075681
+    "training"    0.011681    0.022228    0.0014627    0.00076255
+
+
+
+Trial statistics
+    <strong>parameter</strong>      <strong>mean</strong>         <strong>std</strong>           <strong>CV</strong>    
+    <strong>_________</strong>    <strong>________</strong>    <strong>__________</strong>    <strong>_________</strong>
+
+       "J"       0.011683    3.9363e-05    0.0033693
+       "B"        0.02211    0.00048876     0.022106
+
+
+
+Multistart stability (solutions within 1% of best converged cost):
+set 1: converged 9/9; near-optimum J [0.0116898, 0.011689805], B [0.022560651, 0.022560688]
+set 2: converged 9/9; near-optimum J [0.011740124, 0.011740134], B [0.022147436, 0.022147511]
+set 3: converged 9/9; near-optimum J [0.011714679, 0.011714684], B [0.021444399, 0.021444453]
+set 4: converged 9/9; near-optimum J [0.01167532, 0.011675327], B [0.022216584, 0.022216627]
+set 5: converged 9/9; near-optimum J [0.011680806, 0.011680813], B [0.02237985, 0.022379937]
+set 6: converged 9/9; near-optimum J [0.011672701, 0.01167271], B [0.022623468, 0.022623608]
+set 7: converged 9/9; near-optimum J [0.011624509, 0.011624522], B [0.02260021, 0.022600273]
+set 8: converged 9/9; near-optimum J [0.011732133, 0.011732146], B [0.022525027, 0.022525119]
+set 9: converged 9/9; near-optimum J [0.011596585, 0.011596589], B [0.021532998, 0.021533083]
+set 10: converged 9/9; near-optimum J [0.011710257, 0.011710264], B [0.022147815, 0.022147877]
+set 11: converged 9/9; near-optimum J [0.011676477, 0.011676489], B [0.021493514, 0.021493609]
+set 12: converged 9/9; near-optimum J [0.011678838, 0.011678846], B [0.021313131, 0.021313195]
+set 13: converged 9/9; near-optimum J [0.011685474, 0.011685487], B [0.022440622, 0.022440656]
+set 14: converged 9/9; near-optimum J [0.011682793, 0.011682803], B [0.022112039, 0.022112092]
+set 15: converged 9/9; near-optimum J [0.011680608, 0.011680615], B [0.022227784, 0.022227901]
+
+Pooled phase slope diagnostics
+    <strong>trial</strong>    <strong>low_Hz</strong>    <strong>high_Hz</strong>     <strong>delay_s</strong>        <strong>R2</strong>       <strong>phaseResidual_deg</strong>    <strong>gainRMSE_dB</strong>    <strong>freeIntercept_deg</strong>    <strong>freeSlopeDelay_s</strong>    <strong>points</strong>
+    <strong>_____</strong>    <strong>______</strong>    <strong>_______</strong>    <strong>__________</strong>    <strong>_______</strong>    <strong>_________________</strong>    <strong>___________</strong>    <strong>_________________</strong>    <strong>________________</strong>    <strong>______</strong>
+
+      0         1         10      0.00033783    0.21441          0.7649           0.14842           0.26579            0.00047239         50  
+      0        10         30       0.0014287    0.93164          1.0474           0.22001            3.4148             0.0018968         24  
+      0        30         60       0.0015298    0.99049         0.43858           0.20753           -1.9555             0.0014115         15  
+      0        60        100       0.0014547    0.99079         0.54333           0.13592           -3.4689              0.001337         11  
+      0        30        100        0.001477    0.99172         0.91473           0.18073           -2.7002             0.0013641         26  
+      0         1        100       0.0014624    0.98724          1.5997           0.17642            1.3795             0.0015366        100  
+
+
+Trial 30-100 Hz effective delay: mean 1.47709 ms; SD 0.00790585 ms; range 1.46156 to 1.48901 ms
+Coherence: minimum 0.998917; median 0.999885; grid points below .9: 0/100
+
+Below .9 (grid endpoints, no interpolated crossing)
+    <strong>first_grid_Hz</strong>    <strong>last_grid_Hz</strong>
+    <strong>_____________</strong>    <strong>____________</strong>
+
+
+
+
+Initial position associations
+     <strong>parameter</strong>     <strong>Pearson_r_with_q0</strong>
+    <strong>___________</strong>    <strong>_________________</strong>
+
+    "J"                 0.29422     
+    "B"                 0.33837     
+    "Td_30_100"        -0.14002     
+
+
+
+Model metrics by trial and evaluation scope
+    <strong>trial</strong>         <strong>scope</strong>                 <strong>subset</strong>             <strong>model</strong>      <strong>angleFit_percent</strong>    <strong>angleRMSE_rad</strong>    <strong>velocityRMSE_rad_s</strong>    <strong>gainRMSE_dB</strong>    <strong>phaseRMSE_deg</strong>
+    <strong>_____</strong>    <strong>________________</strong>    <strong>_____________________</strong>    <strong>________</strong>    <strong>________________</strong>    <strong>_____________</strong>    <strong>__________________</strong>    <strong>___________</strong>    <strong>_____________</strong>
+
+      1      "all-fit"           "descriptive-all-fit"    "A"              90.227           0.039219            0.55017            0.23124         17.731    
+      1      "all-fit"           "descriptive-all-fit"    "B_FRF"          90.218           0.039255            0.30585            0.22814          1.625    
+      1      "all-fit"           "descriptive-all-fit"    "B_time"          90.25           0.039127            0.41506            0.22963         8.6729    
+      2      "all-fit"           "descriptive-all-fit"    "A"              91.224           0.035177            0.55212            0.22294          17.73    
+      2      "all-fit"           "descriptive-all-fit"    "B_FRF"          91.268           0.035001            0.30757            0.22021         1.6223    
+      2      "all-fit"           "descriptive-all-fit"    "B_time"         91.278           0.034962            0.41705            0.22153         8.6719    
+      3      "all-fit"           "descriptive-all-fit"    "A"              90.725           0.037389            0.55233            0.21935         17.567    
+      3      "all-fit"           "descriptive-all-fit"    "B_FRF"          90.737            0.03734            0.31204            0.21648          1.663    
+      3      "all-fit"           "descriptive-all-fit"    "B_time"          90.76           0.037247            0.41888            0.21786         8.5138    
+      4      "all-fit"           "descriptive-all-fit"    "A"              91.601           0.033705            0.54716            0.18809          17.69    
+      4      "all-fit"           "descriptive-all-fit"    "B_FRF"          91.579           0.033796            0.30552             0.1854         1.7159    
+      4      "all-fit"           "descriptive-all-fit"    "B_time"         91.622           0.033624             0.4133             0.1867         8.6413    
+      5      "all-fit"           "descriptive-all-fit"    "A"              91.824           0.032827            0.55047            0.20654         17.608    
+      5      "all-fit"           "descriptive-all-fit"    "B_FRF"          91.827           0.032814            0.30901            0.20382         1.5904    
+      5      "all-fit"           "descriptive-all-fit"    "B_time"         91.858           0.032688            0.41664            0.20514         8.5478    
+      6      "all-fit"           "descriptive-all-fit"    "A"              90.246           0.039025            0.55907            0.20833         17.796    
+      6      "all-fit"           "descriptive-all-fit"    "B_FRF"          90.254           0.038996            0.32162            0.20551         1.6601    
+      6      "all-fit"           "descriptive-all-fit"    "B_time"         90.278           0.038899            0.42703            0.20685         8.7403    
+      7      "all-fit"           "descriptive-all-fit"    "A"              90.213            0.03916            0.55889            0.17973         17.881    
+      7      "all-fit"           "descriptive-all-fit"    "B_FRF"           90.19           0.039253            0.32307            0.17696         1.6832    
+      7      "all-fit"           "descriptive-all-fit"    "B_time"         90.229           0.039097             0.4276             0.1783         8.8258    
+      8      "all-fit"           "descriptive-all-fit"    "A"              89.497            0.04207            0.56003            0.19184         17.852    
+      8      "all-fit"           "descriptive-all-fit"    "B_FRF"          89.539           0.041899            0.32077             0.1888         1.6352    
+      8      "all-fit"           "descriptive-all-fit"    "B_time"         89.544           0.041878            0.42738            0.19025         8.7923    
+      9      "all-fit"           "descriptive-all-fit"    "A"              91.357           0.034937            0.54904            0.19884         17.728    
+      9      "all-fit"           "descriptive-all-fit"    "B_FRF"          91.291           0.035202            0.30728            0.19612         1.5723    
+      9      "all-fit"           "descriptive-all-fit"    "B_time"         91.354            0.03495            0.41506            0.19745         8.6647    
+     10      "all-fit"           "descriptive-all-fit"    "A"               90.51           0.038179            0.55425            0.19458         17.868    
+     10      "all-fit"           "descriptive-all-fit"    "B_FRF"          90.545           0.038039            0.31137            0.19188         1.5954    
+     10      "all-fit"           "descriptive-all-fit"    "B_time"         90.557           0.037992            0.42007            0.19319         8.8043    
+     11      "all-fit"           "descriptive-all-fit"    "A"              91.216           0.035408            0.55166            0.19151         17.679    
+     11      "all-fit"           "descriptive-all-fit"    "B_FRF"          91.211            0.03543            0.30687            0.18866         1.5842    
+     11      "all-fit"           "descriptive-all-fit"    "B_time"         91.244           0.035296            0.41658            0.19002         8.6176    
+     12      "all-fit"           "descriptive-all-fit"    "A"              92.224           0.031475            0.55047             0.2106         17.742    
+     12      "all-fit"           "descriptive-all-fit"    "B_FRF"          92.222           0.031482             0.3057             0.2079         1.6118    
+     12      "all-fit"           "descriptive-all-fit"    "B_time"         92.257           0.031341            0.41537            0.20919         8.6826    
+     13      "all-fit"           "descriptive-all-fit"    "A"              90.024           0.039892             0.5636            0.22297         17.733    
+     13      "all-fit"           "descriptive-all-fit"    "B_FRF"          90.049           0.039794            0.32675            0.21984         1.5791    
+     13      "all-fit"           "descriptive-all-fit"    "B_time"         90.064           0.039732             0.4316            0.22132         8.6703    
+      1      "training-fixed"    "training"               "A"              90.229            0.03921            0.55062            0.23048         17.733    
+      1      "training-fixed"    "training"               "B_FRF"          90.226           0.039225            0.30615            0.22739         1.6126    
+      1      "training-fixed"    "training"               "B_time"         90.255           0.039108            0.41445            0.22886         8.6054    
+      2      "training-fixed"    "training"               "A"              91.223            0.03518            0.55264            0.22235         17.732    
+      2      "training-fixed"    "training"               "B_FRF"          91.273           0.034981              0.308            0.21964         1.6112    
+      2      "training-fixed"    "training"               "B_time"          91.28           0.034953            0.41653            0.22094         8.6047    
+      3      "training-fixed"    "training"               "A"               90.72           0.037409            0.55286            0.21896         17.568    
+      3      "training-fixed"    "training"               "B_FRF"          90.737           0.037339            0.31248             0.2161           1.65    
+      3      "training-fixed"    "training"               "B_time"         90.758           0.037256            0.41839            0.21746         8.4463    
+      4      "training-fixed"    "training"               "A"              91.602           0.033704            0.54764            0.18772         17.692    
+      4      "training-fixed"    "training"               "B_FRF"          91.585           0.033771            0.30587            0.18505         1.7037    
+      4      "training-fixed"    "training"               "B_time"         91.625            0.03361            0.41274            0.18633          8.574    
+      5      "training-fixed"    "training"               "A"              91.825           0.032821            0.55097            0.20608          17.61    
+      5      "training-fixed"    "training"               "B_FRF"          91.834           0.032784            0.30941            0.20337         1.5777    
+      5      "training-fixed"    "training"               "B_time"         91.863           0.032669            0.41611            0.20468         8.4804    
+      6      "training-fixed"    "training"               "A"              90.249           0.039014            0.55956            0.20789         17.798    
+      6      "training-fixed"    "training"               "B_FRF"          90.262           0.038964            0.32199            0.20509         1.6484    
+      6      "training-fixed"    "training"               "B_time"         90.283           0.038877            0.42651            0.20641         8.6729    
+      7      "training-fixed"    "training"               "A"              90.217           0.039147            0.55939            0.17948         17.883    
+      7      "training-fixed"    "training"               "B_FRF"          90.199           0.039219            0.32345            0.17673          1.672    
+      7      "training-fixed"    "training"               "B_time"         90.235           0.039074            0.42709            0.17805         8.7584    
+      8      "training-fixed"    "training"               "A"              89.498           0.042063            0.56054            0.19132         17.853    
+      8      "training-fixed"    "training"               "B_FRF"          89.545           0.041874            0.32117             0.1883         1.6243    
+      8      "training-fixed"    "training"               "B_time"         89.548           0.041862            0.42686            0.18972          8.725    
+      9      "training-fixed"    "training"               "A"              91.353           0.034951            0.54958            0.19874         17.729    
+      9      "training-fixed"    "training"               "B_FRF"          91.293           0.035193            0.30774            0.19604         1.5592    
+      9      "training-fixed"    "training"               "B_time"         91.353           0.034953            0.41458            0.19735         8.5971    
+     10      "training-fixed"    "validation"             "A"               90.51            0.03818            0.55479            0.19421         17.869    
+     10      "training-fixed"    "validation"             "B_FRF"           90.55            0.03802            0.31183            0.19153          1.585    
+     10      "training-fixed"    "validation"             "B_time"         90.559           0.037983            0.41958            0.19282         8.7371    
+     11      "training-fixed"    "validation"             "A"              91.212           0.035426            0.55222            0.19111         17.681    
+     11      "training-fixed"    "validation"             "B_FRF"          91.212           0.035426            0.30737            0.18827         1.5723    
+     11      "training-fixed"    "validation"             "B_time"         91.242           0.035303            0.41612            0.18961         8.5503    
+     12      "training-fixed"    "validation"             "A"              92.218           0.031502            0.55103            0.21029         17.744    
+     12      "training-fixed"    "validation"             "B_FRF"          92.222           0.031483            0.30622             0.2076         1.6004    
+     12      "training-fixed"    "validation"             "B_time"         92.254           0.031354            0.41492            0.20886         8.6153    
+     13      "training-fixed"    "validation"             "A"              90.026           0.039885            0.56413            0.22234         17.735    
+     13      "training-fixed"    "validation"             "B_FRF"          90.055           0.039768            0.32718            0.21922          1.567    
+     13      "training-fixed"    "validation"             "B_time"         90.069           0.039715            0.43112            0.22069         8.6028    
+
+
+
+Held-out mean metrics (parameters fixed from training):
+A: Fit 90.991 %; angle RMSE 0.0362483 rad; velocity RMSE 0.555542 rad/s; gain RMSE 0.20449 dB; phase RMSE 17.757 deg
+B_FRF: Fit 91.01 %; angle RMSE 0.0361741 rad; velocity RMSE 0.31315 rad/s; gain RMSE 0.20166 dB; phase RMSE 1.5812 deg
+B_time: Fit 91.031 %; angle RMSE 0.0360889 rad; velocity RMSE 0.420435 rad/s; gain RMSE 0.203 dB; phase RMSE 8.6264 deg
+CSV lacks an independent wall-clock timestamp; chronology is filename-derived and cannot be independently confirmed.
+Inspect multistart CSVs for convergence and parameter spread; a B=0 boundary does not establish zero friction.
+Synthetic tests verify algorithms; they do not establish physical identifiability.
