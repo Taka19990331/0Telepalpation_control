@@ -1,0 +1,2 @@
+J,B,normalizedMSE,RMSE,fitPercent,velocityRMSE,fn,zeta,fitDefinition,initialState_1,initialState_2,interpretation,sensitivityCondition,sensitivityParameterScales_1,sensitivityParameterScales_2
+0.0116897985394476,0.0225606568566269,0.00954036604785301,0.0391974151547145,90.2325202596303,0.551503656140919,1.01756218649835,0.81992330914027,100*(1-norm(x-x_model)/norm(x-mean(x))),-1.14515939145798e-05,0.045787811,Command-equivalent output-coordinate parameters; torque gain not calibrated.,1.0023416279244,0.0116897985394476,0.100000001
