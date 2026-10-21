@@ -5,6 +5,7 @@ inline size_t makeConfig(char *configJson, size_t capacity) {
  size_t n=0;
  n+=snprintf(configJson+n,capacity-n,"{\"format\":\"FRIC001\"");
  n+=snprintf(configJson+n,capacity-n,",\"NO_MOTOR_TEST\":%.9g",double(NO_MOTOR_TEST));
+ n+=snprintf(configJson+n,capacity-n,",\"REQUIRE_INITIAL_STATIONARY\":%.9g",double(REQUIRE_INITIAL_STATIONARY));
  n+=snprintf(configJson+n,capacity-n,",\"BRAKE_VERIFIED\":%.9g",double(BRAKE_VERIFIED));
  n+=snprintf(configJson+n,capacity-n,",\"VERIFIED_MOTOR_TIMEOUT_MS\":%.9g",double(VERIFIED_MOTOR_TIMEOUT_MS));
  n+=snprintf(configJson+n,capacity-n,",\"IS_60\":%.9g",double(IS_60));
@@ -39,11 +40,11 @@ inline size_t makeConfig(char *configJson, size_t capacity) {
  n+=snprintf(configJson+n,capacity-n,",\"STATIONARY_ACQUIRE_US\":%.9g",double(STATIONARY_ACQUIRE_US));
  n+=snprintf(configJson+n,capacity-n,",\"STATIONARY_SPEED\":%.9g",double(STATIONARY_SPEED));
  n+=snprintf(configJson+n,capacity-n,",\"STATIONARY_POSITION_RANGE\":%.9g",double(STATIONARY_POSITION_RANGE));
- n+=snprintf(configJson+n,capacity-n,",\"COAST_US\":%.9g",double(COAST_US));
- n+=snprintf(configJson+n,capacity-n,",\"BRAKE_TIMEOUT_US\":%.9g",double(BRAKE_TIMEOUT_US));
- n+=snprintf(configJson+n,capacity-n,",\"BRAKE_TORQUE_NM\":%.9g",double(BRAKE_TORQUE_NM));
- n+=snprintf(configJson+n,capacity-n,",\"BRAKE_SLEW_NM_S\":%.9g",double(BRAKE_SLEW_NM_S));
- n+=snprintf(configJson+n,capacity-n,",\"BRAKE_MAX_DECEL\":%.9g",double(BRAKE_MAX_DECEL));
+ n+=snprintf(configJson+n,capacity-n,",\"STOP_WINDOW_US\":%.9g",double(STOP_WINDOW_US));
+ n+=snprintf(configJson+n,capacity-n,",\"STOP_WINDOW_SAMPLES\":%.9g",double(STOP_WINDOW_SAMPLES));
+ n+=snprintf(configJson+n,capacity-n,",\"STOP_POSITION_RANGE_RAD\":%.9g",double(STOP_POSITION_RANGE_RAD));
+ n+=snprintf(configJson+n,capacity-n,",\"STOP_MEAN_SPEED_RAD_S\":%.9g",double(STOP_MEAN_SPEED_RAD_S));
+ n+=snprintf(configJson+n,capacity-n,",\"STOP_TIMEOUT_US\":%.9g",double(STOP_TIMEOUT_US));
  n+=snprintf(configJson+n,capacity-n,",\"RING_SIZE\":%.9g",double(RING_SIZE));
  n+=snprintf(configJson+n,capacity-n,",\"BATCH\":%.9g",double(BATCH));
  n+=snprintf(configJson+n,capacity-n,",\"MAX_RUN_US\":%.9g",double(MAX_RUN_US));

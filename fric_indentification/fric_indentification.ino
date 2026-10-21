@@ -268,6 +268,64 @@ bool downloadLatest() {
   input.close(); Serial.print("\nFRICTION_END,"); Serial.print(source); Serial.print(','); Serial.println(uint32_t(size));
   Serial.flush(); return true;
 }
+bool downloadLatestCsv() {
+  if(recording || active || !cardReady) { Serial.println("ERROR,BUSY_OR_NO_SD"); return false; }
+  char source[16]={};
+  if(filename[0] && sd.exists(filename)) strncpy(source,filename,sizeof(source)-1);
+  else for(int n=9999;n>=0;--n) {
+    snprintf(source,sizeof(source),"FR%04d.BIN",n);
+    if(sd.exists(source)) break;
+    source[0]=0;
+  }
+  FsFile input;
+  if(!source[0] || !input.open(source,O_RDONLY)) { Serial.println("ERROR,NO_SAVED_FILE"); return false; }
+  const uint64_t size=input.fileSize();
+  Header h; Footer footer;
+  bool valid=size>=sizeof(Header)+sizeof(Footer) && input.read(&h,sizeof(h))==sizeof(h) &&
+    memcmp(h.magic,"FRIC001\0",8)==0 && h.rowBytes==sizeof(Sample) && h.periodUs==PERIOD_US &&
+    h.configBytes<=sizeof(configJson) && size>=sizeof(Header)+h.configBytes+sizeof(Footer) &&
+    input.seekSet(size-sizeof(Footer)) && input.read(&footer,sizeof(footer))==sizeof(footer) &&
+    memcmp(footer.magic,"ENDFR001",8)==0 && footer.rows<=EXPECTED_ROWS &&
+    size==sizeof(Header)+h.configBytes+uint64_t(footer.rows)*sizeof(Sample)+sizeof(Footer);
+  if(!valid || !input.seekSet(sizeof(Header))) { input.close(); Serial.println("ERROR,INVALID_LOG"); return false; }
+  if(h.configBytes && input.read(configJson,h.configBytes)!=h.configBytes) {
+    input.close(); Serial.println("ERROR,SD_READ"); return false;
+  }
+  if(!input.seekSet(sizeof(Header)+h.configBytes)) { input.close(); Serial.println("ERROR,SD_READ"); return false; }
+
+  Serial.print("FRICTION_CSV,"); Serial.print(source); Serial.print(','); Serial.println(footer.rows);
+  Serial.println("# FRIC001; feedback is the latest pre-command snapshot, not a synchronous response");
+  Serial.print("# config = "); Serial.write(reinterpret_cast<const uint8_t*>(configJson),h.configBytes); Serial.println();
+  Serial.print("# result = {\"reason\":"); Serial.print(footer.reason);
+  Serial.print(",\"rows\":"); Serial.print(footer.rows);
+  Serial.print(",\"stop_confirmed\":"); Serial.print(footer.stopConfirmed?"true":"false");
+  Serial.print(",\"exit_acknowledged\":"); Serial.print(footer.exitAcknowledged?"true":"false"); Serial.println("}");
+  Serial.println("# states = 0:STARTUP;1:SETTLING;2:ACQUIRING;3:STATIONARY;4:COASTING;5:BRAKING;6:EXITING;7:FINISHED");
+  Serial.println("# legacy state 5 (BRAKING) is unused by this firmware");
+  Serial.println("# reasons = 0:OK;1:NOT_SETTLED;2:UNSTABLE;3:USER_ABORT;4:OVERSPEED;5:FEEDBACK_LOST;6:MOTOR_ERROR;7:SD_ERROR;8:RING_FULL;9:TX_FAILED;10:CAN_ERROR;11:CONTROL_DEADLINE;12:TORQUE_RANGE;13:INVALID_FEEDBACK;14:START_TIMEOUT;15:STOP_FAILED;16:RUN_LIMIT");
+  Serial.println("nominal_us,index,actual_us,phase,step_index,settling_status,reason,event,target_torque_Nm,position_deg,speed_rad_s,feedback_torque_estimate_Nm,estimated_acceleration,speed_std,feedback_rx_us,feedback_age_us,feedback_sequence,motor_error,can_tx_accepted,ISR_us,period_us");
+
+  char line[320];
+  for(uint32_t i=0;i<footer.rows;++i) {
+    Sample r;
+    if(input.read(&r,sizeof(r))!=sizeof(r)) {
+      input.close(); Serial.println("\nFRICTION_ERROR,SD_READ"); return false;
+    }
+    int n=snprintf(line,sizeof(line),
+      "%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n",
+      (unsigned long)(uint64_t(r.index)*h.periodUs),(unsigned long)r.index,(unsigned long)r.actualUs,
+      (unsigned long)r.phase,(unsigned long)r.step,(unsigned long)r.state,(unsigned long)r.reason,
+      (unsigned long)r.event,double(r.target),double(r.positionDeg),double(r.speed),
+      double(r.feedbackTorque),double(r.acceleration),double(r.speedStd),(unsigned long)r.rxUs,
+      (unsigned long)r.ageUs,(unsigned long)r.sequence,(unsigned long)r.motorError,
+      (unsigned long)r.txAccepted,(unsigned long)r.executionUs,(unsigned long)r.periodUs);
+    if(n<=0 || size_t(n)>=sizeof(line) || Serial.write(reinterpret_cast<const uint8_t*>(line),size_t(n))!=size_t(n)) {
+      input.close(); Serial.println("\nFRICTION_ERROR,USB_WRITE"); return false;
+    }
+  }
+  input.close(); Serial.print("FRICTION_CSV_END,"); Serial.print(source); Serial.print(','); Serial.println(footer.rows);
+  Serial.flush(); return true;
+}
 void setup() {
   Serial.begin(115200);
   if(!NO_MOTOR_TEST) canReady=setupCAN();
@@ -275,7 +333,7 @@ void setup() {
   controlTimer.priority(ISR_PRIORITY);
   timerReady=controlTimer.begin(controlISR,PERIOD_US);
   Serial.println(NO_MOTOR_TEST?"FRICTION: DRY RUN (NO CAN WRITES)":"FRICTION: HARDWARE");
-  Serial.println(cardReady&&timerReady?"s=start, x=stop, d=download latest FRxxxx.BIN over USB":"INIT FAILED");
+  Serial.println(cardReady&&timerReady?"s=start, x=stop, d=download latest BIN, c=download latest CSV":"INIT FAILED");
 }
 void loop() {
   for(unsigned n=0;n<32 && Serial.available();++n) {
@@ -283,6 +341,7 @@ void loop() {
     if(c=='x'||c=='X') userStop=true;
     if((c=='s'||c=='S')&&!userStop) startRun();
     if(c=='d'||c=='D') downloadLatest();
+    if(c=='c'||c=='C') downloadLatestCsv();
   }
   serviceLog(); // Direct CAN callbacks continue during SD writes; no events().
 }

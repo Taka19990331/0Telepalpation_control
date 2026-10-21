@@ -36,32 +36,41 @@ void assertions() {
   e.reset(0); e.phase=1; e.startStep(0);
   for(uint32_t t=0;t<=450000;t+=500) e.tick(t,observation(t,0,t<300000?12.49f:-12.49f));
   assert(e.state==SETTLING);
-  // Overspeed, startup refusal and bounded braking timeout.
-  e.reset(0); e.tick(0,observation(0,20)); assert(e.finalStop && e.reason==OVERSPEED && e.phase==0);
-  for(uint32_t t=500;t<=COAST_US+BRAKE_TIMEOUT_US;t+=500) {
-    e.tick(t,observation(t,20,t*.00002f));
-    assert(fabsf(e.target)<=BRAKE_TORQUE_NM+.00001f);
-    assert(e.phase==0);
+  // Overspeed immediately commands zero and requires the full 2001-sample window.
+  e.reset(0); e.tick(0,observation(0,20,12.499f));
+  assert(e.finalStop && e.reason==OVERSPEED && e.phase==0 && e.state==COASTING);
+  assert(e.target==0 && !e.stopConfirmed && e.stopWindow.seen==1);
+  for(uint32_t t=500;t<STOP_WINDOW_US;t+=500) {
+    e.tick(t,observation(t,0,-12.499f));
+    assert(e.target==0 && e.state==COASTING && !e.stopConfirmed);
   }
-  assert(e.state==EXITING && !e.stopConfirmed);
+  assert(e.stopWindow.seen==STOP_WINDOW_SAMPLES-1);
+  e.tick(STOP_WINDOW_US,observation(STOP_WINDOW_US,0,-12.499f));
+  assert(e.state==EXITING && e.stopConfirmed && e.target==0);
+  // Stop timeout remains 8 s and never sends a nonzero command.
+  e.reset(0); e.tick(0,observation(0,20,0));
+  for(uint32_t t=500;t<STOP_TIMEOUT_US;t+=500) {
+    e.tick(t,observation(t,.1f,t*.00005f));
+    assert(e.target==0 && e.state==COASTING && !e.stopConfirmed);
+  }
+  e.tick(STOP_TIMEOUT_US,observation(STOP_TIMEOUT_US,.1f,STOP_TIMEOUT_US*.00000005f));
+  assert(e.state==EXITING && !e.stopConfirmed && e.target==0);
   e.reset(0); e.tick(START_TIMEOUT_US,{}); assert(e.state==EXITING && e.reason==START_TIMEOUT);
   e.reset(0); e.phase=1; e.startStep(0);
   e.tick(21000,observation(0)); assert(e.reason==FEEDBACK_LOST && e.state==EXITING);
   e.reset(0); auto f=observation(0); f.error=3; e.tick(0,f); assert(e.reason==MOTOR_ERROR);
   e.reset(0); f=observation(0); f.speed=NAN; e.tick(0,f); assert(e.reason==INVALID_FEEDBACK);
   e.reset(0); e.phase=1; e.startStep(0); e.target=1.1f; e.tick(0,observation(0)); assert(e.reason==TORQUE_RANGE);
-  // Repeated ring-full faults must not reset braking slew to zero each tick.
+  // Repeated reliable stop faults keep the requested torque at zero.
   for(auto why: {SD_ERROR,RING_FULL,USER_ABORT}) {
     e.reset(0); e.phase=1; e.startStep(0); e.stop(why,0);
-    for(uint32_t t=0;t<=COAST_US+1000000;t+=500) {
+    for(uint32_t t=0;t<=1000000;t+=500) {
       e.stop(why,t); e.tick(t,observation(t,2,t*.000002f));
+      assert(e.target==0);
     }
-    assert(e.state==BRAKING && e.target<-.1f && e.reason==why && e.finalStop);
-    e.tick(COAST_US+1021000,observation(0)); assert(e.state==EXITING && !e.stopConfirmed);
+    assert(e.state==COASTING && e.reason==why && e.finalStop);
+    e.tick(STOP_TIMEOUT_US+500,observation(STOP_TIMEOUT_US+500,2)); assert(e.state==EXITING && !e.stopConfirmed && e.target==0);
   }
-  e.reset(0); e.state=BRAKING; e.finalStop=true; e.stateUs=0;
-  for(uint32_t t=0;t<=250000 && e.state!=EXITING;t+=500) e.tick(t,observation(t,10-t*.00001f));
-  assert(e.state==EXITING && e.reason==STOP_FAILED); // excessive measured deceleration
   // Acquisition invalidation by a delayed acceleration (entire interval rejected).
   e.reset(0); e.phase=1; e.startStep(0);
   for(uint32_t t=0;t<=400000;t+=500) e.tick(t,observation(t,1,t*1e-6f));

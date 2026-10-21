@@ -7,6 +7,9 @@
 #define FRICTION_NO_MOTOR 0
 #endif
 constexpr bool NO_MOTOR_TEST = FRICTION_NO_MOTOR != 0;
+// Require a stationary shaft before starting the initial torque sweep.
+// Set false to begin the sweep as soon as fresh, valid feedback is received.
+constexpr bool REQUIRE_INITIAL_STATIONARY = false;
 // Documentary metadata only; these values do not configure motor protection.
 constexpr bool BRAKE_VERIFIED = true;
 constexpr uint32_t VERIFIED_MOTOR_TIMEOUT_MS = 0; // UNKNOWN
@@ -22,11 +25,11 @@ constexpr float TORQUE_LIMIT_NM=1, TORQUE_STEP_NM=.02f, SPEED_LIMIT_RAD_S=20;
 constexpr uint32_t MIN_SETTLE_US=100000, MAX_SETTLE_US=2000000, WINDOW_US=200000;
 constexpr uint32_t CONFIRM_US=100000, ACQUIRE_US=500000;
 constexpr float ACCEL_THRESHOLD=.3f, SPEED_STD_THRESHOLD=.08f;
-constexpr uint32_t STATIONARY_CONFIRM_US=400000, STATIONARY_ACQUIRE_US=100000;
+constexpr uint32_t STATIONARY_CONFIRM_US=1000000, STATIONARY_ACQUIRE_US=100000;
 constexpr float STATIONARY_SPEED=.04f, STATIONARY_POSITION_RANGE=.003f;
-// Provisional brake values: not a validated physical motor safety envelope.
-constexpr uint32_t COAST_US=2000000, BRAKE_TIMEOUT_US=8000000;
-constexpr float BRAKE_TORQUE_NM=.15f, BRAKE_SLEW_NM_S=.3f, BRAKE_MAX_DECEL=5;
+constexpr uint32_t STOP_WINDOW_US=1000000, STOP_TIMEOUT_US=8000000;
+constexpr float STOP_POSITION_RANGE_RAD=.003f, STOP_MEAN_SPEED_RAD_S=.03f;
+constexpr unsigned STOP_WINDOW_SAMPLES=STOP_WINDOW_US/PERIOD_US+1;
 constexpr uint32_t RING_SIZE=4096, BATCH=128, MAX_RUN_US=900000000;
 constexpr uint32_t EXPECTED_ROWS=MAX_RUN_US/PERIOD_US+2;
 constexpr unsigned WINDOW_CAPACITY=WINDOW_US/PERIOD_US+4;
@@ -34,8 +37,8 @@ static_assert(TORQUE_STEP_NM>0 && TORQUE_STEP_NM<=TORQUE_LIMIT_NM && TORQUE_LIMI
               "Invalid sweep range");
 static_assert(WINDOW_US>=PERIOD_US && WINDOW_US<=MAX_SETTLE_US && MIN_SETTLE_US<=MAX_SETTLE_US,
               "Invalid settling times");
-static_assert(BRAKE_TORQUE_NM>0 && BRAKE_TORQUE_NM<=TORQUE_LIMIT_NM && BRAKE_SLEW_NM_S>0 && BRAKE_MAX_DECEL>0,
-              "Invalid brake limits");
+static_assert(STOP_WINDOW_US%PERIOD_US==0 && STOP_WINDOW_SAMPLES==2001 && STOP_TIMEOUT_US>=STOP_WINDOW_US,
+              "Invalid stop confirmation window or timeout");
 static_assert(BATCH<=RING_SIZE && SPEED_LIMIT_RAD_S>0 && SPEED_LIMIT_RAD_S<VELOCITY_MAX_RAD_S,
               "Invalid buffer or speed limit");
 inline constexpr uint32_t encode(float x,float lo,float hi,unsigned bits) {
