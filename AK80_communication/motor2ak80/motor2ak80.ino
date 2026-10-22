@@ -94,8 +94,8 @@ const uint32_t AUTO_START_DELAY_MS = 5000;
 
 const float P_MIN = -12.5f;
 const float P_MAX = 12.5f;
-const float V_MIN = -45.0f;
-const float V_MAX = 45.0f;
+const float V_MIN = -37.5f;
+const float V_MAX = 37.5f;
 const float KP_MIN = 0.0f;
 const float KP_MAX = 500.0f;
 const float KD_MIN = 0.0f;

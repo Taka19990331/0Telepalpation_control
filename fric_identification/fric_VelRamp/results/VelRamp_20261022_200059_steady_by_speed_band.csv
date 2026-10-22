@@ -1,0 +1,287 @@
+scenario,polarity,abs_speed_min_rad_s,abs_speed_max_rad_s,all_samples,steady_samples,steady_percent
+MATLAB baseline,negative,0.0,1.0,39941,0,0.000000
+MATLAB baseline,negative,1.0,2.0,8135,0,0.000000
+MATLAB baseline,negative,2.0,3.0,7991,0,0.000000
+MATLAB baseline,negative,3.0,4.0,7900,0,0.000000
+MATLAB baseline,negative,4.0,5.0,8052,0,0.000000
+MATLAB baseline,negative,5.0,6.0,7982,0,0.000000
+MATLAB baseline,negative,6.0,7.0,7942,0,0.000000
+MATLAB baseline,negative,7.0,8.0,8029,0,0.000000
+MATLAB baseline,negative,8.0,9.0,7969,0,0.000000
+MATLAB baseline,negative,9.0,10.0,7039,0,0.000000
+MATLAB baseline,negative,10.0,11.0,841,0,0.000000
+MATLAB baseline,positive,0.0,1.0,39008,0,0.000000
+MATLAB baseline,positive,1.0,2.0,8075,0,0.000000
+MATLAB baseline,positive,2.0,3.0,7943,0,0.000000
+MATLAB baseline,positive,3.0,4.0,7973,0,0.000000
+MATLAB baseline,positive,4.0,5.0,8038,0,0.000000
+MATLAB baseline,positive,5.0,6.0,8037,0,0.000000
+MATLAB baseline,positive,6.0,7.0,7941,0,0.000000
+MATLAB baseline,positive,7.0,8.0,8131,0,0.000000
+MATLAB baseline,positive,8.0,9.0,7843,0,0.000000
+MATLAB baseline,positive,9.0,10.0,7048,0,0.000000
+MATLAB baseline,positive,10.0,11.0,942,0,0.000000
+Range 0.20 only,negative,0.0,1.0,39941,0,0.000000
+Range 0.20 only,negative,1.0,2.0,8135,0,0.000000
+Range 0.20 only,negative,2.0,3.0,7991,0,0.000000
+Range 0.20 only,negative,3.0,4.0,7900,0,0.000000
+Range 0.20 only,negative,4.0,5.0,8052,0,0.000000
+Range 0.20 only,negative,5.0,6.0,7982,0,0.000000
+Range 0.20 only,negative,6.0,7.0,7942,0,0.000000
+Range 0.20 only,negative,7.0,8.0,8029,0,0.000000
+Range 0.20 only,negative,8.0,9.0,7969,0,0.000000
+Range 0.20 only,negative,9.0,10.0,7039,0,0.000000
+Range 0.20 only,negative,10.0,11.0,841,0,0.000000
+Range 0.20 only,positive,0.0,1.0,39008,0,0.000000
+Range 0.20 only,positive,1.0,2.0,8075,0,0.000000
+Range 0.20 only,positive,2.0,3.0,7943,0,0.000000
+Range 0.20 only,positive,3.0,4.0,7973,0,0.000000
+Range 0.20 only,positive,4.0,5.0,8038,0,0.000000
+Range 0.20 only,positive,5.0,6.0,8037,0,0.000000
+Range 0.20 only,positive,6.0,7.0,7941,0,0.000000
+Range 0.20 only,positive,7.0,8.0,8131,0,0.000000
+Range 0.20 only,positive,8.0,9.0,7843,0,0.000000
+Range 0.20 only,positive,9.0,10.0,7048,0,0.000000
+Range 0.20 only,positive,10.0,11.0,942,0,0.000000
+Slope 5 only,negative,0.0,1.0,39941,0,0.000000
+Slope 5 only,negative,1.0,2.0,8135,0,0.000000
+Slope 5 only,negative,2.0,3.0,7991,0,0.000000
+Slope 5 only,negative,3.0,4.0,7900,0,0.000000
+Slope 5 only,negative,4.0,5.0,8052,0,0.000000
+Slope 5 only,negative,5.0,6.0,7982,0,0.000000
+Slope 5 only,negative,6.0,7.0,7942,0,0.000000
+Slope 5 only,negative,7.0,8.0,8029,0,0.000000
+Slope 5 only,negative,8.0,9.0,7969,0,0.000000
+Slope 5 only,negative,9.0,10.0,7039,0,0.000000
+Slope 5 only,negative,10.0,11.0,841,0,0.000000
+Slope 5 only,positive,0.0,1.0,39008,0,0.000000
+Slope 5 only,positive,1.0,2.0,8075,0,0.000000
+Slope 5 only,positive,2.0,3.0,7943,0,0.000000
+Slope 5 only,positive,3.0,4.0,7973,0,0.000000
+Slope 5 only,positive,4.0,5.0,8038,0,0.000000
+Slope 5 only,positive,5.0,6.0,8037,0,0.000000
+Slope 5 only,positive,6.0,7.0,7941,0,0.000000
+Slope 5 only,positive,7.0,8.0,8131,0,0.000000
+Slope 5 only,positive,8.0,9.0,7843,0,0.000000
+Slope 5 only,positive,9.0,10.0,7048,0,0.000000
+Slope 5 only,positive,10.0,11.0,942,0,0.000000
+Duration 5 ms only,negative,0.0,1.0,39941,0,0.000000
+Duration 5 ms only,negative,1.0,2.0,8135,0,0.000000
+Duration 5 ms only,negative,2.0,3.0,7991,0,0.000000
+Duration 5 ms only,negative,3.0,4.0,7900,0,0.000000
+Duration 5 ms only,negative,4.0,5.0,8052,0,0.000000
+Duration 5 ms only,negative,5.0,6.0,7982,0,0.000000
+Duration 5 ms only,negative,6.0,7.0,7942,0,0.000000
+Duration 5 ms only,negative,7.0,8.0,8029,0,0.000000
+Duration 5 ms only,negative,8.0,9.0,7969,0,0.000000
+Duration 5 ms only,negative,9.0,10.0,7039,0,0.000000
+Duration 5 ms only,negative,10.0,11.0,841,0,0.000000
+Duration 5 ms only,positive,0.0,1.0,39008,0,0.000000
+Duration 5 ms only,positive,1.0,2.0,8075,0,0.000000
+Duration 5 ms only,positive,2.0,3.0,7943,0,0.000000
+Duration 5 ms only,positive,3.0,4.0,7973,0,0.000000
+Duration 5 ms only,positive,4.0,5.0,8038,0,0.000000
+Duration 5 ms only,positive,5.0,6.0,8037,0,0.000000
+Duration 5 ms only,positive,6.0,7.0,7941,0,0.000000
+Duration 5 ms only,positive,7.0,8.0,8131,0,0.000000
+Duration 5 ms only,positive,8.0,9.0,7843,0,0.000000
+Duration 5 ms only,positive,9.0,10.0,7048,0,0.000000
+Duration 5 ms only,positive,10.0,11.0,942,0,0.000000
+Moderate combined,negative,0.0,1.0,39941,23757,59.480233
+Moderate combined,negative,1.0,2.0,8135,1699,20.885065
+Moderate combined,negative,2.0,3.0,7991,71,0.888500
+Moderate combined,negative,3.0,4.0,7900,0,0.000000
+Moderate combined,negative,4.0,5.0,8052,0,0.000000
+Moderate combined,negative,5.0,6.0,7982,0,0.000000
+Moderate combined,negative,6.0,7.0,7942,0,0.000000
+Moderate combined,negative,7.0,8.0,8029,0,0.000000
+Moderate combined,negative,8.0,9.0,7969,0,0.000000
+Moderate combined,negative,9.0,10.0,7039,0,0.000000
+Moderate combined,negative,10.0,11.0,841,0,0.000000
+Moderate combined,positive,0.0,1.0,39008,22686,58.157301
+Moderate combined,positive,1.0,2.0,8075,1272,15.752322
+Moderate combined,positive,2.0,3.0,7943,346,4.356037
+Moderate combined,positive,3.0,4.0,7973,0,0.000000
+Moderate combined,positive,4.0,5.0,8038,0,0.000000
+Moderate combined,positive,5.0,6.0,8037,0,0.000000
+Moderate combined,positive,6.0,7.0,7941,0,0.000000
+Moderate combined,positive,7.0,8.0,8131,0,0.000000
+Moderate combined,positive,8.0,9.0,7843,0,0.000000
+Moderate combined,positive,9.0,10.0,7048,0,0.000000
+Moderate combined,positive,10.0,11.0,942,0,0.000000
+"Moderate combined, 20 ms",negative,0.0,1.0,39941,28192,70.584112
+"Moderate combined, 20 ms",negative,1.0,2.0,8135,2727,33.521819
+"Moderate combined, 20 ms",negative,2.0,3.0,7991,436,5.456138
+"Moderate combined, 20 ms",negative,3.0,4.0,7900,1,0.012658
+"Moderate combined, 20 ms",negative,4.0,5.0,8052,0,0.000000
+"Moderate combined, 20 ms",negative,5.0,6.0,7982,0,0.000000
+"Moderate combined, 20 ms",negative,6.0,7.0,7942,0,0.000000
+"Moderate combined, 20 ms",negative,7.0,8.0,8029,0,0.000000
+"Moderate combined, 20 ms",negative,8.0,9.0,7969,0,0.000000
+"Moderate combined, 20 ms",negative,9.0,10.0,7039,0,0.000000
+"Moderate combined, 20 ms",negative,10.0,11.0,841,0,0.000000
+"Moderate combined, 20 ms",positive,0.0,1.0,39008,26977,69.157609
+"Moderate combined, 20 ms",positive,1.0,2.0,8075,1816,22.489164
+"Moderate combined, 20 ms",positive,2.0,3.0,7943,579,7.289437
+"Moderate combined, 20 ms",positive,3.0,4.0,7973,4,0.050169
+"Moderate combined, 20 ms",positive,4.0,5.0,8038,0,0.000000
+"Moderate combined, 20 ms",positive,5.0,6.0,8037,0,0.000000
+"Moderate combined, 20 ms",positive,6.0,7.0,7941,0,0.000000
+"Moderate combined, 20 ms",positive,7.0,8.0,8131,0,0.000000
+"Moderate combined, 20 ms",positive,8.0,9.0,7843,0,0.000000
+"Moderate combined, 20 ms",positive,9.0,10.0,7048,0,0.000000
+"Moderate combined, 20 ms",positive,10.0,11.0,942,0,0.000000
+"Range 0.50, slope 2",negative,0.0,1.0,39941,24670,61.766105
+"Range 0.50, slope 2",negative,1.0,2.0,8135,4959,60.958820
+"Range 0.50, slope 2",negative,2.0,3.0,7991,5338,66.800150
+"Range 0.50, slope 2",negative,3.0,4.0,7900,4398,55.670886
+"Range 0.50, slope 2",negative,4.0,5.0,8052,1954,24.267263
+"Range 0.50, slope 2",negative,5.0,6.0,7982,132,1.653721
+"Range 0.50, slope 2",negative,6.0,7.0,7942,0,0.000000
+"Range 0.50, slope 2",negative,7.0,8.0,8029,0,0.000000
+"Range 0.50, slope 2",negative,8.0,9.0,7969,0,0.000000
+"Range 0.50, slope 2",negative,9.0,10.0,7039,0,0.000000
+"Range 0.50, slope 2",negative,10.0,11.0,841,0,0.000000
+"Range 0.50, slope 2",positive,0.0,1.0,39008,22371,57.349774
+"Range 0.50, slope 2",positive,1.0,2.0,8075,5050,62.538700
+"Range 0.50, slope 2",positive,2.0,3.0,7943,5217,65.680473
+"Range 0.50, slope 2",positive,3.0,4.0,7973,4511,56.578452
+"Range 0.50, slope 2",positive,4.0,5.0,8038,2470,30.729037
+"Range 0.50, slope 2",positive,5.0,6.0,8037,267,3.322135
+"Range 0.50, slope 2",positive,6.0,7.0,7941,0,0.000000
+"Range 0.50, slope 2",positive,7.0,8.0,8131,0,0.000000
+"Range 0.50, slope 2",positive,8.0,9.0,7843,0,0.000000
+"Range 0.50, slope 2",positive,9.0,10.0,7048,0,0.000000
+"Range 0.50, slope 2",positive,10.0,11.0,942,0,0.000000
+"Range 0.50, slope 5",negative,0.0,1.0,39941,37089,92.859468
+"Range 0.50, slope 5",negative,1.0,2.0,8135,5694,69.993854
+"Range 0.50, slope 5",negative,2.0,3.0,7991,5485,68.639720
+"Range 0.50, slope 5",negative,3.0,4.0,7900,4565,57.784810
+"Range 0.50, slope 5",negative,4.0,5.0,8052,2117,26.291605
+"Range 0.50, slope 5",negative,5.0,6.0,7982,132,1.653721
+"Range 0.50, slope 5",negative,6.0,7.0,7942,0,0.000000
+"Range 0.50, slope 5",negative,7.0,8.0,8029,0,0.000000
+"Range 0.50, slope 5",negative,8.0,9.0,7969,0,0.000000
+"Range 0.50, slope 5",negative,9.0,10.0,7039,0,0.000000
+"Range 0.50, slope 5",negative,10.0,11.0,841,0,0.000000
+"Range 0.50, slope 5",positive,0.0,1.0,39008,36200,92.801477
+"Range 0.50, slope 5",positive,1.0,2.0,8075,5726,70.910217
+"Range 0.50, slope 5",positive,2.0,3.0,7943,5467,68.827899
+"Range 0.50, slope 5",positive,3.0,4.0,7973,4696,58.898783
+"Range 0.50, slope 5",positive,4.0,5.0,8038,2667,33.179895
+"Range 0.50, slope 5",positive,5.0,6.0,8037,386,4.802787
+"Range 0.50, slope 5",positive,6.0,7.0,7941,0,0.000000
+"Range 0.50, slope 5",positive,7.0,8.0,8131,0,0.000000
+"Range 0.50, slope 5",positive,8.0,9.0,7843,0,0.000000
+"Range 0.50, slope 5",positive,9.0,10.0,7048,0,0.000000
+"Range 0.50, slope 5",positive,10.0,11.0,942,0,0.000000
+Relaxed combined,negative,0.0,1.0,39941,37138,92.982149
+Relaxed combined,negative,1.0,2.0,8135,5751,70.694530
+Relaxed combined,negative,2.0,3.0,7991,5552,69.478163
+Relaxed combined,negative,3.0,4.0,7900,5278,66.810127
+Relaxed combined,negative,4.0,5.0,8052,3771,46.833085
+Relaxed combined,negative,5.0,6.0,7982,1204,15.083939
+Relaxed combined,negative,6.0,7.0,7942,68,0.856208
+Relaxed combined,negative,7.0,8.0,8029,0,0.000000
+Relaxed combined,negative,8.0,9.0,7969,0,0.000000
+Relaxed combined,negative,9.0,10.0,7039,0,0.000000
+Relaxed combined,negative,10.0,11.0,841,0,0.000000
+Relaxed combined,positive,0.0,1.0,39008,36358,93.206522
+Relaxed combined,positive,1.0,2.0,8075,5726,70.910217
+Relaxed combined,positive,2.0,3.0,7943,5550,69.872844
+Relaxed combined,positive,3.0,4.0,7973,5262,65.997742
+Relaxed combined,positive,4.0,5.0,8038,3953,49.178900
+Relaxed combined,positive,5.0,6.0,8037,1668,20.754013
+Relaxed combined,positive,6.0,7.0,7941,121,1.523738
+Relaxed combined,positive,7.0,8.0,8131,0,0.000000
+Relaxed combined,positive,8.0,9.0,7843,0,0.000000
+Relaxed combined,positive,9.0,10.0,7048,0,0.000000
+Relaxed combined,positive,10.0,11.0,942,0,0.000000
+Aggressive combined,negative,0.0,1.0,39941,37306,93.402769
+Aggressive combined,negative,1.0,2.0,8135,5751,70.694530
+Aggressive combined,negative,2.0,3.0,7991,5553,69.490677
+Aggressive combined,negative,3.0,4.0,7900,5310,67.215190
+Aggressive combined,negative,4.0,5.0,8052,4297,53.365623
+Aggressive combined,negative,5.0,6.0,7982,2123,26.597344
+Aggressive combined,negative,6.0,7.0,7942,472,5.943087
+Aggressive combined,negative,7.0,8.0,8029,75,0.934114
+Aggressive combined,negative,8.0,9.0,7969,0,0.000000
+Aggressive combined,negative,9.0,10.0,7039,0,0.000000
+Aggressive combined,negative,10.0,11.0,841,0,0.000000
+Aggressive combined,positive,0.0,1.0,39008,36539,93.670529
+Aggressive combined,positive,1.0,2.0,8075,5728,70.934985
+Aggressive combined,positive,2.0,3.0,7943,5551,69.885434
+Aggressive combined,positive,3.0,4.0,7973,5308,66.574690
+Aggressive combined,positive,4.0,5.0,8038,4363,54.279672
+Aggressive combined,positive,5.0,6.0,8037,2154,26.801045
+Aggressive combined,positive,6.0,7.0,7941,321,4.042312
+Aggressive combined,positive,7.0,8.0,8131,26,0.319764
+Aggressive combined,positive,8.0,9.0,7843,1,0.012750
+Aggressive combined,positive,9.0,10.0,7048,0,0.000000
+Aggressive combined,positive,10.0,11.0,942,0,0.000000
+Very relaxed combined,negative,0.0,1.0,39941,37306,93.402769
+Very relaxed combined,negative,1.0,2.0,8135,5753,70.719115
+Very relaxed combined,negative,2.0,3.0,7991,5588,69.928670
+Very relaxed combined,negative,3.0,4.0,7900,5530,70.000000
+Very relaxed combined,negative,4.0,5.0,8052,5622,69.821162
+Very relaxed combined,negative,5.0,6.0,7982,5613,70.320722
+Very relaxed combined,negative,6.0,7.0,7942,5534,69.680181
+Very relaxed combined,negative,7.0,8.0,8029,5623,70.033628
+Very relaxed combined,negative,8.0,9.0,7969,5561,69.782909
+Very relaxed combined,negative,9.0,10.0,7039,4725,67.126012
+Very relaxed combined,negative,10.0,11.0,841,563,66.944114
+Very relaxed combined,positive,0.0,1.0,39008,36541,93.675656
+Very relaxed combined,positive,1.0,2.0,8075,5728,70.934985
+Very relaxed combined,positive,2.0,3.0,7943,5584,70.300894
+Very relaxed combined,positive,3.0,4.0,7973,5555,69.672645
+Very relaxed combined,positive,4.0,5.0,8038,5640,70.166708
+Very relaxed combined,positive,5.0,6.0,8037,5634,70.100784
+Very relaxed combined,positive,6.0,7.0,7941,5547,69.852663
+Very relaxed combined,positive,7.0,8.0,8131,5672,69.757717
+Very relaxed combined,positive,8.0,9.0,7843,5431,69.246462
+Very relaxed combined,positive,9.0,10.0,7048,4748,67.366629
+Very relaxed combined,positive,10.0,11.0,942,641,68.046709
+"Range 0.50, no trend",negative,0.0,1.0,39941,38617,96.685111
+"Range 0.50, no trend",negative,1.0,2.0,8135,6886,84.646589
+"Range 0.50, no trend",negative,2.0,3.0,7991,6649,83.206107
+"Range 0.50, no trend",negative,3.0,4.0,7900,5799,73.405063
+"Range 0.50, no trend",negative,4.0,5.0,8052,2656,32.985594
+"Range 0.50, no trend",negative,5.0,6.0,7982,132,1.653721
+"Range 0.50, no trend",negative,6.0,7.0,7942,0,0.000000
+"Range 0.50, no trend",negative,7.0,8.0,8029,0,0.000000
+"Range 0.50, no trend",negative,8.0,9.0,7969,0,0.000000
+"Range 0.50, no trend",negative,9.0,10.0,7039,0,0.000000
+"Range 0.50, no trend",negative,10.0,11.0,841,0,0.000000
+"Range 0.50, no trend",positive,0.0,1.0,39008,37769,96.823728
+"Range 0.50, no trend",positive,1.0,2.0,8075,6872,85.102167
+"Range 0.50, no trend",positive,2.0,3.0,7943,6600,83.092031
+"Range 0.50, no trend",positive,3.0,4.0,7973,5829,73.109244
+"Range 0.50, no trend",positive,4.0,5.0,8038,3270,40.681762
+"Range 0.50, no trend",positive,5.0,6.0,8037,451,5.611547
+"Range 0.50, no trend",positive,6.0,7.0,7941,0,0.000000
+"Range 0.50, no trend",positive,7.0,8.0,8131,0,0.000000
+"Range 0.50, no trend",positive,8.0,9.0,7843,0,0.000000
+"Range 0.50, no trend",positive,9.0,10.0,7048,0,0.000000
+"Range 0.50, no trend",positive,10.0,11.0,942,0,0.000000
+"Range 0.50, no trend, 10 ms",negative,0.0,1.0,39941,39506,98.910894
+"Range 0.50, no trend, 10 ms",negative,1.0,2.0,8135,7725,94.960049
+"Range 0.50, no trend, 10 ms",negative,2.0,3.0,7991,7529,94.218496
+"Range 0.50, no trend, 10 ms",negative,3.0,4.0,7900,7124,90.177215
+"Range 0.50, no trend, 10 ms",negative,4.0,5.0,8052,5301,65.834575
+"Range 0.50, no trend, 10 ms",negative,5.0,6.0,7982,1634,20.471060
+"Range 0.50, no trend, 10 ms",negative,6.0,7.0,7942,122,1.536137
+"Range 0.50, no trend, 10 ms",negative,7.0,8.0,8029,0,0.000000
+"Range 0.50, no trend, 10 ms",negative,8.0,9.0,7969,0,0.000000
+"Range 0.50, no trend, 10 ms",negative,9.0,10.0,7039,0,0.000000
+"Range 0.50, no trend, 10 ms",negative,10.0,11.0,841,0,0.000000
+"Range 0.50, no trend, 10 ms",positive,0.0,1.0,39008,38569,98.874590
+"Range 0.50, no trend, 10 ms",positive,1.0,2.0,8075,7669,94.972136
+"Range 0.50, no trend, 10 ms",positive,2.0,3.0,7943,7484,94.221327
+"Range 0.50, no trend, 10 ms",positive,3.0,4.0,7973,7195,90.242067
+"Range 0.50, no trend, 10 ms",positive,4.0,5.0,8038,5226,65.016173
+"Range 0.50, no trend, 10 ms",positive,5.0,6.0,8037,2168,26.975240
+"Range 0.50, no trend, 10 ms",positive,6.0,7.0,7941,145,1.825967
+"Range 0.50, no trend, 10 ms",positive,7.0,8.0,8131,0,0.000000
+"Range 0.50, no trend, 10 ms",positive,8.0,9.0,7843,0,0.000000
+"Range 0.50, no trend, 10 ms",positive,9.0,10.0,7048,0,0.000000
+"Range 0.50, no trend, 10 ms",positive,10.0,11.0,942,0,0.000000

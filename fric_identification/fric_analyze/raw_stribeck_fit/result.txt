@@ -1,0 +1,47 @@
+Asymmetric Stribeck friction model fit
+======================================
+
+Model used (omega ~= 0):
+tau_hat(omega) = sgn(omega) * [tau_c_sigma + (tau_s_sigma - tau_c_sigma) * exp(-(abs(omega)/v_s_sigma)^2)] + b_sigma * omega
+sigma=+ for omega>0 and sigma=- for omega<0; the measured torque sign was retained.
+Constraints: tau_s >= tau_c >= 0, v_s > 0, b >= 0.
+
+Positive rotation (+) parameters:
+  tau_c_plus = 0.459212 Nm
+  tau_s_plus = 0.526341 Nm
+  v_s_plus = 0.474762 rad/s
+  b_plus = 0.00218903 Nm/(rad/s)
+  Substituted equation: tau_hat(omega) = (+1) * [0.459212 + (0.526341 - 0.459212) * exp(-(abs(omega)/0.474762)^2)] + 0.00218903 * omega
+
+Negative rotation (-) parameters:
+  tau_c_minus = 0.410719 Nm
+  tau_s_minus = 0.527041 Nm
+  v_s_minus = 0.473325 rad/s
+  b_minus = 0.00341074 Nm/(rad/s)
+  Substituted equation: tau_hat(omega) = (-1) * [0.410719 + (0.527041 - 0.410719) * exp(-(abs(omega)/0.473325)^2)] + 0.00341074 * omega
+
+Parameter meanings and units:
+tau_c: Coulomb friction torque [Nm]
+tau_s: low-speed Stribeck friction torque [Nm]
+v_s: Stribeck characteristic speed [rad/s]
+b: viscous friction coefficient [Nm/(rad/s)]
+
+Data counts: raw scatter total=90833; positive=40500; negative=50333; zero-speed=0.
+Fit threshold: fitThreshold=0.3 rad/s; fit only omega>fitThreshold or omega<-fitThreshold.
+Identification data counts: total=2478; positive=1104; negative=1374.
+Identification speed ranges: positive=[0.302197, 19.8993] rad/s; negative=[-19.9908, -0.302197] rad/s.
+Fit statistics use unweighted raw torque residuals on thresholded identification data only.
+Overall RMSE=0.0523306 Nm; R^2=0.987335 (N=2478).
+Positive RMSE=0.0489248 Nm; R^2=0.0543377 (N=1104).
+Negative RMSE=0.0549143 Nm; R^2=0.0983114 (N=1374).
+
+Positive-direction optimization: Converged (fminsearch exit flag 1).
+Negative-direction optimization: Converged (fminsearch exit flag 1).
+Opposite-sign fraction in identification data: positive speed / negative torque=0; negative speed / positive torque=0.
+Sign check: no direction exceeds the 10% opposite-sign warning threshold.
+
+Data file: C:\0Telepalpation_control\data\FR0007.csv
+Raw source: main.m calls plot_friction_results; its "Raw velocity-torque data" scatter uses T.speed_rad_s and T.feedback_torque_estimate_Nm.
+Selection copied from plot_friction_results.m: phase 1..4, abs(target_torque_Nm)>1e-9 Nm, finite speed and feedback torque.
+No smoothing, binning, averaging, steady-state selection, or sign change was applied.
+Angular velocity unit: rad/s. Feedback estimated torque unit: Nm.

@@ -14,6 +14,12 @@ analyze_chirp_multi
 ```
 
 `qdd_chirp_multi(struct('makeFigures',false))` で図を省略できます。
+メインスクリプトの `options.showSummaryFigureOnly` は既定で `true` です。
+`true` では2枚の要約図に必要な試行選定、共通J/B同定、FRF遅延推定だけを行い、
+従来の個別試行同定・検証・時間領域評価・従来図をスキップします。
+ゲイン・位相・Coherenceの3段図と、試行ごとの位相遅延周波数応答および30–100 Hzの平均±SD図を表示します。
+`false` なら従来の全解析と従来図だけを実行します。要約図は
+`figure_gain_phase_coherence.png/.fig`、`figure_trial_phase_delay.png/.fig` として保存します。
 単一試行の場合、CoherenceはNaN、未知試行検証は利用不能です。
 
 ## 方法

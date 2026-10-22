@@ -1,23 +1,40 @@
-function D=delay(trials,p,o)
+function D=delay(trials,p,o,summaryOnly)
+if nargin<4, summaryOnly=false; end
 n=numel(trials); U=[]; Y=[]; A=[]; per=[];
+phaseDelay=nan(o.frfPoints,n);
 bands=[1 10;10 30;30 60;60 100;30 100;1 100];
 for k=1:n
     tr=trials{k}; pred=qm.predict(p(1),p(2),0,tr);
     F=qm.regression(tr,[tr.d.u tr.d.x pred(:,1)],o);
     U(:,k)=F.C(:,1); Y(:,k)=F.C(:,2); A(:,k)=F.C(:,3); %#ok<AGROW>
-    for b=1:size(bands,1)
-        per=[per; phasefit(F.f,F.C(:,2)./F.C(:,3),bands(b,:),k)]; %#ok<AGROW>
+    ratio=F.C(:,2)./F.C(:,3);
+    ok=isfinite(real(ratio))&isfinite(imag(ratio))&abs(ratio)>0&isfinite(F.f)&F.f>0;
+    ph=nan(size(F.f)); ph(ok)=unwrap(angle(ratio(ok)));
+    phaseDelay(ok,k)=-ph(ok)./(2*pi*F.f(ok));
+    if ~summaryOnly
+        for b=1:size(bands,1)
+            per=[per; phasefit(F.f,ratio,bands(b,:),k)]; %#ok<AGROW>
+        end
     end
 end
 s=qm.spectra(U,Y); a=qm.spectra(U,A); f=F.f;
-pooled=[];
-for b=1:size(bands,1), pooled=[pooled;phasefit(f,s.H1./a.H1,bands(b,:),0)]; end %#ok<AGROW>
+if summaryOnly
+    pooled=table;
+else
+    pooled=[];
+    for b=1:size(bands,1), pooled=[pooled;phasefit(f,s.H1./a.H1,bands(b,:),0)]; end %#ok<AGROW>
+end
 % Full-band complex relative FRF error, every estimable frequency equal weight.
 fun=@(td)frfcost(td,trials,p,o,s.H1);
 [tdF,scanF]=qm.bounded(fun,o);
-[tdT,scanT]=qm.bounded(@(td)qm.cost(p,td,trials),o);
+if summaryOnly
+    tdT=NaN; scanT=table;
+else
+    [tdT,scanT]=qm.bounded(@(td)qm.cost(p,td,trials),o);
+end
 D=struct('phaseByTrial',per,'phasePooled',pooled,'frf_s',tdF,'time_s',tdT, ...
-    'frfScan',scanF,'timeScan',scanT,'f',f,'spectra',s,'modelA',a);
+    'frfScan',scanF,'timeScan',scanT,'f',f,'spectra',s,'modelA',a, ...
+    'phaseDelayByTrial_s',phaseDelay);
 end
 function v=frfcost(td,trials,p,o,E)
 U=[]; Y=[];

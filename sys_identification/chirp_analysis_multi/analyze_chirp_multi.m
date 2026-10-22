@@ -4,4 +4,5 @@ addpath(root);
 options = struct;
 options.files = strings(0,1); % Optional subset of eligible CSV basenames.
 options.makeFigures = true;
+options.showSummaryFigureOnly = true; % true: show new 3-panel figure; false: show legacy figures.
 results = qdd_chirp_multi(options);

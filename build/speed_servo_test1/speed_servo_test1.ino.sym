@@ -1,0 +1,372 @@
+
+C:\0Telepalpation_control\build\speed_servo_test1/speed_servo_test1.ino.elf:     file format elf32-littlearm
+
+SYMBOL TABLE:
+60000000 l    d  .text.headers	00000000 .text.headers
+60001400 l    d  .text.code	00000000 .text.code
+60001dfc l    d  .text.progmem	00000000 .text.progmem
+00000000 l    d  .text.itcm	00000000 .text.itcm
+00004c70 l    d  .fini	00000000 .fini
+00004c74 l    d  .ARM.exidx	00000000 .ARM.exidx
+20000000 l    d  .data	00000000 .data
+20000ec0 l    d  .bss	00000000 .bss
+20200000 l    d  .bss.dma	00000000 .bss.dma
+70000000 l    d  .bss.extram	00000000 .bss.extram
+60007a40 l    d  .text.csf	00000000 .text.csf
+00000000 l    d  .debug_info	00000000 .debug_info
+00000000 l    d  .debug_abbrev	00000000 .debug_abbrev
+00000000 l    d  .debug_line	00000000 .debug_line
+00000000 l    d  .debug_frame	00000000 .debug_frame
+00000000 l    d  .debug_str	00000000 .debug_str
+00000000 l    d  .ARM.attributes	00000000 .ARM.attributes
+00000000 l    d  .comment	00000000 .comment
+00000000 l    d  .debug_loclists	00000000 .debug_loclists
+00000000 l    d  .debug_aranges	00000000 .debug_aranges
+00000000 l    d  .debug_rnglists	00000000 .debug_rnglists
+00000000 l    d  .debug_line_str	00000000 .debug_line_str
+00000000 l    df *ABS*	00000000 bootdata.c
+00000000 l    df *ABS*	00000000 startup.c
+60001618 l     F .text.code	000000b0 flexspi2_psram_size
+60001400 l     F .text.code	00000012 memory_copy
+60001414 l     F .text.code	0000001c memory_clear.constprop.0
+60001430 l     F .text.code	000001c0 ResetHandler2
+00000000 l    df *ABS*	00000000 tempmon.c
+20006fdc l     O .bss	00000004 s_hot_ROOM
+20006fe0 l     O .bss	00000004 s_roomC_hotC
+20006fd4 l     O .bss	00000004 s_hotCount
+20006fd8 l     O .bss	00000004 s_hotTemp
+00000000 l    df *ABS*	00000000 usb.c
+00002d5c l     F .text.itcm	00000094 schedule_transfer
+00002df0 l     F .text.itcm	00000038 run_callbacks
+00002e28 l     F .text.itcm	000000ac endpoint0_transmit.constprop.0
+20003d18 l     O .bss	00000004 endpoint0_notify_mask
+2000702a l     O .bss	00000001 sof_usage
+20006f9c l     O .bss	00000008 reply_buffer
+20003d1c l     O .bss	00000004 endpointN_notify_mask
+20007035 l     O .bss	00000001 usb_reboot_timer
+20003a18 l     O .bss	00000008 endpoint0_setupdata
+20003d10 l     O .bss	00000008 endpoint0_buffer
+00000000 l    df *ABS*	00000000 analog.c
+20007021 l     O .bss	00000001 calibrating
+00000000 l    df *ABS*	00000000 crti.o
+00000000 l    df *ABS*	00000000 crtn.o
+00000000 l    df *ABS*	00000000 crtstuff.c
+00000020 l     F .text.itcm	00000000 register_tm_clones
+00000044 l     F .text.itcm	00000000 frame_dummy
+20006f80 l     O .bss	00000000 object.0
+60001df0 l     O .text.code	00000000 __frame_dummy_init_array_entry
+00000000 l    df *ABS*	00000000 speed_servo_test1.ino.cpp
+0000022c l     F .text.itcm	00000044 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::mailboxOffset() [clone .part.0]
+00000270 l     F .text.itcm	00000050 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::mbCallbacks(FLEXCAN_MAILBOX const&, CAN_message_t const&) [clone .isra.0]
+000002c0 l     F .text.itcm	00000078 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::writeTxMailbox(unsigned char, CAN_message_t const&) [clone .isra.0]
+00000550 l     F .text.itcm	00000208 serviceReport() [clone .part.0]
+000022ec l     F .text.itcm	00000024 flexcan_isr_can2()
+20003a24 l     O .bss	00000004 _CAN2
+00002310 l     F .text.itcm	0000008c _GLOBAL__sub_I_Can2
+00000000 l    df *ABS*	00000000 IntervalTimer.cpp
+000023ac l     F .text.itcm	00000084 pit_isr()
+20000ec0 l     O .bss	00000060 funct_table
+00002430 l     F .text.itcm	00000020 __tcf_ZL11funct_table
+000025dc l     F .text.itcm	00000030 _GLOBAL__sub_I__ZN13IntervalTimer14nvic_prioritesE
+00000000 l    df *ABS*	00000000 usb_desc.c
+20000a08 l     O .data	00000012 device_descriptor
+60001ef8 l     O .text.progmem	0000000a qualifier_descriptor
+20000a44 l     O .data	00000012 microsoft_os_string_desc
+20000a1c l     O .data	00000028 microsoft_os_compatible_id_desc
+00000000 l    df *ABS*	00000000 Print.cpp
+00002614 l     F .text.itcm	00000074 Print::printNumber(unsigned long, unsigned char, unsigned char) [clone .part.0]
+00000000 l    df *ABS*	00000000 WMath.cpp
+20003a20 l     O .bss	00000004 seed
+00000000 l    df *ABS*	00000000 delay.c
+00000000 l    df *ABS*	00000000 main.cpp
+00000000 l    df *ABS*	00000000 memcpy-armv7m.S.o
+00000000 l    df *ABS*	00000000 nonstd.c
+00000000 l    df *ABS*	00000000 usb_inst.cpp
+00000000 l    df *ABS*	00000000 usb_serial.c
+000036e8 l     F .text.itcm	00000068 rx_queue_transfer
+20000f80 l     O .bss	00000100 rx_transfer
+20200080 l     O .bss.dma	00001000 rx_buffer
+20007018 l     O .bss	00000002 rx_packet_size
+00003750 l     F .text.itcm	000000bc rx_event
+20007028 l     O .bss	00000001 rx_head
+20007029 l     O .bss	00000001 rx_tail
+20006fa8 l     O .bss	00000010 rx_count
+20006fb8 l     O .bss	00000010 rx_index
+20006fa4 l     O .bss	00000004 rx_available
+20006fc8 l     O .bss	00000009 rx_list
+0000380c l     F .text.itcm	000000a4 usb_serial_flush_callback
+20007031 l     O .bss	00000001 tx_noautoflush
+2000701a l     O .bss	00000002 tx_available
+20007030 l     O .bss	00000001 tx_head
+20001080 l     O .bss	00000080 tx_transfer
+20201080 l     O .bss.dma	00002000 txbuffer
+000038b0 l     F .text.itcm	000001b4 usb_serial_write.part.0
+2000702e l     O .bss	00000001 transmit_previous_timeout
+2000701c l     O .bss	00000002 tx_packet_size
+00000000 l    df *ABS*	00000000 yield.cpp
+20007020 l     O .bss	00000001 yield::running
+00000000 l    df *ABS*	00000000 EventResponder.cpp
+00000000 l    df *ABS*	00000000 clockspeed.c
+00000000 l    df *ABS*	00000000 pwm.c
+00000000 l    df *ABS*	00000000 rtc.c
+00000000 l    df *ABS*	00000000 sm_pool.c
+00000000 l    df *ABS*	00000000 atexit_arm.cc
+00000000 l    df *ABS*	00000000 _aeabi_ldivmod.o
+00000000 l    df *ABS*	00000000 libgcc2.c
+00000000 l    df *ABS*	00000000 _dvmd_tls.o
+00000000 l    df *ABS*	00000000 cxa_atexit.c
+00000000 l    df *ABS*	00000000 memmove.c
+00000000 l    df *ABS*	00000000 memset.c
+00000000 l    df *ABS*	00000000 errno.c
+00000000 l    df *ABS*	00000000 init.c
+00000000 l    df *ABS*	00000000 lock.c
+00000000 l    df *ABS*	00000000 libc_a-strlen.o
+00000000 l    df *ABS*	00000000 __atexit.c
+00000000 l    df *ABS*	00000000 impure.c
+00000000 l    df *ABS*	00000000 __call_atexit.c
+00000000 l    df *ABS*	00000000 HardwareSerial.cpp
+00000000 l    df *ABS*	00000000 findfp.c
+60001db0 l     F .text.code	00000008 __memset_veneer
+60001db8 l     F .text.code	00000008 __set_arm_clock_veneer
+60001dc0 l     F .text.code	00000008 __main_veneer
+60001dc8 l     F .text.code	00000008 __pwm_init_veneer
+60001dd0 l     F .text.code	00000008 __delay_veneer
+60001dd8 l     F .text.code	00000008 __sm_set_pool_veneer
+60001de0 l     F .text.code	00000008 ____libc_init_array_veneer
+60001de8 l     F .text.code	00000008 __usb_init_serialnumber_veneer
+00004c60 l     F .text.itcm	00000008 ___init_veneer
+00004c68 l     F .text.itcm	00000008 ___reboot_Teensyduino__veneer
+00003c88 g     F .text.itcm	0000001c usb_serial_available
+0000021c  w    F .text.itcm	00000010 IntervalTimer::~IntervalTimer()
+600016d0 g     F .text.code	00000002 startup_default_late_hook
+00003e54  w    F .text.itcm	000000d8 yield
+0000112c g     F .text.itcm	0000014c startTrial()
+20007010 g     O .bss	00000004 usb_timer1_callback
+000018d8  w    F .text.itcm	000001ec FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::readMB(CAN_message_t&)
+60001e14 g     O .text.progmem	00000018 usb_string_manufacturer_name_default
+600017f4 g     F .text.code	00000284 configure_external_ram
+200006e4  w    O .data	00000010 teensy::inplace_function_detail::empty_vtable<void>
+20003bd0 g     O .bss	00000001 __lock___atexit_recursive_mutex
+000026a0 g     F .text.itcm	0000001a Print::println()
+00002844 g     F .text.itcm	00000080 random(long, long)
+20007026 g     O .bss	00000001 reportHeaderPrinted
+2000701f g     O .bss	00000001 HardwareSerialIMXRT::s_count_serials_with_serial_events
+60001d50 g     F .text.code	00000050 analog_init
+000001d0  w    F .text.itcm	00000006 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*, void*)#1}::_FUN(void*, void*)
+20003d5c g     O .bss	00003220 logRows
+000001e0  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*)#4}::_FUN(void*)
+000023a4  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*, void*)#2}::_FUN(void*, void*)
+200009dc g     O .data	00000004 F_CPU_ACTUAL
+000048dc g     F .text.itcm	00000124 memmove
+00004c7c g       .ARM.exidx	00000000 __exidx_end
+2000701e g     O .bss	00000001 EventResponder::runningFromYield
+00002cfc g     F .text.itcm	00000060 tempmonGetTemp
+200009f4 g     O .data	00000004 __atexit_recursive_mutex
+00004a88 g     F .text.itcm	0000000c __errno
+60001000 g     O .text.headers	00000020 ImageVectorTable
+20003a30 g     O .bss	00000004 EventResponder::firstInterrupt
+00003664 g     F .text.itcm	00000004 usb_transfer_status
+00004480 g     F .text.itcm	00000080 sm_set_pool
+20006f98 g     O .bss	00000004 receivedFrameCount
+20000f20 g     O .bss	00000020 HardwareSerialIMXRT::s_serials_with_serial_events
+000036e0  w    F .text.itcm	00000008 usb_serial_class::write(unsigned char const*, unsigned int)
+00004c78 g       .text.itcm	00000000 _etext
+20000ec0 g       .bss	00000000 _sbss
+00000f64  w    F .text.itcm	00000170 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::write(CAN_message_t const&)
+60001f04 g       *ABS*	00000000 _stextload
+00001cb0 g     F .text.itcm	00000024 loop
+000042a8 g     F .text.itcm	00000074 flexpwm_init
+600016d4 g     F .text.code	00000004 startup_debug_reset
+00003518 g     F .text.itcm	00000064 usb_config_rx
+000001e0  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*)#2}::_FUN(void*)
+000001e8  w    F .text.itcm	00000004 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::isFD()
+00000d5c  w    F .text.itcm	000000ec FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::fifo_filter_match(unsigned long)
+20003a2c g     O .bss	00000004 EventResponder::lastInterrupt
+000029d4 g     F .text.itcm	00000134 memcpy
+20000ec0 g     O .data	00000000 .hidden __TMC_END__
+20006fec g     O .bss	00000004 systick_millis_count
+20007033 g     O .bss	00000001 usb_configuration
+00000068  w    F .text.itcm	00000004 CANListener::frameHandler(CAN_message_t&, int, unsigned char)
+00004434 g     F .text.itcm	0000004c sm_align_pool
+60000000 g     O .text.headers	00000200 FlexSPI_NOR_Config
+20007037 g     O .bss	00000001 zeroHold
+000001ec  w    F .text.itcm	00000004 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::getFirstTxBoxSize()
+60001e14  w    O .text.progmem	00000018 usb_string_manufacturer_name
+60001c14 g     F .text.code	000000e8 usb_init
+20006ffc g     O .bss	00000004 txFailureCount
+20006ff0 g     O .bss	00000004 systick_safe_read
+20000740  w    O .data	00000010 teensy::inplace_function<void (), 16u, 8u>::inplace_function<void (&)(), void (*)(), void>(void (&)())::vt
+aaaaaaab g       *ABS*	00000000 _flexram_bank_config
+200009f8 g     O .data	00000000 .hidden __dso_handle
+20006ff8 g     O .bss	00000004 trialStartUs
+20000000 g       .data	00000000 _sdata
+60001e94 g     O .text.progmem	00000062 usb_config_descriptor_480
+000045ac g     F .text.itcm	00000320 .hidden __udivmoddi4
+00001300 g     F .text.itcm	00000238 handlePendingTick()
+600016c8 g     F .text.code	00000002 startup_default_early_hook
+600015f0 g     F .text.code	00000028 ResetHandler
+00003d14 g     F .text.itcm	0000001e usb_serial_getchar
+20006ff4 g     O .bss	00000004 tickTimestampUs
+20007000 g     O .bss	00000008 usb_cdc_line_coding
+20003a34 g     O .bss	00000004 EventResponder::lastYield
+20003d20 g     O .bss	00000010 extmem_smalloc_pool
+000026e0 g     F .text.itcm	00000164 Print::printFloat(double, unsigned char)
+60007c00 g     O .text.csf	00000c00 hab_csf
+20280000 g       .text.csf	00000000 _heap_end
+00004c74 g       .ARM.exidx	00000000 __exidx_start
+70000000 g       .bss.extram	00000000 _extram_end
+20003a28 g     O .bss	00000004 EventResponder::firstYield
+00000efc  w    F .text.itcm	00000066 Circular_Buffer<unsigned char, (unsigned short)16, (unsigned short)24>::write(unsigned char const*, unsigned short)
+00004a94 g     F .text.itcm	0000004c __libc_init_array
+000036c8  w    F .text.itcm	00000004 usb_serial_class::clear()
+60006b80 g       *ABS*	00000000 _sdataload
+20003a38  w    O .bss	00000004 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::flexcan_interrupt()::last_esr1
+20007032 g     O .bss	00000001 usb_cdc_line_rtsdtr
+60001da0 g     F .text.code	00000000 _init
+00003a64 g     F .text.itcm	00000002 usb_serial_reset
+60001e30 g     O .text.progmem	00000062 usb_config_descriptor_12
+20007060 g       .bss	00000000 _ebss
+00001ac4 g     F .text.itcm	000001ec readCanFeedback()
+2000702d g     O .bss	00000001 timerReady
+2000702b g     O .bss	00000001 tickOverrun
+20203080 g       .bss.dma	00000000 _heap_start
+2000702c g     O .bss	00000001 tickPending
+20003bd4 g     O .bss	00000138 __sf
+00001278 g     F .text.itcm	00000088 serviceSerialInput()
+00000001 g       *ABS*	00000000 _itcm_block_count
+00000758 g     F .text.itcm	000001ac printFeedbackDiagnostics()
+20000f60 g     O .bss	00000020 endpoint0_transfer_data
+0000431c g     F .text.itcm	000000f4 pwm_init
+00001538  w    F .text.itcm	00000118 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::struct2queueRx(CAN_message_t const&)
+60008800 g       .text.csf	00000000 __text_csf_end
+60001a78 g     F .text.code	00000064 usb_pll_start
+20000f40 g     O .bss	00000020 endpoint0_transfer_ack
+20007008 g     O .bss	00000004 usb_cdc_line_rtsdtr_millis
+00003618 g     F .text.itcm	0000002c usb_transmit
+00003f74 g     F .text.itcm	00000020 systick_isr
+00004ae4 g     F .text.itcm	00000002 __retarget_lock_release_recursive
+200009e0 g     O .data	00000010 Serial
+0000260c  w    F .text.itcm	00000006 usb_serial_class::write(unsigned char)
+600016c8  w    F .text.code	00000002 startup_early_hook
+20007025 g     O .bss	00000001 lastCanRemote
+00003c44 g     F .text.itcm	00000044 usb_serial_peekchar
+00003f94 g     F .text.itcm	00000314 set_arm_clock
+20006fe8 g     O .bss	00000004 systick_cycle_count
+20007027 g     O .bss	00000001 reportPending
+20000a5c g     O .data	00000016 usb_string_serial_number_default
+20003a40 g     O .bss	00000190 __atexit0
+20003d40 g     O .bss	00000004 lastCanId
+000036d8  w    F .text.itcm	00000004 usb_serial_class::flush()
+000036d0  w    F .text.itcm	00000004 usb_serial_class::read()
+00001cd4  w    F .text.itcm	00000618 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::flexcan_interrupt()
+000035e8 g     F .text.itcm	00000030 usb_prepare_transfer
+00001650  w    F .text.itcm	00000288 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::frame_distribution(CAN_message_t&)
+00002b70 g     F .text.itcm	00000188 unused_interrupt_vector
+2000700c g     O .bss	00000004 usb_timer0_callback
+60001adc g     F .text.code	00000138 tempmon_init
+00004bd8 g     F .text.itcm	00000084 __register_exitproc
+000023a8  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*)#4}::_FUN(void*)
+00003ca4 g     F .text.itcm	00000070 usb_serial_flush_input
+00003d34 g     F .text.itcm	00000028 usb_serial_putchar
+00000025 g       *ABS*	00000000 _teensy_model_identifier
+2000702f g     O .bss	00000001 trialRunning
+20003d3c g     O .bss	00000004 lastCanFrameUs
+60001cfc g     F .text.code	00000054 _reboot_Teensyduino_
+600016cc g     F .text.code	00000002 startup_default_middle_hook
+20007016 g     O .bss	00000002 reportIndex
+20007014 g     O .bss	00000002 logCount
+00000338  w    F .text.itcm	00000218 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::events()
+00002efc g     F .text.itcm	0000061c usb_isr
+000023a0  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*, void*)#1}::_FUN(void*, void*)
+000048d0 g     F .text.itcm	0000000c __cxa_atexit
+00002450 g     F .text.itcm	00000108 IntervalTimer::beginCycles(teensy::inplace_function<void (), 16u, 8u>, unsigned long)
+20000718  w    O .data	00000028 vtable for usb_serial_class
+20000a00 g     O .data	00000008 controlTimer
+20006fe4 g     O .bss	00000004 scale_cpu_cycles_to_microseconds
+000048cc  w    F .text.itcm	00000002 .hidden __aeabi_ldiv0
+20003a3c g     O .bss	00000004 __atexit
+000010d4 g     F .text.itcm	00000058 sendSpeedCommand(long)
+00003db8 g     F .text.itcm	0000009c usb_serial_flush_output
+20000c00 g     O .data	000002c0 _VectorsRam
+000001f0 g     F .text.itcm	0000002c controlTickISR()
+0000006c  w    F .text.itcm	00000160 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::setBaudRate(unsigned long, FLEXCAN_RXTX)
+20000a58 g     O .data	00000004 trialResult
+20007036 g     O .bss	00000001 yield_active_check_flags
+00004ae0 g     F .text.itcm	00000002 __retarget_lock_acquire_recursive
+20007034 g     O .bss	00000001 usb_high_speed
+00004a00 g     F .text.itcm	00000086 memset
+000029c4 g     F .text.itcm	00000010 main
+20200000 g     O .bss.dma	00000062 usb_descriptor_buffer
+20003d30 g     O .bss	00000004 ignoredCanFrameCount
+00003668 g     F .text.itcm	00000060 usb_init_serialnumber
+60001dfc g       .text.code	00000000 __init_array_end
+20003d34 g     O .bss	00000008 lastCanData
+00000e48  w    F .text.itcm	000000b2 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::filter_match(FLEXCAN_MAILBOX, unsigned long)
+00002970 g     F .text.itcm	00000054 micros
+20003d44 g     O .bss	00000018 latestFeedback
+60001e2c g     O .text.progmem	00000004 string0
+00003d5c g     F .text.itcm	00000014 usb_serial_write
+600016d0  w    F .text.code	00000002 startup_late_hook
+000036d4  w    F .text.itcm	00000004 usb_serial_class::available()
+20000000 g     O .data	00000280 endpoint_queue_head
+60001dfc  w    O .text.progmem	00000016 usb_string_product_name
+000028c4 g     F .text.itcm	000000ac delay
+00004c70 g     F .fini	00000000 _fini
+60001020 g     O .text.headers	0000000c BootData
+000009b0  w    F .text.itcm	00000294 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::begin()
+00002688 g     F .text.itcm	00000016 Print::print(long)
+00002cf8 g     F .text.itcm	00000004 Panic_Temp_isr
+200006f4  w    O .data	00000024 vtable for FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>
+000023a4  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*, void*)#3}::_FUN(void*, void*)
+200009fc g     O .data	00000004 _impure_ptr
+00002558 g     F .text.itcm	00000084 IntervalTimer::end()
+60001df0 g       .text.code	00000000 __preinit_array_end
+00002ed4 g     F .text.itcm	00000028 usb_stop_sof_interrupts
+00000c44 g     F .text.itcm	00000118 setup
+20000750 g     O .data	00000084 usb_descriptor_list
+20003d0c g     O .bss	00000004 abortedTicks
+00000904 g     F .text.itcm	000000ac saveLogRow(unsigned long, long)
+20078000 g       .text.csf	00000000 _estack
+00003d70 g     F .text.itcm	00000048 usb_serial_write_buffer_free
+000001cc  w    F .text.itcm	00000004 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*)#1}::_FUN(void*)
+00003a68 g     F .text.itcm	00000100 usb_serial_configure
+20000ec0 g       .data	00000000 _edata
+20007022 g     O .bss	00000001 external_psram_size
+000036dc  w    F .text.itcm	00000004 usb_serial_class::availableForWrite()
+000001d8  w    F .text.itcm	00000006 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*, void*)#3}::_FUN(void*, void*)
+00002b08 g     F .text.itcm	00000066 ultoa
+20007023 g     O .bss	00000001 lastCanExtended
+000023a8  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*)#2}::_FUN(void*)
+00003f2c g     F .text.itcm	00000044 EventResponder::runFromInterrupt()
+000036cc  w    F .text.itcm	00000004 usb_serial_class::peek()
+200007d8 g     O .data	00000200 _impure_data
+20001100 g     O .bss	00002918 Can2
+60001df0 g       .text.code	00000000 __init_array_start
+000048cc  w    F .text.itcm	00000002 .hidden __aeabi_idiv0
+200009d8 g     O .data	00000004 F_BUS_ACTUAL
+20006f7c g     O .bss	00000004 maxTxDelayUs
+0000239c  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*)#1}::_FUN(void*)
+00000000 g       .text.itcm	00000000 _stext
+200009f0 g     O .data	00000004 IntervalTimer::nvic_priorites
+000001d8  w    F .text.itcm	00000006 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*, void*)#2}::_FUN(void*, void*)
+00004b00 g     F .text.itcm	000000d8 strlen
+20007024 g     O .bss	00000001 lastCanLength
+0000021c  w    F .text.itcm	00000010 IntervalTimer::~IntervalTimer()
+60001dfc g     O .text.progmem	00000016 usb_string_product_name_default
+000001e4  w    F .text.itcm	00000004 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::write(CANFD_message_t const&)
+600016cc  w    F .text.code	00000002 startup_middle_hook
+600016d8 g     F .text.code	0000011c configure_cache
+60001df0 g       .text.code	00000000 __preinit_array_start
+00003644 g     F .text.itcm	00000020 usb_receive
+00008800 g       *ABS*	00000000 _flashimagelen
+0000450c g     F .text.itcm	00000000 .hidden __aeabi_ldivmod
+00004500 g     F .text.itcm	0000000a __aeabi_atexit
+00004410 g     F .text.itcm	00000024 rtc_get
+70000000 g       .bss.extram	00000000 _extram_start
+00003f70 g     F .text.itcm	00000004 pendablesrvreq_isr
+00003b68 g     F .text.itcm	000000dc usb_serial_read
+000026bc g     F .text.itcm	00000020 Print::printNumber(unsigned long, unsigned char, unsigned char)
+0000357c g     F .text.itcm	0000006c usb_config_tx
+20000a5c  w    O .data	00000016 usb_string_serial_number
+
+

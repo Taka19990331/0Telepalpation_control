@@ -1,7 +1,7 @@
 function figures(r)
 f=r.frf.frequency_Hz; E=r.frf.H1_real+1i*r.frf.H1_imag;
 fig=gobjects(8,1); n=numel(r.trials);
-for k=1:8, fig(k)=figure('Visible','off','Color','w','Position',[60 60 1150 850]); end
+for k=1:8, fig(k)=figure('Visible','on','Color','w','Position',[60 60 1150 850]); end
 figure(fig(1)); tiledlayout(3,1);
 labels={'Chirp torque [Nm]','Relative angle [rad]','Velocity [rad/s]'};
 for j=1:3
@@ -87,7 +87,6 @@ sgtitle('8: Trial reproducibility and initial position (color = trial index)');
 for k=1:8
     savefig(fig(k),fullfile(r.output,sprintf('figure_%d.fig',k)));
     exportgraphics(fig(k),fullfile(r.output,sprintf('figure_%d.png',k)),'Resolution',160);
-    close(fig(k));
 end
 end
 function a=viewH(H,j)

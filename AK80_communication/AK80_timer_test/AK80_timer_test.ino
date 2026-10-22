@@ -13,9 +13,9 @@ constexpr bool IS_60=sameText(MOTOR_SELECT,"60");
 static_assert(IS_80A || IS_80B || IS_60,"Select 80A, 80B or 60");
 FlexCAN_T4<IS_60 ? CAN3 : (IS_80A ? CAN1 : CAN2), RX_SIZE_256, TX_SIZE_16> Can0;
 constexpr uint32_t MOTOR_ID=IS_60 ? 3 : (IS_80A ? 1 : 2);
-// Match 06_Integrated_Controller Mode1 ranges.
+// Match sys_identification/chirp_simplified_test1 ranges.
 const float P_MIN=IS_60 ? -12.56f : -12.5f, P_MAX=-P_MIN;
-const float V_MIN=IS_60 ? -60.0f : -45.0f, V_MAX=-V_MIN;
+const float V_MIN=IS_60 ? -60.0f : -37.5f, V_MAX=-V_MIN;
 const float T_MIN=IS_60 ? -12.0f : -32.0f, T_MAX=-T_MIN;
 const float KP_MIN=0, KP_MAX=500, KD_MIN=0, KD_MAX=5;
 const float TEST_TORQUE_NM = 0.5f;

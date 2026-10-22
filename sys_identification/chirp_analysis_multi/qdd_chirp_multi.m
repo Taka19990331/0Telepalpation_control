@@ -11,6 +11,13 @@ out=fullfile(dest,char(datetime('now','Format','yyyyMMdd_HHmmss_SSS')));
 while isfolder(out), out=[out '_new']; end
 mkdir(out); fprintf('Output: %s\n',out);
 [trials,selection,metadata,referenceCheck]=qm.select(o,out);
+if o.showSummaryFigureOnly
+    summary=qm.summaryAnalysis(trials,o,out);
+    if o.makeFigures, qm.summaryFigures(summary); end
+    r=summary;
+    fprintf('Finished summary-only analysis. Results: %s\n',out);
+    return
+end
 n=numel(trials); [train,test]=qm.split(n);
 split=table((1:n)',string(cellfun(@(t)t.file,trials,'UniformOutput',false))', ...
     ismember((1:n)',train),ismember((1:n)',test), ...
