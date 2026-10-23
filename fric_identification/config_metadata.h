@@ -28,6 +28,8 @@ inline size_t makeConfig(char *configJson, size_t capacity) {
  n+=snprintf(configJson+n,capacity-n,",\"AK60_KT_NM_PER_A\":%.9g",double(AK60_KT_NM_PER_A));
  n+=snprintf(configJson+n,capacity-n,",\"TORQUE_LIMIT_NM\":%.9g",double(TORQUE_LIMIT_NM));
  n+=snprintf(configJson+n,capacity-n,",\"TORQUE_STEP_NM\":%.9g",double(TORQUE_STEP_NM));
+ n+=snprintf(configJson+n,capacity-n,",\"TORQUE_STEP_CHANGE_SPEED_RAD_S\":%.9g",double(TORQUE_STEP_CHANGE_SPEED_RAD_S));
+ n+=snprintf(configJson+n,capacity-n,",\"HIGH_SPEED_TORQUE_STEP_LSBS\":%.9g",double(HIGH_SPEED_TORQUE_STEP_LSBS));
  n+=snprintf(configJson+n,capacity-n,",\"SPEED_LIMIT_RAD_S\":%.9g",double(SPEED_LIMIT_RAD_S));
  n+=snprintf(configJson+n,capacity-n,",\"MIN_SETTLE_US\":%.9g",double(MIN_SETTLE_US));
  n+=snprintf(configJson+n,capacity-n,",\"MAX_SETTLE_US\":%.9g",double(MAX_SETTLE_US));
