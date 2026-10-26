@@ -117,10 +117,10 @@ int main(int argc,char **argv) {
     if(e.state==EXITING) break;
   }
   assert(e.reason==OK && e.stopConfirmed && e.state==EXITING);
-  assert(commands.size()==202);
-  assert(commands[0]==0 && commands[50]==1 && commands[100]==0 && commands[101]==0 && commands[151]==-1 && commands.back()==0);
-  assert(phases[50]==1 && phases[51]==2 && phases[101]==3 && phases[152]==4);
+  assert(commands.size()==258);
+  assert(commands[0]==0 && commands[64]==1 && commands[128]==0 && commands[129]==0 && commands[193]==-1 && commands.back()==0);
+  assert(phases[64]==1 && phases[65]==2 && phases[129]==3 && phases[194]==4);
   for(size_t i=1;i<commands.size();++i) assert(fabsf(commands[i]-commands[i-1])<=TORQUE_STEP_NM+.00001f);
   if(out) { Footer f={{'E','N','D','F','R','0','0','1'},rows,e.reason,e.stopConfirmed,0}; fwrite(&f,sizeof(f),1,out); fclose(out); }
-  printf("PASS: regression, freshness, wraps, settling, faults, protocol, 202-step sweep; %u rows\n",rows);
+  printf("PASS: regression, freshness, wraps, settling, faults, protocol, 258-step sweep; %u rows\n",rows);
 }

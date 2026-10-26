@@ -137,23 +137,34 @@ struct Engine {
     }
     return stationaryCandidate && now-stationaryUs>=STATIONARY_CONFIRM_US;
   }
-  void next(uint32_t now) {
+  void next(uint32_t now,float speed) {
     pendingNext=false;
     const unsigned intervals=unsigned(ceilf(TORQUE_LIMIT_NM/TORQUE_STEP_NM));
+    const unsigned stepLsbs=fabsf(speed)>=TORQUE_STEP_CHANGE_SPEED_RAD_S?HIGH_SPEED_TORQUE_STEP_LSBS:1u;
     ++step; // global step index; endpoints clamped, including non-divisible increments
     if(phase==1) {
-      if(level==intervals) { phase=2; level=1; target=fmaxf(0.f,TORQUE_LIMIT_NM-TORQUE_STEP_NM); }
-      else { ++level; target=fminf(TORQUE_LIMIT_NM,level*TORQUE_STEP_NM); }
+      if(level>=intervals) {
+        phase=2; level=stepLsbs<intervals?stepLsbs:intervals;
+        target=fmaxf(0.f,TORQUE_LIMIT_NM-level*TORQUE_STEP_NM);
+      } else {
+        level=level+stepLsbs<intervals?level+stepLsbs:intervals;
+        target=fminf(TORQUE_LIMIT_NM,level*TORQUE_STEP_NM);
+      }
     } else if(phase==2) {
       if(target<=0) { phase=0; state=COASTING; stateUs=now; target=0; resetDetection(now); return; }
-      ++level;
+      level=level+stepLsbs<intervals?level+stepLsbs:intervals;
       target=level>=intervals?0:fmaxf(0.f,TORQUE_LIMIT_NM-level*TORQUE_STEP_NM);
     } else if(phase==3) {
-      if(level==intervals) { phase=4; level=1; target=fminf(0.f,-TORQUE_LIMIT_NM+TORQUE_STEP_NM); }
-      else target=fmaxf(-TORQUE_LIMIT_NM,(++level)*-TORQUE_STEP_NM);
+      if(level>=intervals) {
+        phase=4; level=stepLsbs<intervals?stepLsbs:intervals;
+        target=fminf(0.f,-TORQUE_LIMIT_NM+level*TORQUE_STEP_NM);
+      } else {
+        level=level+stepLsbs<intervals?level+stepLsbs:intervals;
+        target=fmaxf(-TORQUE_LIMIT_NM,level*-TORQUE_STEP_NM);
+      }
     } else {
       if(target>=0) { stop(OK,now); return; }
-      ++level;
+      level=level+stepLsbs<intervals?level+stepLsbs:intervals;
       target=level>=intervals?0:fminf(0.f,-TORQUE_LIMIT_NM+level*TORQUE_STEP_NM);
     }
     startStep(now);
@@ -213,7 +224,7 @@ struct Engine {
       target=0;
       return;
     }
-    if(pendingNext) { next(now); return; }
+    if(pendingNext) { next(now,f.speed); return; }
     bool settled=regression.settled();
     if(state==SETTLING) {
       if(settled) { if(!candidate) {candidate=true; candidateUs=now;} } else candidate=false;
