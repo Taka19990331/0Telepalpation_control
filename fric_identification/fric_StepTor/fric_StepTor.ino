@@ -13,7 +13,9 @@
 constexpr float P_MIN=-12.5f, P_MAX=12.5f, V_MIN=-37.5f, V_MAX=37.5f;
 constexpr float T_MIN=-32.0f, T_MAX=32.0f, KP_MIN=0.0f, KP_MAX=500.0f, KD_MIN=0.0f, KD_MAX=5.0f;
 constexpr uint8_t ISR_PRIORITY=192;
-FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> Can2;
+static_assert(MOTOR_ID==1 || MOTOR_ID==2,
+  "StepTor supports AK80 Motor ID 1/2; Motor ID 3 uses a different CAN protocol");
+FlexCAN_T4<(MOTOR_ID==1 ? CAN1 : CAN2), RX_SIZE_256, TX_SIZE_16> Can;
 IntervalTimer controlTimer;
 SdFs sd;
 
@@ -50,7 +52,9 @@ uint32_t floatToUint(float x,float lo,float hi,uint8_t bits) {
   x=fmaxf(lo,fminf(hi,x)); return uint32_t((x-lo)*float((1UL<<bits)-1)/(hi-lo));
 }
 void receiveFrame(const CAN_message_t &m) {
-  if (m.flags.extended || m.flags.remote || m.len!=8 || m.buf[0]!=MOTOR_ID) return;
+  // AK80 feedback may identify the motor by the CAN ID or by data byte 0.
+  if (m.flags.extended || m.flags.remote || m.len!=8 ||
+      (m.id!=MOTOR_ID && m.buf[0]!=MOTOR_ID)) return;
   const uint32_t p=(uint32_t(m.buf[1])<<8)|m.buf[2];
   const uint32_t v=(uint32_t(m.buf[3])<<4)|(m.buf[4]>>4);
   const uint32_t t=((uint32_t(m.buf[4])&15)<<8)|m.buf[5];
@@ -62,7 +66,7 @@ void receiveFrame(const CAN_message_t &m) {
 bool sendSpecial(uint8_t code) {
   CAN_message_t m={}; m.id=MOTOR_ID; m.len=8;
   for (uint8_t i=0;i<7;i++) m.buf[i]=0xff; m.buf[7]=code;
-  if (!Can2.write(m)) { ++txFailures; return false; } return true;
+  if (!Can.write(m)) { ++txFailures; return false; } return true;
 }
 bool sendMit(float velocity,float torque) {
   const uint32_t p=floatToUint(0,P_MIN,P_MAX,16), v=floatToUint(velocity,V_MIN,V_MAX,12);
@@ -71,7 +75,7 @@ bool sendMit(float velocity,float torque) {
   CAN_message_t m={}; m.id=MOTOR_ID; m.len=8;
   m.buf[0]=p>>8; m.buf[1]=p; m.buf[2]=v>>4; m.buf[3]=((v&15)<<4)|(kp>>8);
   m.buf[4]=kp; m.buf[5]=kd>>4; m.buf[6]=((kd&15)<<4)|(t>>8); m.buf[7]=t;
-  if (!Can2.write(m)) { ++txFailures; return false; } return true;
+  if (!Can.write(m)) { ++txFailures; return false; } return true;
 }
 void timerISR() {
   const uint32_t now=micros();
@@ -214,10 +218,10 @@ void findLatestLog() {
 }
 void setup() {
   Serial.begin(115200);
-  Can2.begin(); Can2.setBaudRate(CAN_BAUD); Can2.setMaxMB(16);
-  Can2.setMB(MB0,RX,STD); Can2.setMBFilter(REJECT_ALL); Can2.setMBFilter(MB0,MOTOR_ID);
-  Can2.onReceive(MB0,receiveFrame); Can2.enableMBInterrupt(MB0);
-  NVIC_SET_PRIORITY(IRQ_CAN2,ISR_PRIORITY); canReady=true;
+  Can.begin(); Can.setBaudRate(CAN_BAUD); Can.setMaxMB(16);
+  Can.setMB(MB0,RX,STD); Can.setMBFilter(REJECT_ALL); Can.setMBFilter(MB0,ACCEPT_ALL);
+  Can.onReceive(MB0,receiveFrame); Can.enableMBInterrupt(MB0);
+  NVIC_SET_PRIORITY(MOTOR_ID==1 ? IRQ_CAN1 : IRQ_CAN2,ISR_PRIORITY); canReady=true;
   cardReady=sd.begin(SdioConfig(FIFO_SDIO));
   findLatestLog();
   controlTimer.priority(ISR_PRIORITY);

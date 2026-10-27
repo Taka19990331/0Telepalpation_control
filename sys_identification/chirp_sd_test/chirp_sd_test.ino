@@ -526,7 +526,8 @@ bool setupCAN() {
   // setMB(TX) enables its IRQ; disableMBInterrupt(TX) is a keeper in this
   // library and does NOT clear it. Clear the mask directly for polled aborts.
   FLEXCANb_IMASK1(MOTOR_CAN_BUS) &= ~TX_BIT;
-  MotorCan.setMBFilter(MB0, IS_60 ? ((0x29u<<8)|MOTOR_ID) : MOTOR_ID);
+  if (IS_60) MotorCan.setMBFilter(MB0, (0x29u<<8)|MOTOR_ID);
+  else MotorCan.setMBFilter(MB0, ACCEPT_ALL);
   MotorCan.onReceive(MB0, receiveISR); MotorCan.enableMBInterrupt(MB0);
   // TX interrupt stays disabled: controlISR polls completion/abort state.
   NVIC_SET_PRIORITY(IS_60 ? IRQ_CAN3 : (IS_80A ? IRQ_CAN1 : IRQ_CAN2), ISR_PRIORITY);

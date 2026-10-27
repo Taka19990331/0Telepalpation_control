@@ -1,6 +1,6 @@
 # ConstVel Teensy sketch
 
-`fric_ConstVel.ino`はTeensy 4.1とCAN2接続のAK80（ID 2）を、設定した速度指令で一定時間動かしながらデータ取得します。制御周期と記録周期は2 kHzです。実行中は速度PI制御、速度指令、位置、実速度、ドライバ推定トルク、積分トルク指令をSDカードへ記録します。
+`fric_ConstVel.ino`はTeensy 4.1とAK80（ID 1ならCAN1、ID 2ならCAN2）を、設定した速度指令で一定時間動かしながらデータ取得します。制御周期と記録周期は2 kHzです。実行中は速度PI制御、速度指令、位置、実速度、ドライバ推定トルク、積分トルク指令をSDカードへ記録します。
 
 ## 設定
 
@@ -15,7 +15,7 @@
 
 ## 実行とデータ取得
 
-1. Arduino IDEでTeensy 4.1を選び、`fric_ConstVel.ino`を開いて書き込みます。SDカードを挿入し、モータをMITモードにしてCAN2へ接続してください。
+1. Arduino IDEでTeensy 4.1を選び、`fric_ConstVel.ino`を開いて書き込みます。SDカードを挿入し、`constvel_config.h`の`MOTOR_ID`に合わせてモータをMITモードにし、ID 1はCAN1、ID 2はCAN2へ接続してください。
 2. USBシリアルで`s`を送ると、フィードバック受信を確認してから一定速度の記録を開始します。設定時間が経過するとゼロ速度指令を送り、自動停止します。`x`で途中停止できます。
 3. CSVをPCへ転送します。開始と転送を一括で行う場合は、PowerShellで次を実行します。
 

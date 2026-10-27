@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 
-// AK80 MIT constant-velocity test on CAN2 / motor ID 2.
+// AK80 MIT constant-velocity test. ID 1 uses CAN1; ID 2 uses CAN2.
 constexpr uint8_t MOTOR_ID = 2;
 constexpr uint32_t CAN_BAUD = 1000000;
 constexpr uint32_t CONTROL_PERIOD_US = 500; // 2 kHz

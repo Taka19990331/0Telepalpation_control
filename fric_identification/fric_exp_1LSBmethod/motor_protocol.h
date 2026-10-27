@@ -29,7 +29,8 @@ inline MotorFrame torqueFrameFromCount(uint16_t t) {
 }
 inline float torqueForCount(uint16_t c) { return decodeValue(c,-MIT_TORQUE_MAX_NM,MIT_TORQUE_MAX_NM,12); }
 inline bool isTargetFeedback(const MotorFrame &f) {
-  return !f.extended && !f.remote && f.len==8 && f.id==MOTOR_ID && f.data[0]==MOTOR_ID;
+  return !f.extended && !f.remote && f.len==8 &&
+         (f.id==MOTOR_ID || f.data[0]==MOTOR_ID);
 }
 inline MotorFeedback decodeMotorFeedback(const MotorFrame &f) {
   if(!isTargetFeedback(f)) return {};

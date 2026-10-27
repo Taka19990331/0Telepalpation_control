@@ -40,7 +40,7 @@ inline constexpr MotorFrame torqueFrame(float torque, float limit = TORQUE_LIMIT
 inline constexpr bool isTargetFeedback(const MotorFrame &f) {
   return !f.remote && f.len==8 && (IS_60 ?
       (f.extended && f.id==((0x29u<<8)|MOTOR_ID)) :
-      (!f.extended && f.id==MOTOR_ID && f.data[0]==MOTOR_ID));
+      (!f.extended && (f.id==MOTOR_ID || f.data[0]==MOTOR_ID)));
 }
 inline constexpr int32_t signed16(uint32_t x) { return x&0x8000 ? int32_t(x)-65536 : int32_t(x); }
 inline constexpr MotorFeedback decodeMotorFeedback(const MotorFrame &f) {

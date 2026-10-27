@@ -13,8 +13,9 @@ constexpr bool REQUIRE_INITIAL_STATIONARY = false;
 // Documentary metadata only; these values do not configure motor protection.
 constexpr bool BRAKE_VERIFIED = true;
 constexpr uint32_t VERIFIED_MOTOR_TIMEOUT_MS = 0; // UNKNOWN
-constexpr bool IS_60=false, IS_80A=false; // AK80 only; false selects CAN2/ID2
-constexpr uint32_t CAN_PORT_NUMBER=IS_80A?1:2, MOTOR_ID=IS_80A?1:2;
+constexpr bool IS_60=false, IS_80A=false; // Select AK60 / AK80A / AK80B below.
+constexpr uint32_t CAN_PORT_NUMBER=IS_60?3:(IS_80A?1:2);
+constexpr uint32_t MOTOR_ID=IS_60?3:(IS_80A?1:2);
 constexpr uint32_t CAN_BITRATE=1000000, PERIOD_US=500, ISR_PRIORITY=192;
 constexpr uint32_t FEEDBACK_TIMEOUT_US=20000, START_TIMEOUT_US=500000;
 constexpr uint32_t MAX_CONTROL_GAP_US=2000, EXIT_TIMEOUT_US=100000;

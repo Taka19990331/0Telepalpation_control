@@ -1,6 +1,6 @@
 # StepTor トルクステップ実験
 
-Teensy 4.1 / CAN2 / モータID 2用。ConstVelと同じSDバイナリ記録→USBシリアルCSV抽出方式です。
+Teensy 4.1 / AK80 Motor ID 1（CAN1）またはID 2（CAN2）用。ID 3は異なるCANプロトコルのため未対応です。ConstVelと同じSDバイナリ記録→USBシリアルCSV抽出方式です。
 
 ## 設定と動作
 

@@ -1,6 +1,6 @@
 # VelRamp Teensy sketch
 
-`fric_VelRamp.ino` is for Teensy 4.1 and the AK80 on CAN2, motor ID 2. It samples and commands at 2 kHz, buffers rows in RAM, and writes them to the built-in SD card while the run is active. It emits no status or telemetry text during the run.
+`fric_VelRamp.ino` is for Teensy 4.1 and the AK80 (motor ID 1 on CAN1 or ID 2 on CAN2). It samples and commands at 2 kHz, buffers rows in RAM, and writes them to the built-in SD card while the run is active. It emits no status or telemetry text during the run.
 
 ## Profile
 
@@ -9,7 +9,7 @@ The schedule uses 0.1 rad/s increments. It ramps 0 to +1 rad/s in 1 s per step, 
 ## Use
 
 1. Set the Teensy board to Teensy 4.1, insert the SD card, and load the sketch.
-2. Ensure the motor is in MIT mode and the CAN2 / ID 2 wiring is correct.
+2. Ensure the motor is in MIT mode and the wiring matches `velramp_config.h`: ID 1 on CAN1 or ID 2 on CAN2.
 3. Send `s` over USB Serial to start. Send `x` to abort; the run is then finalized on SD.
 4. After the run, use PowerShell:
 

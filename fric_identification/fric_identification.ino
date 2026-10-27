@@ -9,7 +9,7 @@
 #if !defined(ARDUINO_TEENSY41)
 #error "Select Teensy 4.1"
 #endif
-constexpr CAN_DEV_TABLE MOTOR_CAN_BUS=IS_80A?CAN1:CAN2;
+constexpr CAN_DEV_TABLE MOTOR_CAN_BUS=IS_60?CAN3:(IS_80A?CAN1:CAN2);
 FlexCAN_T4<MOTOR_CAN_BUS,RX_SIZE_256,TX_SIZE_16> MotorCan;
 constexpr FLEXCAN_MAILBOX TX_MAILBOX=MB8;
 constexpr uint32_t TX_BIT=1u<<8;
@@ -166,7 +166,8 @@ bool setupCAN() {
   // setMB(TX) enables its IRQ; disableMBInterrupt(TX) is a keeper in this
   // library and does NOT clear it. Clear the mask directly for polled aborts.
   FLEXCANb_IMASK1(MOTOR_CAN_BUS) &= ~TX_BIT;
-  MotorCan.setMBFilter(MB0, IS_60 ? ((0x29u<<8)|MOTOR_ID) : MOTOR_ID);
+  if (IS_60) MotorCan.setMBFilter(MB0, (0x29u<<8)|MOTOR_ID);
+  else MotorCan.setMBFilter(MB0, ACCEPT_ALL);
   MotorCan.onReceive(MB0, receiveISR); MotorCan.enableMBInterrupt(MB0);
   // TX interrupt stays disabled: controlISR polls completion/abort state.
   NVIC_SET_PRIORITY(IS_60 ? IRQ_CAN3 : (IS_80A ? IRQ_CAN1 : IRQ_CAN2), ISR_PRIORITY);

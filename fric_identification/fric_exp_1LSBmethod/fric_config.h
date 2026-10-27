@@ -2,8 +2,10 @@
 #include <stdint.h>
 #include <math.h>
 
-// AK80-8 / Teensy 4.1 fixed hardware profile.
-constexpr uint32_t MOTOR_ID = 2, CAN_BITRATE = 1000000, CAN_PORT_NUMBER = 2;
+// AK80-8 / Teensy 4.1. Motor ID 1 uses CAN1; ID 2 uses CAN2.
+constexpr uint32_t MOTOR_ID = 2, CAN_BITRATE = 1000000;
+static_assert(MOTOR_ID==1 || MOTOR_ID==2, "AK80 Motor ID 1 uses CAN1; ID 2 uses CAN2");
+constexpr uint32_t CAN_PORT_NUMBER = MOTOR_ID;
 constexpr uint32_t PERIOD_US = 500, ISR_PRIORITY = 192;
 // MIT's 16-bit position field is encoded over this range. This is a wire
 // representation range, not an absolute experiment position limit.

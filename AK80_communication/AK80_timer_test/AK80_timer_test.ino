@@ -18,7 +18,7 @@ const float P_MIN=IS_60 ? -12.56f : -12.5f, P_MAX=-P_MIN;
 const float V_MIN=IS_60 ? -60.0f : -37.5f, V_MAX=-V_MIN;
 const float T_MIN=IS_60 ? -12.0f : -32.0f, T_MAX=-T_MIN;
 const float KP_MIN=0, KP_MAX=500, KD_MIN=0, KD_MAX=5;
-const float TEST_TORQUE_NM = 0.5f;
+const float TEST_TORQUE_NM = 1.0f;
 const float SPEED_STOP_RAD_S = 40.0f;
 const uint32_t RUN_MS = 1000, FEEDBACK_TIMEOUT_MS = 100;
 uint32_t txCount=0, startedMs=0, lastRxMs=0, runMs=0;

@@ -10,7 +10,8 @@
 #error "Select Teensy 4.1; this firmware uses its built-in SDIO microSD slot"
 #endif
 
-FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> MotorCan;
+constexpr CAN_DEV_TABLE MOTOR_CAN_BUS = CAN_PORT_NUMBER==1 ? CAN1 : CAN2;
+FlexCAN_T4<MOTOR_CAN_BUS, RX_SIZE_256, TX_SIZE_16> MotorCan;
 constexpr FLEXCAN_MAILBOX TX_MAILBOX=MB8;
 constexpr uint32_t TX_BIT=1u<<8;
 IntervalTimer controlTimer;
@@ -59,11 +60,11 @@ bool stopZeroActive=false;
 
 uint32_t lockInterrupts(){uint32_t p=__get_primask();__disable_irq();return p;}
 void unlockInterrupts(uint32_t p){if(!p)__enable_irq();}
-bool txIdle(){return !canTxInFlight&&FLEXCAN_get_code(FLEXCANb_MBn_CS(CAN2,8))==FLEXCAN_MB_CODE_TX_INACTIVE;}
+bool txIdle(){return !canTxInFlight&&FLEXCAN_get_code(FLEXCANb_MBn_CS(MOTOR_CAN_BUS,8))==FLEXCAN_MB_CODE_TX_INACTIVE;}
 void pollTxCompletion(){
-  if(!canTxInFlight||!(FLEXCANb_IFLAG1(CAN2)&TX_BIT))return;
-  uint32_t code=FLEXCAN_get_code(FLEXCANb_MBn_CS(CAN2,8));
-  FLEXCANb_IFLAG1(CAN2)=TX_BIT;
+  if(!canTxInFlight||!(FLEXCANb_IFLAG1(MOTOR_CAN_BUS)&TX_BIT))return;
+  uint32_t code=FLEXCAN_get_code(FLEXCANb_MBn_CS(MOTOR_CAN_BUS,8));
+  FLEXCANb_IFLAG1(MOTOR_CAN_BUS)=TX_BIT;
   const uint8_t kind=canTxInFlightKind;
   canTxInFlight=false;
   if(code==FLEXCAN_MB_CODE_TX_INACTIVE){
@@ -74,7 +75,7 @@ void pollTxCompletion(){
 }
 bool sendFrame(const CAN_message_t &m,uint8_t kind=TX_KIND_OTHER){
   if(!txIdle()||MotorCan.getTXQueueCount()){++canTxFailedCount;return false;}
-  FLEXCANb_IFLAG1(CAN2)=TX_BIT;
+  FLEXCANb_IFLAG1(MOTOR_CAN_BUS)=TX_BIT;
   if(!MotorCan.write(TX_MAILBOX,m)){++canTxFailedCount;return false;}
   canTxInFlight=true;canTxInFlightKind=kind;++canTxAcceptedCount;return true;
 }
@@ -224,7 +225,7 @@ void timerISR(){
     return;
   }
   Feedback f=feedback;
-  if(FLEXCANb_ESR1(CAN2)&FLEXCAN_ESR_FLT_CONF_MASK){beginSafeStop(15,true,now);appendSample(now,f);return;}
+  if(FLEXCANb_ESR1(MOTOR_CAN_BUS)&FLEXCAN_ESR_FLT_CONF_MASK){beginSafeStop(15,true,now);appendSample(now,f);return;}
   if(!f.sequence||now-f.rxUs>=FEEDBACK_TIMEOUT_US){beginSafeStop(7,true,now);appendSample(now,f);return;}
   if(f.error){beginSafeStop(2,true,now);appendSample(now,f);return;}
   if(fabsf(f.speedRadS)>=EMERGENCY_SPEED_RAD_S){beginSafeStop(8,true,now);appendSample(now,f);return;}
@@ -286,7 +287,7 @@ void timerISR(){
 
 void writeCsvHeader(){
   logFile.println("# experiment=AK80-8_1LSBfric");logFile.print("# start_epoch=");logFile.println(startEpoch);logFile.print("# start_datetime_local=");logFile.println(startDateTime);
-  logFile.println("# motor=AK80-8,CAN2,ID2,bitrate=1000000");logFile.print("# MIT_torque_range_Nm=-32..32,counts=0..4095,quantum_Nm=");logFile.print(TORQUE_QUANTUM_NM,10);logFile.println(",zero_count=2047,zero_decoded_Nm=-0.007814408");
+  logFile.print("# motor=AK80-8,CAN");logFile.print(CAN_PORT_NUMBER);logFile.print(",ID");logFile.print(MOTOR_ID);logFile.println(",bitrate=1000000");logFile.print("# MIT_torque_range_Nm=-32..32,counts=0..4095,quantum_Nm=");logFile.print(TORQUE_QUANTUM_NM,10);logFile.println(",zero_count=2047,zero_decoded_Nm=-0.007814408");
   logFile.println("# control_period_us=500,low_ramp_us=100000,transition_window_us=50000,steady_window_us=1000000,max_step_wait_us=3000000");
   logFile.println("# accel_limit_rad_s2=0.3,speed_std_limit_rad_s=0.08,low_boundary_rad_s=1,normal_speed_limit_rad_s=15(coast_stop),emergency_speed_rad_s=20,torque_limit_Nm=1,feedback_timeout_us=20000,max_run_s=900");
   logFile.println("# position_encoding_rad=-12.5..12.5,wrap_period_rad=25; absolute_position_limit=disabled; position_raw_rad and position_unwrapped_rad are both logged; position_deg remains unwrapped");
@@ -367,12 +368,12 @@ bool setupCAN(){
   MotorCan.begin();MotorCan.setBaudRate(CAN_BITRATE);MotorCan.setMaxMB(16);
   for(uint8_t i=0;i<16;i++)MotorCan.setMB(FLEXCAN_MAILBOX(i),RX,INACTIVE);
   MotorCan.setMB(MB0,RX,STD);MotorCan.setMBFilter(REJECT_ALL);MotorCan.setMB(TX_MAILBOX,TX,STD);
-  FLEXCANb_IFLAG1(CAN2)=TX_BIT;FLEXCANb_IMASK1(CAN2)&=~TX_BIT;MotorCan.setMBFilter(MB0,MOTOR_ID);MotorCan.onReceive(MB0,receiveISR);MotorCan.enableMBInterrupt(MB0);
-  NVIC_SET_PRIORITY(IRQ_CAN2,ISR_PRIORITY);
-  FLEXCANb_MCR(CAN2)|=FLEXCAN_MCR_FRZ|FLEXCAN_MCR_HALT;
-  uint32_t started=micros();while(!(FLEXCANb_MCR(CAN2)&FLEXCAN_MCR_FRZ_ACK))if(micros()-started>10000)return false;
-  FLEXCANb_MCR(CAN2)|=FLEXCAN_MCR_AEN;FLEXCANb_MCR(CAN2)&=~FLEXCAN_MCR_HALT;
-  started=micros();while(FLEXCANb_MCR(CAN2)&FLEXCAN_MCR_FRZ_ACK)if(micros()-started>10000)return false;
+  FLEXCANb_IFLAG1(MOTOR_CAN_BUS)=TX_BIT;FLEXCANb_IMASK1(MOTOR_CAN_BUS)&=~TX_BIT;MotorCan.setMBFilter(MB0,ACCEPT_ALL);MotorCan.onReceive(MB0,receiveISR);MotorCan.enableMBInterrupt(MB0);
+  NVIC_SET_PRIORITY(CAN_PORT_NUMBER==1 ? IRQ_CAN1 : IRQ_CAN2,ISR_PRIORITY);
+  FLEXCANb_MCR(MOTOR_CAN_BUS)|=FLEXCAN_MCR_FRZ|FLEXCAN_MCR_HALT;
+  uint32_t started=micros();while(!(FLEXCANb_MCR(MOTOR_CAN_BUS)&FLEXCAN_MCR_FRZ_ACK))if(micros()-started>10000)return false;
+  FLEXCANb_MCR(MOTOR_CAN_BUS)|=FLEXCAN_MCR_AEN;FLEXCANb_MCR(MOTOR_CAN_BUS)&=~FLEXCAN_MCR_HALT;
+  started=micros();while(FLEXCANb_MCR(MOTOR_CAN_BUS)&FLEXCAN_MCR_FRZ_ACK)if(micros()-started>10000)return false;
   return true;
 }
 void setup(){Serial.begin(115200);uint32_t t=millis();while(!Serial&&millis()-t<3000){}
