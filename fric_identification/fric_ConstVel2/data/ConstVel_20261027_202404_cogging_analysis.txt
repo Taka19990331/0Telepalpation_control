@@ -1,0 +1,13 @@
+File: ConstVel_20261027_202404.csv
+Rows: 12853; sampling: 2000 Hz; logged duration: 6.426 s; target speed: 8.000 rad/s; end status: 1 (manual stop)
+Steady segment: t >= 0.5 s; 11853 samples; 5.926 s; unwrapped angle 47.232 rad = 7.517 revolutions; mean angle speed 7.9703 rad/s.
+Steady estimated torque: mean 0.1832 N m; SD 0.0489 N m; 5-95% [0.1016, 0.2579] N m.
+Steady speed: mean 8.0000 rad/s; SD 0.2286 rad/s.
+Time spectrum: torque estimate peak in 5-100 Hz at 10.124 Hz, amplitude 0.01493 N m; nominal 8th position order predicts 10.148 Hz. Speed peak in 80-250 Hz at 136.674 Hz, amplitude 0.09941 rad/s, equivalent order 107.74/rev.
+Position-order regression: order 8 amplitude 0.01472 N m (speed amplitude 0.00818 rad/s); order 108 amplitude 0.00174 N m (speed amplitude 0.00618 rad/s).
+Order 8 per-revolution torque amplitudes: [0.0154 0.0156 0.0136 0.0161 0.0189 0.0157 0.017  0.0216] N m; phase-lock factor R=0.888 (1=repeatable phase, 0=unlocked).
+Order 16 per-revolution torque amplitudes: [0.0048 0.0101 0.0085 0.0137 0.0119 0.0078 0.0105 0.0046] N m; phase-lock factor R=0.254 (1=repeatable phase, 0=unlocked).
+Order 107 per-revolution torque amplitudes: [0.0215 0.0339 0.0156 0.0172 0.0082 0.0069 0.0247 0.0362] N m; phase-lock factor R=0.235 (1=repeatable phase, 0=unlocked).
+Order 108 per-revolution torque amplitudes: [0.0093 0.0098 0.0304 0.0319 0.0346 0.0366 0.0201 0.0359] N m; phase-lock factor R=0.179 (1=repeatable phase, 0=unlocked).
+Position-folded torque profile RMS: 0.02013 N m; order-8 Fourier amplitude 0.01454 N m; order-108 amplitude 0.00177 N m.
+Caveat: torque_estimate_nm is the motor controller estimate; commanded torque is reconstructed as Kp*(target_speed-measured_speed)+logged_iTorque. This run does not include an independent torque transducer or rotor electrical-angle/slot calibration.

@@ -19,8 +19,8 @@ constexpr float MAX_I_TORQUE_NM = 1.0f;
 constexpr float MAX_ABS_SPEED_RAD_S = 20.0f;
 
 // Set the signed target velocity and hold duration for each acquisition.
-constexpr float TARGET_SPEED_RAD_S = 1.0f;
-constexpr uint32_t HOLD_DURATION_US = 30000000UL; // 30 s
+constexpr float TARGET_SPEED_RAD_S = 8.0f;
+constexpr uint32_t HOLD_DURATION_US = 10000000UL; // 30 s
 
 constexpr uint32_t FEEDBACK_TIMEOUT_US = 20000;
 constexpr uint32_t START_TIMEOUT_US = 500000;

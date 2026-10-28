@@ -124,6 +124,13 @@ void timerISR() {
       return;
   }
 
+  Sample &r=ring[head%RING_SIZE];
+  r.timestampUs=now-runStartUs; r.command=cmd; r.position=feedback.position;
+  r.velocity=feedback.velocity; r.torque=feedback.torque; r.iTorque=iTorque;
+  r.stage=stage; r.error=feedback.error; r.valid=1; r.reserved=0;
+  __asm__ volatile("dmb" ::: "memory"); ++head; ++sampleIndex;
+}
+
 bool openNewLog() {
   bool found=false;
   for (uint16_t n=0;n<10000;n++) {

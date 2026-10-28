@@ -5,8 +5,8 @@
 constexpr uint32_t SAMPLING_HZ = 500;
 constexpr uint32_t STEP_COUNT = 3;
 constexpr float TORQUE_STEP_NM = 1.0f;
-constexpr uint32_t STEP_HOLD_US = 500000UL; //5000000UL for 5 sec
-constexpr uint32_t ZERO_HOLD_US = 1000000UL; //2000000UL for 2 sec
+constexpr uint32_t STEP_HOLD_US = 5000000UL; //5000000UL for 5 sec
+constexpr uint32_t ZERO_HOLD_US = 2000000UL; //2000000UL for 2 sec
 
 constexpr uint8_t MOTOR_ID = 2;
 constexpr uint32_t CAN_BAUD = 1000000;

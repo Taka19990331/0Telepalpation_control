@@ -2,12 +2,16 @@ param(
     [Parameter(Mandatory=$true)][string]$Port,
     [switch]$Start,
     [ValidateRange(1,120)][int]$DurationSeconds = 30,
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'data')
+    [string]$OutputDirectory
 )
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
+    $OutputDirectory = Join-Path $PSScriptRoot 'data'
+}
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $serial = [System.IO.Ports.SerialPort]::new($Port,115200,[System.IO.Ports.Parity]::None,8,[System.IO.Ports.StopBits]::One)
-$serial.ReadTimeout = 1000
+$serial.ReadBufferSize = 1048576
+$serial.ReadTimeout = 10000
 $serial.WriteTimeout = 5000
 $serial.NewLine = "`n"
 try {
@@ -24,7 +28,7 @@ try {
     $receiving = $false
     $expectedRows = -1
     $sourceName = ''
-    $deadline = [DateTime]::UtcNow.AddMinutes(5)
+    $deadline = [DateTime]::UtcNow.AddMinutes(10)
     while ([DateTime]::UtcNow -lt $deadline) {
         try { $line = $serial.ReadLine().TrimEnd("`r") }
         catch [System.TimeoutException] { continue }
