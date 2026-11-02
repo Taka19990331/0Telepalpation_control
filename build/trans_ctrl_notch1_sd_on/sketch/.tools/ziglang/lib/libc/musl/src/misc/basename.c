@@ -1,0 +1,15 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\src\\misc\\basename.c"
+#include <string.h>
+#include <libgen.h>
+
+char *basename(char *s)
+{
+	size_t i;
+	if (!s || !*s) return ".";
+	i = strlen(s)-1;
+	for (; i&&s[i]=='/'; i--) s[i] = 0;
+	for (; i&&s[i-1]!='/'; i--);
+	return s+i;
+}
+
+weak_alias(basename, __xpg_basename);

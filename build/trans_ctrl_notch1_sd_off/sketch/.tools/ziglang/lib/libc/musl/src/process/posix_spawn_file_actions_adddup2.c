@@ -1,0 +1,19 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\src\\process\\posix_spawn_file_actions_adddup2.c"
+#include <spawn.h>
+#include <stdlib.h>
+#include <errno.h>
+#include "fdop.h"
+
+int posix_spawn_file_actions_adddup2(posix_spawn_file_actions_t *fa, int srcfd, int fd)
+{
+	if (srcfd < 0 || fd < 0) return EBADF;
+	struct fdop *op = malloc(sizeof *op);
+	if (!op) return ENOMEM;
+	op->cmd = FDOP_DUP2;
+	op->srcfd = srcfd;
+	op->fd = fd;
+	if ((op->next = fa->__actions)) op->next->prev = op;
+	op->prev = 0;
+	fa->__actions = op;
+	return 0;
+}

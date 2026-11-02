@@ -1,0 +1,62 @@
+[
+  {
+    "file": "trans_ctrl_test1_20261102_122211.csv",
+    "samples": 78501,
+    "duration_s": 39.25,
+    "median_dt_s": 0.0004999999999999449,
+    "ranges": {
+      "position_rad": [
+        -13.079839999999999,
+        0.0
+      ],
+      "velocity_filtered_rad_s": [
+        -6.255646,
+        5.339542
+      ],
+      "external_torque_est_Nm": [
+        -4.189059,
+        4.339838
+      ]
+    }
+  },
+  {
+    "file": "trans_ctrl_test1_20261102_122519.csv",
+    "samples": 47243,
+    "duration_s": 23.621,
+    "median_dt_s": 0.0004999999999999449,
+    "ranges": {
+      "position_rad": [
+        0.0,
+        1.10914
+      ],
+      "velocity_filtered_rad_s": [
+        -0.2902809,
+        0.2546067
+      ],
+      "external_torque_est_Nm": [
+        -3.24172,
+        3.122046
+      ]
+    }
+  },
+  {
+    "file": "trans_ctrl_test1_20261102_123759.csv",
+    "samples": 28159,
+    "duration_s": 14.079,
+    "median_dt_s": 0.0005000000000000004,
+    "ranges": {
+      "position_rad": [
+        -0.3439007,
+        0.0
+      ],
+      "velocity_filtered_rad_s": [
+        -0.8627049,
+        0.8469838
+      ],
+      "external_torque_est_Nm": [
+        -2.866559,
+        3.079943
+      ]
+    }
+  }
+]

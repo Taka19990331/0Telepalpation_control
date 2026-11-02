@@ -1,0 +1,9 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\src\\stat\\lchmod.c"
+#define _GNU_SOURCE
+#include <sys/stat.h>
+#include <fcntl.h>
+
+int lchmod(const char *path, mode_t mode)
+{
+	return fchmodat(AT_FDCWD, path, mode, AT_SYMLINK_NOFOLLOW);
+}

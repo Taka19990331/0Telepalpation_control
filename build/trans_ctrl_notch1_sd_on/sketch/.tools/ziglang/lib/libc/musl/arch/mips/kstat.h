@@ -1,0 +1,23 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\arch\\mips\\kstat.h"
+struct kstat {
+	unsigned st_dev;
+	long __st_padding1[3];
+	ino_t st_ino;
+	mode_t st_mode;
+	nlink_t st_nlink;
+	uid_t st_uid;
+	gid_t st_gid;
+	unsigned st_rdev;
+	long __st_padding2[3];
+	off_t st_size;
+	long st_atime_sec;
+	long st_atime_nsec;
+	long st_mtime_sec;
+	long st_mtime_nsec;
+	long st_ctime_sec;
+	long st_ctime_nsec;
+	blksize_t st_blksize;
+	long __st_padding3;
+	blkcnt_t st_blocks;
+        long __st_padding4[14];
+};

@@ -1,0 +1,11 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\src\\network\\inet_ntoa.c"
+#include <arpa/inet.h>
+#include <stdio.h>
+
+char *inet_ntoa(struct in_addr in)
+{
+	static char buf[16];
+	unsigned char *a = (void *)&in;
+	snprintf(buf, sizeof buf, "%d.%d.%d.%d", a[0], a[1], a[2], a[3]);
+	return buf;
+}

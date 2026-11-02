@@ -1,0 +1,13 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\mingw\\stdio\\mingw_vfwscanf.c"
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "mingw_swformat.h"
+
+int
+__mingw_vfwscanf (FILE *s, const wchar_t *format, va_list argp)
+{
+  _IFPW ifp = { .fp = s };
+  return __mingw_swformat (&ifp, format, argp);
+}

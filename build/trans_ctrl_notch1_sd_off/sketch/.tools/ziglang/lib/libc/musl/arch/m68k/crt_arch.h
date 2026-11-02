@@ -1,0 +1,15 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\arch\\m68k\\crt_arch.h"
+__asm__(
+".text\n"
+".weak _DYNAMIC \n"
+".hidden _DYNAMIC \n"
+".global " START "\n"
+START ":\n"
+"	suba.l %fp,%fp \n"
+"	movea.l %sp,%a0 \n"
+"	lea _DYNAMIC-.-8,%a1 \n"
+"	pea (%pc,%a1) \n"
+"	pea (%a0) \n"
+"	lea " START "_c-.-8,%a1 \n"
+"	jsr (%pc,%a1) \n"
+);

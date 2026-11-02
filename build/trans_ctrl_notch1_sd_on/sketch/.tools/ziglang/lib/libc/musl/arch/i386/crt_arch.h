@@ -1,0 +1,18 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\arch\\i386\\crt_arch.h"
+__asm__(
+".text\n"
+".weak _DYNAMIC \n"
+".hidden _DYNAMIC \n"
+".global " START "\n"
+".type " START ",%function \n"
+START ":\n"
+"	xor %ebp,%ebp \n"
+"	mov %esp,%eax \n"
+"	and $-16,%esp \n"
+"	push %eax \n"
+"	push %eax \n"
+"	call 1f \n"
+"1:	addl $_DYNAMIC-1b,(%esp) \n"
+"	push %eax \n"
+"	call " START "_c \n"
+);

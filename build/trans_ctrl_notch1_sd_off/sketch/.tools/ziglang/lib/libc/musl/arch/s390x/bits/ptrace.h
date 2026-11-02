@@ -1,0 +1,13 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\arch\\s390x\\bits\\ptrace.h"
+#define PTRACE_SINGLEBLOCK		12
+#define PTRACE_OLDSETOPTIONS		21
+#define PTRACE_SYSEMU			31
+#define PTRACE_SYSEMU_SINGLESTEP	32
+#define PTRACE_PEEKUSR_AREA		0x5000
+#define PTRACE_POKEUSR_AREA		0x5001
+#define PTRACE_GET_LAST_BREAK		0x5006
+#define PTRACE_ENABLE_TE		0x5009
+#define PTRACE_DISABLE_TE		0x5010
+#define PTRACE_TE_ABORT_RAND		0x5011
+
+#define PT_STEPBLOCK PTRACE_SINGLEBLOCK
