@@ -13,7 +13,7 @@ constexpr uint32_t RX_INTERVAL_MIN_US=250, RX_INTERVAL_MAX_US=1000;
 // ==================== USER SETTINGS / ユーザー設定 ====================
 constexpr bool INITIAL_ENABLED=false; // 初期透明化制御ON/OFF [bool]
 // 起動時とS開始時に以下を自動適用。KR/KFコマンドの送信は不要。
-constexpr float INITIAL_K_R=0.75f; // RFOBフィードバックゲイン初期設定 [無次元]
+constexpr float INITIAL_K_R=0.0f; // RFOBフィードバックゲイン初期設定 [無次元]
 constexpr float INITIAL_K_F=0.0f; // 摩擦FFゲイン初期設定 [無次元]
 // KR/KF: 有限なfloat値のみ許可。追加のゲイン範囲制限なし。
 constexpr float TORQUE_LIMIT=1.5f; // 指令トルク絶対値上限 [Nm]
