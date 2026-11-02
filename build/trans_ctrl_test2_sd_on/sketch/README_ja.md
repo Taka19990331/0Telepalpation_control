@@ -1,4 +1,4 @@
-#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2\\README_ja.md"
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2_startup_diag\\README_ja.md"
 # trans_ctrl_test1 — AK80-8透明化制御器 v2（受信FIFO・バイナリ記録）
 
 Teensy 4.1 / AK80-8 KV60 / ID2 / CAN2 / 1 Mbps / MITモード用。

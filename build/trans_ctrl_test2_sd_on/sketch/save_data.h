@@ -1,4 +1,4 @@
-#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2\\save_data.h"
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2_startup_diag\\save_data.h"
 #pragma once
 #include <Arduino.h>
 #include "control_config.h"
@@ -35,6 +35,8 @@ static FsFile logFile;
 static char latestFile[16]={};
 static uint32_t savedRows=0;
 static bool cardReady=false;
+static uint32_t lastStartSearchUs=0, lastStartCreateUs=0, lastStartMetadataUs=0, lastStartSyncUs=0;
+static const char *lastStartFailure="NONE";
 #endif
 constexpr char CSV_HEADER[]="timestamp_us,position_rad,velocity_raw_rad_s,velocity_filtered_rad_s,feedback_torque_Nm,torque_bias_Nm,feedback_age_us,friction_model_Nm,rfob_input_Nm,rfob_filter_state_Nm,external_torque_est_Nm,torque_RFOB_Nm,torque_FF_Nm,torque_cmd_unsat_Nm,torque_cmd_Nm,K_R,K_F,control_enabled,torque_saturated,motor_error,fault_code,tx_queue_count,isr_interval_us,previous_isr_duration_us,can_snapshot_time_us,can_esr1,can_ecr,can_write_success,can_write_failure";
 inline void writeDiagnostics(Print &out) {
@@ -84,25 +86,42 @@ inline void writeDiagnostics(Print &out) {
     out.print("#diag,failure_torque_Nm,"); out.println(f.torque,9);
   }
 }
+inline bool isReady() { return cardReady; }
 
 #if TRANS_ENABLE_SD_LOGGING
 inline bool begin() {
+  const uint32_t beginUs=micros();
   cardReady=sd.begin(SdioConfig(FIFO_SDIO));
+  const uint32_t mountUs=micros()-beginUs;
+  uint32_t searchUs=0;
   if(cardReady) for(int n=int(ControlConfig::LOG_FILE_COUNT)-1;n>=0;--n) {
     snprintf(latestFile,sizeof(latestFile),"TC%04d.BIN",n);
-    if(sd.exists(latestFile)) return true;
+    if(sd.exists(latestFile)) { searchUs=micros()-beginUs-mountUs; break; }
   }
-  latestFile[0]=0; return cardReady;
+  if(!cardReady) latestFile[0]=0;
+  Serial.print("BOOT_SD,mount_us,"); Serial.print(mountUs);
+  Serial.print(",search_us,"); Serial.print(searchUs);
+  Serial.print(",found,"); Serial.print(latestFile[0]?1:0);
+  Serial.print(",file,"); Serial.println(latestFile);
+  return cardReady;
 }
 inline bool start() {
-  if(!cardReady || recording || finalizeRequest) return false;
-  char name[16]; bool found=false;
+  lastStartSearchUs=lastStartCreateUs=lastStartMetadataUs=lastStartSyncUs=0; lastStartFailure="NONE";
+  if(!cardReady) { lastStartFailure="SD_NOT_READY"; return false; }
+  if(recording) { lastStartFailure="ALREADY_RECORDING"; return false; }
+  if(finalizeRequest) { lastStartFailure="FINALIZE_PENDING"; return false; }
+  char name[16]; bool found=false; const uint32_t searchStart=micros();
   for(unsigned n=0;n<ControlConfig::LOG_FILE_COUNT;++n) {
     snprintf(name,sizeof(name),"TC%04u.BIN",n);
     if(!sd.exists(name)) { found=true; break; }
   }
-  if(!found || !logFile.open(name,O_WRONLY|O_CREAT|O_EXCL)) return false;
+  lastStartSearchUs=micros()-searchStart;
+  if(!found) { lastStartFailure="NO_FREE_FILE_INDEX"; return false; }
+  const uint32_t createStart=micros();
+  if(!logFile.open(name,O_WRONLY|O_CREAT|O_EXCL)) { lastStartCreateUs=micros()-createStart; lastStartFailure="FILE_CREATE_FAILED"; return false; }
+  lastStartCreateUs=micros()-createStart;
   strcpy(latestFile,name);
+  const uint32_t metadataStart=micros();
   logFile.println("#design,AK80-8_transparency_v2_binary");
   using namespace ControlConfig;
   auto meta=[&](const char *name,double value) { logFile.print(name); logFile.print(','); logFile.println(value,9); };
@@ -121,7 +140,10 @@ inline bool start() {
   meta("#rx_queue_rows",RX_QUEUE_ROWS); meta("#rx_budget",RX_BUDGET);
   meta("#rx_stale_us",RX_STALE_US); meta("#rx_interval_min_us",RX_INTERVAL_MIN_US); meta("#rx_interval_max_us",RX_INTERVAL_MAX_US);
   logFile.println("#binary,TCBIN2,120");
-  if(logFile.getWriteError() || !logFile.sync()) { logFile.close(); return false; }
+  lastStartMetadataUs=micros()-metadataStart;
+  if(logFile.getWriteError()) { lastStartFailure="METADATA_WRITE_FAILED"; logFile.close(); return false; }
+  const uint32_t syncStart=micros(); const bool syncOK=logFile.sync(); lastStartSyncUs=micros()-syncStart;
+  if(!syncOK) { lastStartFailure="METADATA_SYNC_FAILED"; logFile.close(); return false; }
   head=tail=0; savedRows=0; statusCode=0; recording=true; return true;
 }
 inline bool record(const Sample &s) {
@@ -230,6 +252,7 @@ inline void dumpCsv() {
 #else
 // SD is completely absent: no card access, ring allocation, formatting or writes.
 inline bool begin() { return true; }
+inline bool isReady() { return true; }
 inline bool start() { if(recording) return false; statusCode=0; recording=true; return true; }
 inline bool record(const Sample &) { return true; }
 inline void finish(uint32_t status) { statusCode=status; recording=false; }

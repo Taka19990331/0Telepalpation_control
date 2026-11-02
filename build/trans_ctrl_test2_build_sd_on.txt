@@ -1,9 +1,9 @@
 In file included from C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.h:35,
-                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2\can_protocol.h:4,
-                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2\trans_ctrl_test2.ino:5:
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2_startup_diag\can_protocol.h:5,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2_startup_diag\trans_ctrl_test2_startup_diag.ino:5:
 C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp: In instantiation of 'bool FlexCAN_T4<_bus, _rxSize, _txSize>::setMB(const FLEXCAN_MAILBOX&, const FLEXCAN_RXTX&, const FLEXCAN_IDE&) [with CAN_DEV_TABLE _bus = CAN2; FLEXCAN_RXQUEUE_TABLE _rxSize = RX_SIZE_256; FLEXCAN_TXQUEUE_TABLE _txSize = TX_SIZE_16; FLEXCAN_MAILBOX = FLEXCAN_MAILBOX; FLEXCAN_RXTX = FLEXCAN_RXTX; FLEXCAN_IDE = FLEXCAN_IDE]':
-C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2\can_protocol.h:136:30:   required from here
-  136 |   can.setMaxMB(16); can.setMB(MB0,RX,STD);
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2_startup_diag\can_protocol.h:137:30:   required from here
+  137 |   can.setMaxMB(16); can.setMB(MB0,RX,STD);
       |                     ~~~~~~~~~^~~~~~~~~~~~
 C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/imxrt_flexcan.h:583:90: warning: value computed is not used [-Wunused-value]
   583 | #define FLEXCAN_get_code(cs)                            (((cs) & FLEXCAN_MB_CS_CODE_MASK)>>24)
@@ -17,7 +17,7 @@ C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libra
  1363 |     strncpy((char*)error.FLT_CONF, "Error Passive", (sizeof(error.FLT_CONF) - 1));
       |     ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Memory Usage on Teensy 4.1:
-  FLASH: code:96708, data:11208, headers:8816   free for files:8009732
-   RAM1: variables:42624, code:94152, padding:4152   free for local variables:383360
+  FLASH: code:100612, data:12232, headers:9008   free for files:8004612
+   RAM1: variables:44992, code:98056, padding:248   free for local variables:380992
    RAM2: variables:241792  free for malloc/new:282496
 

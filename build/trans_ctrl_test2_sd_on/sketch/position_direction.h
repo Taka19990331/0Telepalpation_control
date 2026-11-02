@@ -1,4 +1,4 @@
-#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2\\position_direction.h"
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2_startup_diag\\position_direction.h"
 #pragma once
 #include <stdint.h>
 #include "control_config.h"

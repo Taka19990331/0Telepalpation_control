@@ -1,4 +1,4 @@
-#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2\\CAN_DIAGNOSTICS_ja.md"
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2_startup_diag\\CAN_DIAGNOSTICS_ja.md"
 # CAN送信診断（Teensy 4.1 / Teensy core 1.62.0）
 
 ## 原因の切り分け

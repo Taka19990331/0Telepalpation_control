@@ -4,8 +4,8 @@
   },
   {
     "compile": {
-      "source_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged",
-      "depfile_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged.libsdetect.d"
+      "source_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged",
+      "depfile_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged.libsdetect.d"
     },
     "compile_task": {
       "args": [
@@ -41,12 +41,12 @@
         "-DUSB_SERIAL",
         "-DLAYOUT_US_ENGLISH",
         "-IC:\\Users\\Miyam\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.62.0\\cores\\teensy4",
-        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged",
+        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged",
         "-o",
         "nul",
         "-MMD",
         "-MF",
-        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged.libsdetect.d"
+        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged.libsdetect.d"
       ]
     }
   },
@@ -58,8 +58,8 @@
   },
   {
     "compile": {
-      "source_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged",
-      "depfile_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged.libsdetect.d"
+      "source_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged",
+      "depfile_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged.libsdetect.d"
     },
     "compile_task": {
       "args": [
@@ -96,12 +96,12 @@
         "-DLAYOUT_US_ENGLISH",
         "-IC:\\Users\\Miyam\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.62.0\\cores\\teensy4",
         "-IC:\\Users\\Miyam\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.62.0\\libraries\\FlexCAN_T4",
-        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged",
+        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged",
         "-o",
         "nul",
         "-MMD",
         "-MF",
-        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged.libsdetect.d"
+        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged.libsdetect.d"
       ]
     }
   },
@@ -113,8 +113,8 @@
   },
   {
     "compile": {
-      "source_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged",
-      "depfile_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged.libsdetect.d"
+      "source_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged",
+      "depfile_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged.libsdetect.d"
     },
     "compile_task": {
       "args": [
@@ -152,12 +152,12 @@
         "-IC:\\Users\\Miyam\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.62.0\\cores\\teensy4",
         "-IC:\\Users\\Miyam\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.62.0\\libraries\\FlexCAN_T4",
         "-IC:\\Users\\Miyam\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.62.0\\libraries\\SdFat\\src",
-        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged",
+        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged",
         "-o",
         "nul",
         "-MMD",
         "-MF",
-        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged.libsdetect.d"
+        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged.libsdetect.d"
       ]
     }
   },
@@ -169,8 +169,8 @@
   },
   {
     "compile": {
-      "source_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged",
-      "depfile_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged.libsdetect.d"
+      "source_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged",
+      "depfile_path": "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged.libsdetect.d"
     },
     "compile_task": {
       "args": [
@@ -209,12 +209,12 @@
         "-IC:\\Users\\Miyam\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.62.0\\libraries\\FlexCAN_T4",
         "-IC:\\Users\\Miyam\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.62.0\\libraries\\SdFat\\src",
         "-IC:\\Users\\Miyam\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.62.0\\libraries\\SPI",
-        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged",
+        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged",
         "-o",
         "nul",
         "-MMD",
         "-MF",
-        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2.ino.cpp.merged.libsdetect.d"
+        "C:\\0Telepalpation_control\\build\\trans_ctrl_test2_sd_on\\sketch\\trans_ctrl_test2_startup_diag.ino.cpp.merged.libsdetect.d"
       ]
     }
   },

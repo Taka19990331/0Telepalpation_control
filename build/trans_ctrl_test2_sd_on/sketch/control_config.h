@@ -1,4 +1,4 @@
-#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2\\control_config.h"
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2_startup_diag\\control_config.h"
 #pragma once
 #include <stdint.h>
 #ifndef TRANS_ENABLE_SD_LOGGING
@@ -14,13 +14,13 @@ constexpr uint32_t RX_INTERVAL_MIN_US=250, RX_INTERVAL_MAX_US=1000;
 // ==================== USER SETTINGS / ユーザー設定 ====================
 constexpr bool INITIAL_ENABLED=false; // 初期透明化制御ON/OFF [bool]
 // 起動時とS開始時に以下を自動適用。KR/KFコマンドの送信は不要。
-constexpr float INITIAL_K_R=0.0f; // RFOBフィードバックゲイン初期設定 [無次元]
-constexpr float INITIAL_K_F=0.6f; // 摩擦FFゲイン初期設定 [無次元]
+constexpr float INITIAL_K_R=0.75f; // RFOBフィードバックゲイン初期設定 [無次元]
+constexpr float INITIAL_K_F=0.0f; // 摩擦FFゲイン初期設定 [無次元]
 // KR/KF: 有限なfloat値のみ許可。追加のゲイン範囲制限なし。
-constexpr float TORQUE_LIMIT=1.0f; // 指令トルク絶対値上限 [Nm]
+constexpr float TORQUE_LIMIT=1.5f; // 指令トルク絶対値上限 [Nm]
 constexpr uint32_t CONTROL_PERIOD_US=500; // MIT指令周期 [us]
-constexpr float Q_HZ=10.0f; // RFOB Qフィルタ遮断周波数 [Hz]
-constexpr float VELOCITY_HZ=15.0f; // 角速度LPF遮断周波数 [Hz]
+constexpr float Q_HZ=400.0f; // RFOB Qフィルタ遮断周波数 [Hz]
+constexpr float VELOCITY_HZ=1000.0f; // 角速度LPF遮断周波数 [Hz]
 // Position is used only for low-speed friction feedforward direction.
 constexpr uint32_t POSITION_DIRECTION_WINDOW_US=50000;
 constexpr float POSITION_DIRECTION_THRESHOLD_RAD=3.0f*(25.0f/65535.0f);
@@ -28,8 +28,10 @@ constexpr float FRICTION_BLEND_LOW=0.8f, FRICTION_BLEND_HIGH=1.2f;
 constexpr float J=0.0116806f; // 出力軸換算慣性 [kg m^2]
 struct FrictionParameters { float tc, ts, vs, b; };
 // tc: クーロン摩擦 [Nm], ts: 静止摩擦 [Nm], vs: Stribeck速度 [rad/s], b: 粘性 [Nm s/rad]
-constexpr FrictionParameters POSITIVE={0.459212f,0.526341f,0.474762f,0.00218903f};
-constexpr FrictionParameters NEGATIVE={0.410719f,0.527041f,0.473325f,0.00341074f};
+ constexpr FrictionParameters POSITIVE={0.459212f,0.526341f,0.474762f,0.00218903f};
+ constexpr FrictionParameters NEGATIVE={0.410719f,0.527041f,0.473325f,0.00341074f};
+//constexpr FrictionParameters POSITIVE={0.0f,0.0f,0.0f,0.0f};
+//constexpr FrictionParameters NEGATIVE={0.0f,0.0f,0.0f,0.0f};
 constexpr uint8_t MOTOR_ID=2; // AK80モータID [CANノード番号]
 constexpr unsigned CAN_BUS=2; // 接続CANポート [1=CAN1, 2=CAN2, 3=CAN3]
 constexpr uint32_t CAN_BAUD=1000000; // CAN通信速度 [bit/s]

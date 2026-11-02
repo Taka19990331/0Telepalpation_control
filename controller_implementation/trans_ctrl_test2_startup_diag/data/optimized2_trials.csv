@@ -1,0 +1,4 @@
+"label","trial","s_to_start_reply_ms","s_to_saved_ms","start_accepted","reject_reason","saved","active_timing","start_sd_phases","stop_reason","fault_code","can_write_success","sd_write_failures","boot_timing","boot_sd","saved_line"
+"optimized2","1","34.966","393.835","True",,"True","START_ACTIVE,elapsed_us,4807","START_PHASE,search_us,1863,create_us,1459,metadata_us,91,sync_us,1203","STOP,reason,2","0","24","0",,,"SAVED,TC0092.BIN,STATUS,2"
+"optimized2","2","15.806","349.764","False","START_FAIL,CAN_ENABLE_OR_ZERO_TX_REJECTED","True",,,,"0","0","0",,,"SAVED,TC0093.BIN,STATUS,2"
+"optimized2","3","13.628","366.121","False","START_FAIL,CAN_ENABLE_OR_ZERO_TX_REJECTED","True",,,,"0","0","0",,,"SAVED,TC0094.BIN,STATUS,2"

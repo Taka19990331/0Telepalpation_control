@@ -1,4 +1,4 @@
-#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2\\can_diagnostics.h"
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2_startup_diag\\can_diagnostics.h"
 #pragma once
 // Fixed-size RAM diagnostics. No formatting, SD or Serial in interrupt context.
 namespace CanDiagnostics {

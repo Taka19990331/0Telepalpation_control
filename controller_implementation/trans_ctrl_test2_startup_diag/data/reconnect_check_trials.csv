@@ -1,0 +1,2 @@
+"label","trial","s_to_start_reply_ms","s_to_saved_ms","start_accepted","on_accepted","reject_reason","saved","active_timing","start_sd_phases","stop_reason","fault_code","can_write_success","sd_write_failures","finalize_us","finalize_sync_us","boot_timing","boot_sd","saved_line","sd_dump_verified"
+"reconnect_check","1","32.8","44.988","True","True",,"True","START_ACTIVE,elapsed_us,5696","START_PHASE,search_us,2,create_us,3980,metadata_us,89,sync_us,1201","STOP,reason,2","2","24","0","1740","990",,,"SAVED,TC0116.BIN,STATUS,2,FINALIZE_US,1740,SYNC_US,990","True"

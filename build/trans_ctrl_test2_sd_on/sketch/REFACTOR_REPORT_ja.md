@@ -1,4 +1,4 @@
-#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2\\REFACTOR_REPORT_ja.md"
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test2_startup_diag\\REFACTOR_REPORT_ja.md"
 # 通信・ロギング分離の変更報告
 
 ## 比較と変更理由

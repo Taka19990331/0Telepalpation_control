@@ -1,0 +1,4 @@
+"label","trial","s_to_on_ms","s_to_saved_ms","saved","status_running","fault_code","can_write_success","sd_write_failures","saved_line"
+"baseline","1","17.019","428.084","True","0","2","24","0","SAVED,TC0086.BIN,STATUS,2"
+"baseline","2","15.64","441.007","True","0","2","24","0","SAVED,TC0087.BIN,STATUS,2"
+"baseline","3","21.012","401.15","True","0","2","24","0","SAVED,TC0088.BIN,STATUS,2"
