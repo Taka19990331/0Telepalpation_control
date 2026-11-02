@@ -1,0 +1,13 @@
+PASS: 120000 ticks, 119364 feedback updates; exact observer/friction/command equality; FIFO/budget/overflow/wrap/NaN
+test_complete_and_recovery (test_binary_log.BinaryLogTest.test_complete_and_recovery) ... ok
+test_damage_and_order (test_binary_log.BinaryLogTest.test_damage_and_order) ... ok
+test_legacy_columns (test_binary_log.BinaryLogTest.test_legacy_columns) ... ok
+Direction-state steps at |v|=0.01: unknown->positive 0.526333094 Nm, positive->negative -1.05335629 Nm (before Kf)
+PASS: 120000 production-interface feedback samples; exact LPF/RFOB equality; 80491 high-speed FF/command matches; 14995 stationary FF suppressions
+test_cpp (test_direction.DirectionTest.test_cpp) ... ok
+test_unchanged_files_and_safety (test_preservation.PreservationTest.test_unchanged_files_and_safety) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.587s
+
+OK

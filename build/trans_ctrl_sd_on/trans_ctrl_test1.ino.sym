@@ -1,0 +1,859 @@
+
+C:\0Telepalpation_control\build\trans_ctrl_sd_on/trans_ctrl_test1.ino.elf:     file format elf32-littlearm
+
+SYMBOL TABLE:
+60000000 l    d  .text.headers	00000000 .text.headers
+60001400 l    d  .text.code	00000000 .text.code
+60001dfc l    d  .text.progmem	00000000 .text.progmem
+00000000 l    d  .text.itcm	00000000 .text.itcm
+00016b00 l    d  .fini	00000000 .fini
+00016b04 l    d  .ARM.exidx	00000000 .ARM.exidx
+20000000 l    d  .data	00000000 .data
+20002ac0 l    d  .bss	00000000 .bss
+20200000 l    d  .bss.dma	00000000 .bss.dma
+70000000 l    d  .bss.extram	00000000 .bss.extram
+6001b4d0 l    d  .text.csf	00000000 .text.csf
+00000000 l    d  .debug_info	00000000 .debug_info
+00000000 l    d  .debug_abbrev	00000000 .debug_abbrev
+00000000 l    d  .debug_line	00000000 .debug_line
+00000000 l    d  .debug_frame	00000000 .debug_frame
+00000000 l    d  .debug_str	00000000 .debug_str
+00000000 l    d  .ARM.attributes	00000000 .ARM.attributes
+00000000 l    d  .comment	00000000 .comment
+00000000 l    d  .debug_loclists	00000000 .debug_loclists
+00000000 l    d  .debug_aranges	00000000 .debug_aranges
+00000000 l    d  .debug_rnglists	00000000 .debug_rnglists
+00000000 l    d  .debug_line_str	00000000 .debug_line_str
+00000000 l    df *ABS*	00000000 bootdata.c
+00000000 l    df *ABS*	00000000 startup.c
+60001618 l     F .text.code	000000b0 flexspi2_psram_size
+60001400 l     F .text.code	00000012 memory_copy
+60001414 l     F .text.code	0000001c memory_clear.constprop.0
+60001430 l     F .text.code	000001c0 ResetHandler2
+00000000 l    df *ABS*	00000000 tempmon.c
+200085dc l     O .bss	00000004 s_hot_ROOM
+200085e0 l     O .bss	00000004 s_roomC_hotC
+200085d4 l     O .bss	00000004 s_hotCount
+200085d8 l     O .bss	00000004 s_hotTemp
+00000000 l    df *ABS*	00000000 usb.c
+0000c1c0 l     F .text.itcm	00000094 schedule_transfer
+0000c254 l     F .text.itcm	00000038 run_callbacks
+0000c28c l     F .text.itcm	000000ac endpoint0_transmit.constprop.0
+20008564 l     O .bss	00000004 endpoint0_notify_mask
+20008631 l     O .bss	00000001 sof_usage
+20008598 l     O .bss	00000008 reply_buffer
+20008568 l     O .bss	00000004 endpointN_notify_mask
+20008639 l     O .bss	00000001 usb_reboot_timer
+20002d68 l     O .bss	00000008 endpoint0_setupdata
+2000855c l     O .bss	00000008 endpoint0_buffer
+00000000 l    df *ABS*	00000000 analog.c
+2000862d l     O .bss	00000001 calibrating
+00000000 l    df *ABS*	00000000 crti.o
+00000000 l    df *ABS*	00000000 crtn.o
+00000000 l    df *ABS*	00000000 crtstuff.c
+00000020 l     F .text.itcm	00000000 register_tm_clones
+00000044 l     F .text.itcm	00000000 frame_dummy
+20008580 l     O .bss	00000000 object.0
+60001df0 l     O .text.code	00000000 __frame_dummy_init_array_entry
+00000000 l    df *ABS*	00000000 trans_ctrl_test1.ino.cpp
+20008620 l     O .bss	00000001 CanProtocol::capture
+20005e74 l     O .bss	00000004 CanDiagnostics::rxFrames
+20005e28 l     O .bss	00000004 CanDiagnostics::rxHardwareOverruns
+20005df8 l     O .bss	00000004 CanDiagnostics::rxRejected
+20005e7c l     O .bss	00000004 CanDiagnostics::rxIsrMax
+20005de8 l     O .bss	00000004 CanDiagnostics::rxAccepted
+2000861c l     O .bss	00000001 CanProtocol::haveRxTime
+20002db4 l     O .bss	00000004 CanProtocol::previousRxUs
+20005e78 l     O .bss	00000004 CanDiagnostics::rxGapMax
+20005de4 l     O .bss	00000004 CanDiagnostics::rxAbnormal
+200056d8 l     O .bss	00000004 CanProtocol::rxTail
+20005df0 l     O .bss	00000004 CanDiagnostics::rxOverflow
+200056dc l     O .bss	00000700 CanProtocol::received
+20005df4 l     O .bss	00000004 CanDiagnostics::rxQueueMax
+200024e4 l     O .data	00000004 CanDiagnostics::rxGapMin
+200056d4 l     O .bss	00000004 CanProtocol::rxHead
+00000370 l     F .text.itcm	00000044 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::mailboxOffset() [clone .part.0]
+000003b4 l     F .text.itcm	00000050 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::mbCallbacks(FLEXCAN_MAILBOX const&, CAN_message_t const&) [clone .isra.0]
+00000404 l     F .text.itcm	00000078 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::writeTxMailbox(unsigned char, CAN_message_t const&) [clone .isra.0]
+00000788 l     F .text.itcm	00000198 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::enableFIFO(bool) [clone .isra.0]
+20005e10 l     O .bss	00000004 CanDiagnostics::errorRecords
+20005e80 l     O .bss	00000004 CanDiagnostics::errorBits
+20005dec l     O .bss	00000004 CanDiagnostics::rxErrorMax
+20005e00 l     O .bss	00000004 CanDiagnostics::txErrorMax
+20005e18 l     O .bss	00000004 CanDiagnostics::busOffObserved
+20002dbc l     O .bss	00002918 CanProtocol::can
+20005e58 l     O .bss	00000004 CanDiagnostics::rxStale
+20002d00 l     O .bss	00000018 CanProtocol::feedback
+2000861f l     O .bss	00000001 CanProtocol::communicationFault
+2000861d l     O .bss	00000001 CanProtocol::motorFault
+2000861e l     O .bss	00000001 CanProtocol::numericFault
+20005e0c l     O .bss	00000004 CanDiagnostics::rxProcessed
+20002db8 l     O .bss	00000004 CanProtocol::feedbackHandler
+200027cf l     O .data	00000001 awaitingFirstFeedback
+20005e60 l     O .bss	00000004 CanDiagnostics::success
+20005e68 l     O .bss	00000004 CanDiagnostics::failures
+20005e70 l     O .bss	00000004 CanDiagnostics::queueMax
+20005e08 l     O .bss	00000004 CanDiagnostics::intervalMax
+200024e0 l     O .data	00000004 CanDiagnostics::intervalMin
+20005e2c l     O .bss	00000004 CanDiagnostics::rxStartupDiscarded
+20005e14 l     O .bss	00000004 CanDiagnostics::rxBudgetHits
+20005de0 l     O .bss	00000004 CanDiagnostics::logDropped
+20005e1c l     O .bss	00000004 CanDiagnostics::sdWriteFailures
+2000637c l     O .bss	00000004 SaveData::head
+20006380 l     O .bss	00000004 SaveData::tail
+20005e04 l     O .bss	00000004 CanDiagnostics::durationMax
+20005e20 l     O .bss	00000004 CanDiagnostics::intervalOverruns
+20005e24 l     O .bss	00000004 CanDiagnostics::executionOverruns
+20005e5c l     O .bss	00000004 CanDiagnostics::sdMaxUs
+20005e54 l     O .bss	00000004 CanDiagnostics::ringMax
+20005e50 l     O .bss	00000004 CanDiagnostics::stopUs
+20005dfc l     O .bss	00000004 CanDiagnostics::stopReason
+20008623 l     O .bss	00000001 CanDiagnostics::stopZero
+20008621 l     O .bss	00000001 CanDiagnostics::stopDisable
+20002d18 l     O .bss	0000004c CanDiagnostics::firstFailure
+20005e34 l     O .bss	00000018 CanDiagnostics::latest
+20008628 l     O .bss	00000001 SaveData::cardReady
+20008629 l     O .bss	00000001 SaveData::recording
+20008627 l     O .bss	00000001 SaveData::finalizeRequest
+20005eb0 l     O .bss	000004cc SaveData::sd
+20008184 l     O .bss	00000050 SaveData::logFile
+20005e9c l     O .bss	00000010 SaveData::latestFile
+200081d4 l     O .bss	00000004 SaveData::savedRows
+20005eac l     O .bss	00000004 SaveData::statusCode
+200014e8 l     O .data	000001c3 SaveData::CSV_HEADER
+200024d0 l     O .data	0000000c runtime
+000065f4 l     F .text.itcm	00000024 flexcan_isr_can2()
+20002d78 l     O .bss	00000004 _CAN2
+20008618 l     O .bss	00000001 timerReady
+20008624 l     O .bss	00000001 CanDiagnostics::measuring
+20008622 l     O .bss	00000001 CanDiagnostics::failureInIsr
+20005e4c l     O .bss	00000004 CanDiagnostics::origin
+20005e6c l     O .bss	00000004 CanDiagnostics::interval
+20005e64 l     O .bss	00000004 CanDiagnostics::duration
+20005e30 l     O .bss	00000004 CanDiagnostics::entry
+20005e84 l     O .bss	00000004 CanDiagnostics::lastEntry
+20002da4 l     O .bss	00000004 logTick
+20200000 l     O .bss.dma	00038000 SaveData::samples
+2000862a l     O .bss	00000001 loop::overflow
+20008210 l     O .bss	00000004 loop::used
+20006384 l     O .bss	00001e00 SaveData::batch
+200081e0 l     O .bss	00000030 loop::line
+200081dc l     O .bss	00000004 loop::lastDiagnosticUs
+00006618 l     F .text.itcm	000001b0 _GLOBAL__sub_I_tau_cmd
+00000000 l    df *ABS*	00000000 IntervalTimer.cpp
+0000b758 l     F .text.itcm	00000084 pit_isr()
+20002ac0 l     O .bss	00000060 funct_table
+0000b7dc l     F .text.itcm	00000020 __tcf_ZL11funct_table
+0000b988 l     F .text.itcm	00000030 _GLOBAL__sub_I__ZN13IntervalTimer14nvic_prioritesE
+00000000 l    df *ABS*	00000000 usb_desc.c
+20002768 l     O .data	00000012 device_descriptor
+60001ef8 l     O .text.progmem	0000000a qualifier_descriptor
+200027a4 l     O .data	00000012 microsoft_os_string_desc
+2000277c l     O .data	00000028 microsoft_os_compatible_id_desc
+00000000 l    df *ABS*	00000000 ExFatFile.cpp
+00000000 l    df *ABS*	00000000 ExFatFileWrite.cpp
+00000000 l    df *ABS*	00000000 ExFatName.cpp
+00000000 l    df *ABS*	00000000 ExFatPartition.cpp
+00000000 l    df *ABS*	00000000 FatFile.cpp
+00000000 l    df *ABS*	00000000 FatFileLFN.cpp
+00000000 l    df *ABS*	00000000 FatFormatter.cpp
+00000000 l    df *ABS*	00000000 FatName.cpp
+00000000 l    df *ABS*	00000000 FatPartition.cpp
+00000000 l    df *ABS*	00000000 FsFile.cpp
+00000000 l    df *ABS*	00000000 FsNew.cpp
+00000000 l    df *ABS*	00000000 FsVolume.cpp
+00000000 l    df *ABS*	00000000 SdSpiCard.cpp
+00000000 l    df *ABS*	00000000 SdioTeensy.cpp
+00009f28 l     F .text.itcm	00000030 sdIrs()
+20002dac l     O .bss	00000004 m_irqstat
+2000861b l     O .bss	00000001 m_dmaBusy
+00009f58 l     F .text.itcm	00000014 isBusyDat()
+00009f6c l     F .text.itcm	0000000c isBusyDMA()
+00009f78 l     F .text.itcm	000000d0 setSdclk(unsigned long)
+20002d70 l     O .bss	00000004 m_sdClkKhz
+200027ce l     O .data	00000001 m_errorCode
+20002d7c l     O .bss	00000010 m_cid
+20002d8c l     O .bss	00000010 m_csd
+20002d9c l     O .bss	00000004 m_ocr
+20008617 l     O .bss	00000001 m_version2
+20008619 l     O .bss	00000001 m_highCapacity
+0000a158 l     F .text.itcm	00000130 initSDHC()
+0000a288 l     F .text.itcm	00000090 waitTransferComplete()
+20002d74 l     O .bss	00000004 m_errorLine
+2000861a l     O .bss	00000001 m_transferActive
+0000a3c4 l     F .text.itcm	00000098 cardCommand(unsigned long, unsigned long)
+0000a45c l     F .text.itcm	00000058 readReg16(unsigned long, void*)
+20002da0 l     O .bss	00000004 m_rca
+20002da8 l     O .bss	00000004 m_busyFcn
+20008616 l     O .bss	00000001 m_initDone
+0000a554 l     F .text.itcm	0000002c isBusyCMD13()
+0000a6e4 l     F .text.itcm	00000138 rdWrSectors(unsigned long, unsigned long, unsigned char*, unsigned int)
+0000a92c l     F .text.itcm	000000fc cardCMD6(unsigned long, unsigned char*)
+00000000 l    df *ABS*	00000000 SdSpiChipSelect.cpp
+00000000 l    df *ABS*	00000000 SdSpiTeensy3.cpp
+00000000 l    df *ABS*	00000000 FsCache.cpp
+00000000 l    df *ABS*	00000000 FsName.cpp
+00000000 l    df *ABS*	00000000 FsUtf.cpp
+00000000 l    df *ABS*	00000000 upcase.cpp
+200006a4 l     O .data	000000d4 mapTable
+20000578 l     O .data	0000012c lookupTable
+00000000 l    df *ABS*	00000000 SPI.cpp
+0000b614 l     F .text.itcm	0000006e SPIClass::transfer(void const*, void*, unsigned int) [clone .part.0]
+00000000 l    df *ABS*	00000000 EventResponder.cpp
+00000000 l    df *ABS*	00000000 Print.cpp
+0000b9c0 l     F .text.itcm	00000074 Print::printNumber(unsigned long, unsigned char, unsigned char) [clone .part.0]
+00000000 l    df *ABS*	00000000 delay.c
+00000000 l    df *ABS*	00000000 digital.c
+00000000 l    df *ABS*	00000000 main.cpp
+00000000 l    df *ABS*	00000000 memcpy-armv7m.S.o
+00000000 l    df *ABS*	00000000 new.cpp
+00000000 l    df *ABS*	00000000 nonstd.c
+00000000 l    df *ABS*	00000000 usb_inst.cpp
+00000000 l    df *ABS*	00000000 usb_serial.c
+0000cb4c l     F .text.itcm	00000068 rx_queue_transfer
+20002b80 l     O .bss	00000100 rx_transfer
+20238080 l     O .bss.dma	00001000 rx_buffer
+20008610 l     O .bss	00000002 rx_packet_size
+0000cbb4 l     F .text.itcm	000000bc rx_event
+2000862f l     O .bss	00000001 rx_head
+20008630 l     O .bss	00000001 rx_tail
+200085a8 l     O .bss	00000010 rx_count
+200085b8 l     O .bss	00000010 rx_index
+200085a4 l     O .bss	00000004 rx_available
+200085c8 l     O .bss	00000009 rx_list
+0000cc70 l     F .text.itcm	000000a4 usb_serial_flush_callback
+20008635 l     O .bss	00000001 tx_noautoflush
+20008612 l     O .bss	00000002 tx_available
+20008634 l     O .bss	00000001 tx_head
+20002c80 l     O .bss	00000080 tx_transfer
+20239080 l     O .bss.dma	00002000 txbuffer
+0000cd14 l     F .text.itcm	000001b4 usb_serial_write.part.0
+20008633 l     O .bss	00000001 transmit_previous_timeout
+20008614 l     O .bss	00000002 tx_packet_size
+00000000 l    df *ABS*	00000000 yield.cpp
+2000862b l     O .bss	00000001 yield::running
+00000000 l    df *ABS*	00000000 clockspeed.c
+00000000 l    df *ABS*	00000000 pwm.c
+00000000 l    df *ABS*	00000000 rtc.c
+00000000 l    df *ABS*	00000000 sm_pool.c
+00000000 l    df *ABS*	00000000 sf_exp.c
+00000000 l    df *ABS*	00000000 math_errf.c
+0000d9e0 l     F .text.itcm	00000018 with_errnof
+0000d9f8 l     F .text.itcm	0000001e xflowf
+00000000 l    df *ABS*	00000000 atexit_arm.cc
+00000000 l    df *ABS*	00000000 malloc.c
+00000000 l    df *ABS*	00000000 mallocr.c
+00000000 l    df *ABS*	00000000 mlock.c
+00000000 l    df *ABS*	00000000 reallocr.c
+00000000 l    df *ABS*	00000000 strtod.c
+20001dd4 l     O .data	00000014 fpi.1
+200004b8 l     O .data	00000028 tinytens
+20001de8 l     O .data	00000014 fpinan.0
+00000000 l    df *ABS*	00000000 cxa_atexit.c
+00000000 l    df *ABS*	00000000 isspace.c
+00000000 l    df *ABS*	00000000 toupper.c
+00000000 l    df *ABS*	00000000 findfp.c
+0000f3fc l     F .text.itcm	00000018 stdio_exit_handler
+0000f414 l     F .text.itcm	00000040 cleanup_stdio
+0000f454 l     F .text.itcm	000000f0 global_stdio_init.part.0
+00000000 l    df *ABS*	00000000 fwalk.c
+00000000 l    df *ABS*	00000000 snprintf.c
+00000000 l    df *ABS*	00000000 stdio.c
+00000000 l    df *ABS*	00000000 memcmp.c
+00000000 l    df *ABS*	00000000 memmove.c
+00000000 l    df *ABS*	00000000 memset.c
+00000000 l    df *ABS*	00000000 strchr.c
+00000000 l    df *ABS*	00000000 strcspn.c
+00000000 l    df *ABS*	00000000 strncmp.c
+00000000 l    df *ABS*	00000000 strncpy.c
+00000000 l    df *ABS*	00000000 strrchr.c
+00000000 l    df *ABS*	00000000 locale.c
+00000000 l    df *ABS*	00000000 closer.c
+00000000 l    df *ABS*	00000000 lseekr.c
+00000000 l    df *ABS*	00000000 readr.c
+00000000 l    df *ABS*	00000000 sbrkr.c
+00000000 l    df *ABS*	00000000 writer.c
+00000000 l    df *ABS*	00000000 errno.c
+00000000 l    df *ABS*	00000000 init.c
+00000000 l    df *ABS*	00000000 lock.c
+00000000 l    df *ABS*	00000000 sysconf.c
+00000000 l    df *ABS*	00000000 libc_a-strcmp.o
+00000000 l    df *ABS*	00000000 strcpy.c
+00000000 l    df *ABS*	00000000 libc_a-memchr.o
+00000000 l    df *ABS*	00000000 libc_a-strlen.o
+00000000 l    df *ABS*	00000000 s_nan.c
+00000000 l    df *ABS*	00000000 sf_nan.c
+00000000 l    df *ABS*	00000000 __atexit.c
+00000000 l    df *ABS*	00000000 freer.c
+00000000 l    df *ABS*	00000000 gdtoa-gethex.c
+0001053c l     F .text.itcm	000000b6 rshift
+00000000 l    df *ABS*	00000000 gdtoa-hexnan.c
+00000000 l    df *ABS*	00000000 mbtowc_r.c
+00000000 l    df *ABS*	00000000 mprec.c
+20001dfc l     O .data	0000000c p05.0
+00000000 l    df *ABS*	00000000 wctomb_r.c
+00000000 l    df *ABS*	00000000 svfprintf.c
+20001e8c l     O .data	00000010 zeroes.0
+20001a44 l     O .data	00000010 blanks.1
+00000000 l    df *ABS*	00000000 ssprint_r.c
+00000000 l    df *ABS*	00000000 fclose.c
+00000000 l    df *ABS*	00000000 fflush.c
+00000000 l    df *ABS*	00000000 localeconv.c
+00000000 l    df *ABS*	00000000 s_frexp.c
+00000000 l    df *ABS*	00000000 assert.c
+00000000 l    df *ABS*	00000000 callocr.c
+00000000 l    df *ABS*	00000000 dtoa.c
+00013d50 l     F .text.itcm	00000128 quorem
+00000000 l    df *ABS*	00000000 wcrtomb.c
+00000000 l    df *ABS*	00000000 wcsrtombs.c
+00000000 l    df *ABS*	00000000 fiprintf.c
+00000000 l    df *ABS*	00000000 vfiprintf.c
+00015f80 l     F .text.itcm	00000080 __sbprintf
+20001e9c l     O .data	00000010 zeroes.0
+20001a54 l     O .data	00000010 blanks.1
+00000000 l    df *ABS*	00000000 sprint_r.c
+00000000 l    df *ABS*	00000000 ssputs_r.c
+00000000 l    df *ABS*	00000000 fvwrite.c
+00000000 l    df *ABS*	00000000 wsetup.c
+00000000 l    df *ABS*	00000000 wcsnrtombs.c
+00000000 l    df *ABS*	00000000 makebuf.c
+00000000 l    df *ABS*	00000000 fstatr.c
+00000000 l    df *ABS*	00000000 isattyr.c
+00000000 l    df *ABS*	00000000 _arm_addsubdf3.o
+00000000 l    df *ABS*	00000000 libgcc2.c
+00000000 l    df *ABS*	00000000 libgcc2.c
+00000000 l    df *ABS*	00000000 sf_exp2_data.c
+00000000 l    df *ABS*	00000000 ctype_.c
+00000000 l    df *ABS*	00000000 impure.c
+00000000 l    df *ABS*	00000000 __call_atexit.c
+00000000 l    df *ABS*	00000000 ExFatVolume.cpp
+00000000 l    df *ABS*	00000000 FatVolume.cpp
+00000000 l    df *ABS*	00000000 FsDateTime.cpp
+00000000 l    df *ABS*	00000000 HardwareSerial.cpp
+00000000 l    df *ABS*	00000000 reent.c
+60001db0 l     F .text.code	00000008 ____libc_init_array_veneer
+60001db8 l     F .text.code	00000008 __main_veneer
+60001dc0 l     F .text.code	00000008 __usb_init_serialnumber_veneer
+60001dc8 l     F .text.code	00000008 __sm_set_pool_veneer
+60001dd0 l     F .text.code	00000008 __set_arm_clock_veneer
+60001dd8 l     F .text.code	00000008 __memset_veneer
+60001de0 l     F .text.code	00000008 __delay_veneer
+60001de8 l     F .text.code	00000008 __pwm_init_veneer
+00016ae8 l     F .text.itcm	00000008 ___reboot_Teensyduino__veneer
+00016af0 l     F .text.itcm	00000008 ___init_veneer
+0000b558 g     F .text.itcm	000000bc toUpcase(unsigned short)
+0000d0ec g     F .text.itcm	0000001c usb_serial_available
+000118a0 g     F .text.itcm	0000003e __any_on
+000166e4 g     F .text.itcm	00000024 _isatty_r
+0000ff80 g     F .text.itcm	000000ba strcpy
+00001208  w    F .text.itcm	000000c8 SaveData::writeDiagnostics(Print&)::{lambda(char const*, CanDiagnostics::Snapshot const&)#1}::operator()(char const*, CanDiagnostics::Snapshot const&) const
+000020a0  w    F .text.itcm	00001196 SaveData::start()
+00000360  w    F .text.itcm	00000010 IntervalTimer::~IntervalTimer()
+600016d0 g     F .text.code	00000002 startup_default_late_hook
+0000fb5c g     F .text.itcm	0000002c _lseek_r
+0000a81c g     F .text.itcm	00000088 SdioCard::readSectors(unsigned long, unsigned char*, unsigned int)
+0000d2b8  w    F .text.itcm	000000d8 yield
+00009498  w    F .text.itcm	00000012 DedicatedSpiCard::~DedicatedSpiCard()
+2000860c g     O .bss	00000004 usb_timer1_callback
+000083a0 g     F .text.itcm	000001e4 FatFile::write(void const*, unsigned int)
+60001e14 g     O .text.progmem	00000018 usb_string_manufacturer_name_default
+600017f4 g     F .text.code	00000284 configure_external_ram
+000093b8  w    F .text.itcm	00000004 DedicatedSpiCard::isDedicatedSpi()
+00008cdc  w    F .text.itcm	0000003a FsBlockDeviceInterface::writeSectorsCallback(unsigned long, unsigned int, unsigned char const* (*)(unsigned long, void*), void*)
+00016a24 g     F .text.itcm	0000005a .hidden __floatdidf
+200014d8  w    O .data	00000010 teensy::inplace_function_detail::empty_vtable<void>
+00008754 g     F .text.itcm	00000184 FatFile::makeSFN(FatLfn_t*)
+0000909c g     F .text.itcm	0000015c FatPartition::init(FsBlockDeviceInterface*, unsigned char)
+0000fc6c g     F .text.itcm	0000001a sysconf
+20002db0 g     O .bss	00000004 FsDateTime::callback
+200083ac g     O .bss	00000001 __lock___atexit_recursive_mutex
+00014ca4 g     F .text.itcm	00000050 _wcrtomb_r
+000088d8 g     F .text.itcm	000000c0 FatFile::makeUniqueSfn(FatLfn_t*)
+00009b20 g     F .text.itcm	0000006c SharedSpiCard::writeStart(unsigned long)
+0000ba4c g     F .text.itcm	0000001a Print::println()
+200016f4 g     O .data	00000070 vtable for DedicatedSpiCard
+0000f6a0 g     F .text.itcm	00000022 __sseek
+0000f544 g     F .text.itcm	0000003c __sinit
+00006b10 g     F .text.itcm	000000f4 ExFatFile::seekSet(unsigned long long)
+0000e010 g     F .text.itcm	0000000c __malloc_unlock
+20005e98 g     O .bss	00000004 FsVolume::m_cwv
+00008298 g     F .text.itcm	000000f8 FatFile::open(FatFile*, char const*, int)
+20008626 g     O .bss	00000001 HardwareSerialIMXRT::s_count_serials_with_serial_events
+000093ac  w    F .text.itcm	00000004 SharedSpiCard::errorData() const
+60001d50 g     F .text.code	00000050 analog_init
+000001d4  w    F .text.itcm	00000006 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*, void*)#1}::_FUN(void*, void*)
+000097fc g     F .text.itcm	00000070 SharedSpiCard::readOCR(unsigned long*)
+000001e4  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*)#4}::_FUN(void*)
+0000b750  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*, void*)#2}::_FUN(void*, void*)
+200024bc g     O .data	00000004 F_CPU_ACTUAL
+0000f750 g     F .text.itcm	00000124 memmove
+0000f5dc g     F .text.itcm	00000060 snprintf
+0000af34 g     F .text.itcm	00000094 SdioCard::stopTransmission(bool)
+00010e2c g     F .text.itcm	00000054 _Balloc
+00016b0c g       .ARM.exidx	00000000 __exidx_end
+00009054 g     F .text.itcm	00000046 FatPartition::freeChain(unsigned long)
+20008625 g     O .bss	00000001 EventResponder::runningFromYield
+0000b35c g     F .text.itcm	00000016 SdSpiArduinoDriver::receive()
+000092c4 g     F .text.itcm	000000dc FsVolume::begin(FsBlockDeviceInterface*, bool, unsigned char)
+0000c160 g     F .text.itcm	00000060 tempmonGetTemp
+200024e8 g     O .data	00000004 __atexit_recursive_mutex
+0000fc04 g     F .text.itcm	0000000c __errno
+0000da24 g     F .text.itcm	0000000c .hidden __math_may_uflowf
+60001000 g     O .text.headers	00000020 ImageVectorTable
+20005e90 g     O .bss	00000004 EventResponder::firstInterrupt
+0000cac8 g     F .text.itcm	00000004 usb_transfer_status
+0000d87c g     F .text.itcm	00000080 sm_set_pool
+20002b20 g     O .bss	00000020 HardwareSerialIMXRT::s_serials_with_serial_events
+20008524 g     O .bss	00000004 __stdio_exit_handler
+00007c28 g     F .text.itcm	00000056 ExFatPartition::rootLength()
+00016a80 g     F .text.itcm	00000024 .hidden __aeabi_d2lz
+0000cb44  w    F .text.itcm	00000008 usb_serial_class::write(unsigned char const*, unsigned int)
+000166bc g     F .text.itcm	00000028 _fstat_r
+20001a64 g     O .data	00000370 digital_pin_to_info_PGM
+2000856c g     O .bss	00000004 errno
+0000b374 g     F .text.itcm	0000001a SdSpiArduinoDriver::receive(unsigned char*, unsigned int)
+000079a4 g     F .text.itcm	00000050 ExFatPartition::fatGet(unsigned long, unsigned long*)
+00016b08 g       .text.itcm	00000000 _etext
+00008c24 g     F .text.itcm	000000b8 FatFile::parsePathName(char const*, FatLfn_t*, char const**)
+20002ac0 g       .bss	00000000 _sbss
+0000404c  w    F .text.itcm	00000170 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::write(CAN_message_t const&)
+0000a054 g     F .text.itcm	0000000c SdioCard::errorData() const
+0000b0cc g     F .text.itcm	0000010c SdioCard::writeSector(unsigned long, unsigned char const*)
+00007b44 g     F .text.itcm	000000e4 ExFatPartition::init(FsBlockDeviceInterface*, unsigned char)
+60001f04 g       *ABS*	00000000 _stextload
+00005560 g     F .text.itcm	0000053c loop
+0000d6a4 g     F .text.itcm	00000074 flexpwm_init
+600016d4 g     F .text.code	00000004 startup_debug_reset
+0000c97c g     F .text.itcm	00000064 usb_config_rx
+000001e4  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*)#2}::_FUN(void*)
+000001ec  w    F .text.itcm	00000004 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::isFD()
+0000684c g     F .text.itcm	0000008c ExFatFile::parsePathName(char const*, ExName_t*, char const**)
+0000ad8c g     F .text.itcm	000000e8 SdioCard::readData(unsigned char*)
+20000280 g     O .data	00000148 .hidden __exp2f_data
+000041bc  w    F .text.itcm	000001dc CanProtocol::writeDiagnosed(CAN_message_t const&, float, unsigned char)
+00005a9c  w    F .text.itcm	000000ec FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::fifo_filter_match(unsigned long)
+20005e8c g     O .bss	00000004 EventResponder::lastInterrupt
+000091f8 g     F .text.itcm	00000028 FsBaseFile::close()
+0000b68c g     F .text.itcm	00000052 SPIClass::end()
+0000bddc g     F .text.itcm	00000134 memcpy
+00010c24 g     F .text.itcm	000001dc __hexnan
+000094ac g     F .text.itcm	00000088 SharedSpiCard::writeStop()
+20002ac0 g     O .data	00000000 .hidden __TMC_END__
+00007a84 g     F .text.itcm	000000c0 ExFatPartition::freeChain(unsigned long)
+00007fc8 g     F .text.itcm	00000028 FatFile::peek()
+00011900 g     F .text.itcm	00002044 _svfprintf_r
+000169ac g     F .text.itcm	00000022 .hidden __floatsidf
+200085f0 g     O .bss	00000004 systick_millis_count
+20008637 g     O .bss	00000001 usb_configuration
+0000006c  w    F .text.itcm	00000004 CANListener::frameHandler(CAN_message_t&, int, unsigned char)
+000093a0  w    F .text.itcm	00000006 SdCardInterface::status()
+0000d830 g     F .text.itcm	0000004c sm_align_pool
+60000000 g     O .text.headers	00000200 FlexSPI_NOR_Config
+0000afc8 g     F .text.itcm	0000001c SdioCard::syncDevice()
+0000a318 g     F .text.itcm	000000ac SdioCard::writeData(unsigned char const*)
+000006c0  w    F .text.itcm	0000004c StreamFile<FsBaseFile, unsigned long long>::available()
+00007ff0 g     F .text.itcm	00000048 FatFile::readDirCache(bool)
+000117e0 g     F .text.itcm	00000062 __ratio
+000001f0  w    F .text.itcm	00000004 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::getFirstTxBoxSize()
+000098e4 g     F .text.itcm	0000009c SharedSpiCard::sectorCount()
+60001e14  w    O .text.progmem	00000018 usb_string_manufacturer_name
+2000178c  w    O .data	00000024 vtable for FsFile
+0000c140  w    F .text.itcm	0000000a _fstat
+00013c98 g     F .text.itcm	00000040 __assert_func
+200003f0 g     O .data	000000c8 __mprec_tens
+60001c14 g     F .text.code	000000e8 usb_init
+00001208  w    F .text.itcm	000000c8 SaveData::writeDiagnostics(Print&)::{lambda(char const*, CanDiagnostics::Snapshot const&)#2}::operator()(char const*, CanDiagnostics::Snapshot const&) const
+000093a8  w    F .text.itcm	00000004 SharedSpiCard::errorCode() const
+200083e8 g     O .bss	00000004 __malloc_top_pad
+200085f4 g     O .bss	00000004 systick_safe_read
+20001820  w    O .data	00000010 teensy::inplace_function<void (), 16u, 8u>::inplace_function<void (&)(), void (*)(), void>(void (&)())::vt
+aaaaaabf g       *ABS*	00000000 _flexram_bank_config
+000073d8 g     F .text.itcm	000000e8 ExFatFile::truncate()
+200024f0 g     O .data	00000000 .hidden __dso_handle
+0001698c g     F .text.itcm	0000001e .hidden __aeabi_ui2d
+00013c04 g     F .text.itcm	00000008 _localeconv_r
+0000b304 g     F .text.itcm	0000004e SdSpiArduinoDriver::deactivate()
+000160e4 g     F .text.itcm	000002f8 __sfvwrite_r
+000110b4 g     F .text.itcm	0000005c __i2b
+20000000 g       .data	00000000 _sdata
+60001e94 g     O .text.progmem	00000062 usb_config_descriptor_480
+00016708 g     F .text.itcm	00000000 .hidden __aeabi_drsub
+0000b354 g     F .text.itcm	00000006 SdSpiArduinoDriver::end()
+00007c80 g     F .text.itcm	0000003a FatFile::addCluster()
+0000fbb4 g     F .text.itcm	00000024 _sbrk_r
+0000a0d0 g     F .text.itcm	0000001c SdioCard::type() const
+600016c8 g     F .text.code	00000002 startup_default_early_hook
+600015f0 g     F .text.code	00000028 ResetHandler
+0000d178 g     F .text.itcm	0000001e usb_serial_getchar
+200085fc g     O .bss	00000008 usb_cdc_line_coding
+0000bd04 g     F .text.itcm	00000044 digitalWrite
+20005e94 g     O .bss	00000004 EventResponder::lastYield
+00006818 g     F .text.itcm	00000034 ExFatFile::openRoot(ExFatVolume*)
+0000fb88 g     F .text.itcm	0000002c _read_r
+200085a0 g     O .bss	00000004 runStart
+00000750  w    F .text.itcm	00000036 StreamFile<FsBaseFile, unsigned long long>::read()
+0000948c  w    F .text.itcm	00000002 DedicatedSpiCard::~DedicatedSpiCard()
+0000f3d8 g     F .text.itcm	00000010 isspace
+0001399c g     F .text.itcm	000000c4 _fclose_r
+20008570 g     O .bss	00000010 extmem_smalloc_pool
+200083e0 g     O .bss	00000004 __malloc_max_sbrked_mem
+000099ec g     F .text.itcm	0000005a DedicatedSpiCard::readSectors(unsigned long, unsigned char*, unsigned int)
+0000bd48 g     F .text.itcm	00000084 pinMode
+0000baa0 g     F .text.itcm	00000164 Print::printFloat(double, unsigned char)
+000169d0 g     F .text.itcm	00000042 .hidden __extendsfdf2
+00016714 g     F .text.itcm	00000276 .hidden __adddf3
+6001b800 g     O .text.csf	00000c00 hab_csf
+20280000 g       .text.csf	00000000 _heap_end
+00011660 g     F .text.itcm	000000c0 __b2d
+00016b04 g       .ARM.exidx	00000000 __exidx_start
+70000000 g       .bss.extram	00000000 _extram_end
+00000d34  w    F .text.itcm	00000430 ControlAlgorithm::Controller::feedback(float, float, unsigned long)
+0000c14c  w    F .text.itcm	00000004 _isatty
+20005e88 g     O .bss	00000004 EventResponder::firstYield
+00003fe4  w    F .text.itcm	00000066 Circular_Buffer<unsigned char, (unsigned short)16, (unsigned short)24>::write(unsigned char const*, unsigned short)
+0000b4c4 g     F .text.itcm	00000094 FsUtf::mbToCp(char const*, char const*, unsigned long*)
+00000720  w    F .text.itcm	00000030 StreamFile<FsBaseFile, unsigned long long>::write(unsigned char)
+0000e01c g     F .text.itcm	0000032c _realloc_r
+0000fc10 g     F .text.itcm	0000004c __libc_init_array
+000070f4 g     F .text.itcm	0000000e ExFatFile::open(ExFatVolume*, char const*, int)
+0000a060 g     F .text.itcm	00000024 SdioCard::readCID(CID*)
+20001840 g     O .data	00000100 __hexdig
+00007328 g     F .text.itcm	000000ae ExFatFile::addDirCluster()
+200003c8 g     O .data	00000028 __mprec_bigtens
+00010f38 g     F .text.itcm	000000a8 __s2b
+00009c94  w    F .text.itcm	0000007a SharedSpiCard::readCID(CID*)
+0000c158  w    F .text.itcm	00000004 abort
+0000cb2c  w    F .text.itcm	00000004 usb_serial_class::clear()
+0001698c g     F .text.itcm	0000001e .hidden __floatunsidf
+0000c104  w    F .text.itcm	00000030 _sbrk
+60018a10 g       *ABS*	00000000 _sdataload
+0001143c g     F .text.itcm	0000003e __mcmp
+20008214  w    O .bss	00000004 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::flexcan_interrupt()::last_esr1
+200024ec g     O .data	00000004 __brkval
+20008636 g     O .bss	00000001 usb_cdc_line_rtsdtr
+60001da0 g     F .text.code	00000000 _init
+0000cec8 g     F .text.itcm	00000002 usb_serial_reset
+00005274 g     F .text.itcm	000002ec processCommand(char*)
+00016aa8 g     F .text.itcm	00000040 .hidden __aeabi_d2ulz
+60001e30 g     O .text.progmem	00000062 usb_config_descriptor_12
+0000e348 g     F .text.itcm	00000fe0 _strtod_l
+00010be4 g     F .text.itcm	00000040 __match
+2000862c g     O .bss	00000001 active
+20008660 g       .bss	00000000 _ebss
+0000a8a4 g     F .text.itcm	00000088 SdioCard::writeSectors(unsigned long, unsigned char const*, unsigned int)
+000006ac  w    F .text.itcm	00000014 StreamFile<FsBaseFile, unsigned long long>::flush()
+0000fb00 g     F .text.itcm	0000002c strrchr
+00010fe0 g     F .text.itcm	00000052 __hi0bits
+000067c8 g     F .text.itcm	0000003c ExFatFile::dirCache(unsigned char, unsigned char)
+2023b080 g       .bss.dma	00000000 _heap_start
+200083b0 g     O .bss	00000001 __lock___malloc_recursive_mutex
+200083ec g     O .bss	00000138 __sf
+00009718 g     F .text.itcm	000000e4 SharedSpiCard::cardCommand(unsigned char, unsigned long)
+00000003 g       *ABS*	00000000 _itcm_block_count
+20002b60 g     O .bss	00000020 endpoint0_transfer_data
+00008d18 g     F .text.itcm	0000002a FatFile::getLfnChar(DirLfn_t*, unsigned char)
+0000b404 g     F .text.itcm	0000006e FsCache::prepare(unsigned long, unsigned char)
+0000bf10 g     F .text.itcm	00000004 operator delete(void*, unsigned int)
+0000d718 g     F .text.itcm	000000f4 pwm_init
+00016714 g     F .text.itcm	00000276 .hidden __aeabi_dadd
+000001f4  w    F .text.itcm	00000154 CanProtocol::receiveFeedback(CAN_message_t const&)
+00005b88  w    F .text.itcm	00000118 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::struct2queueRx(CAN_message_t const&)
+6001c400 g       .text.csf	00000000 __text_csf_end
+60001a78 g     F .text.code	00000064 usb_pll_start
+00011298 g     F .text.itcm	000000b8 __pow5mult
+00016a14 g     F .text.itcm	0000006a .hidden __aeabi_ul2d
+00008fcc g     F .text.itcm	00000088 FatPartition::allocateCluster(unsigned long, unsigned long*)
+00009f24  w    F .text.itcm	00000002 SdioCard::end()
+20002b40 g     O .bss	00000020 endpoint0_transfer_ack
+20008604 g     O .bss	00000004 usb_cdc_line_rtsdtr_millis
+0000ca7c g     F .text.itcm	0000002c usb_transmit
+0000b728 g     F .text.itcm	00000020 systick_isr
+0000fc68 g     F .text.itcm	00000002 __retarget_lock_release_recursive
+200024c0 g     O .data	00000010 Serial
+00016020 g     F .text.itcm	000000c2 __ssputs_r
+0000da18 g     F .text.itcm	0000000c .hidden __math_uflowf
+0000b9b8  w    F .text.itcm	00000006 usb_serial_class::write(unsigned char)
+600016c8  w    F .text.code	00000002 startup_early_hook
+00007104 g     F .text.itcm	0000008e ExFatFile::addCluster()
+000095b8 g     F .text.itcm	00000088 SharedSpiCard::readData(unsigned char*, unsigned int)
+0000d0a8 g     F .text.itcm	00000044 usb_serial_peekchar
+0000f580 g     F .text.itcm	0000000c __sfp_lock_acquire
+00010040 g     F .text.itcm	00000000 memchr
+00008ea4 g     F .text.itcm	00000126 FatPartition::fatPut(unsigned long, unsigned long)
+0000d390 g     F .text.itcm	00000314 set_arm_clock
+200085ec g     O .bss	00000004 systick_cycle_count
+200027b8 g     O .data	00000016 usb_string_serial_number_default
+00010324 g     F .text.itcm	00000218 _free_r
+00009b8c g     F .text.itcm	00000108 SharedSpiCard::erase(unsigned long, unsigned long)
+00009d8c g     F .text.itcm	00000066 SharedSpiCard::writeData(unsigned char, unsigned char const*)
+0000a640 g     F .text.itcm	000000a4 SdioCard::readStop()
+000093b0  w    F .text.itcm	00000004 SharedSpiCard::type() const
+0000fb2c g     F .text.itcm	0000000c __locale_mb_cur_max
+00014cf4 g     F .text.itcm	00000016 _wcsrtombs_r
+00000b80  w    F .text.itcm	000001b4 CanProtocol::processFeedback(unsigned long)
+2000821c g     O .bss	00000190 __atexit0
+0000cb3c  w    F .text.itcm	00000004 usb_serial_class::flush()
+00016710 g     F .text.itcm	0000027a .hidden __aeabi_dsub
+20002748 g     O .data	00000004 __malloc_sbrk_base
+0000cb34  w    F .text.itcm	00000004 usb_serial_class::read()
+00005fdc  w    F .text.itcm	00000618 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::flexcan_interrupt()
+00016a14 g     F .text.itcm	0000006a .hidden __floatundidf
+0000c150  w    F .text.itcm	00000006 _lseek
+00011350 g     F .text.itcm	000000ec __lshift
+0000ca4c g     F .text.itcm	00000030 usb_prepare_transfer
+000093b4  w    F .text.itcm	00000004 DedicatedSpiCard::hasDedicatedSpi()
+00005d54  w    F .text.itcm	00000288 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::frame_distribution(CAN_message_t&)
+0000bf7c g     F .text.itcm	00000188 unused_interrupt_vector
+00013944 g     F .text.itcm	00000058 __ssprint_r
+20008608 g     O .bss	00000004 usb_timer0_callback
+60001adc g     F .text.code	00000138 tempmon_init
+00008644 g     F .text.itcm	0000010e FatFile::createLFN(unsigned short, FatLfn_t*, unsigned char)
+200085e8 g     O .bss	00000004 statusCode
+000101f4 g     F .text.itcm	00000084 __register_exitproc
+0000b754  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*)#4}::_FUN(void*)
+00009420 g     F .text.itcm	0000006c DedicatedSpiCard::writeSectorsCallback(unsigned long, unsigned int, unsigned char const* (*)(unsigned long, void*), void*)
+00007000 g     F .text.itcm	000000f2 ExFatFile::open(ExFatFile*, char const*, int)
+0000fa1c g     F .text.itcm	00000078 strncmp
+00008584 g     F .text.itcm	000000c0 FatFile::cmpName(unsigned short, FatLfn_t*, unsigned char)
+0000d108 g     F .text.itcm	00000070 usb_serial_flush_input
+00011110 g     F .text.itcm	00000188 __multiply
+0000d198 g     F .text.itcm	00000028 usb_serial_putchar
+00000025 g       *ABS*	00000000 _teensy_model_identifier
+0000fa94 g     F .text.itcm	0000006a strncpy
+200083b8 g     O .bss	00000028 __malloc_current_mallinfo
+00011720 g     F .text.itcm	000000c0 __d2b
+00009df4 g     F .text.itcm	00000064 SharedSpiCard::writeData(unsigned char const*)
+00009f1c  w    F .text.itcm	00000004 SdCardInterface::isDedicatedSpi()
+60001cfc g     F .text.code	00000054 _reboot_Teensyduino_
+0000a0bc  w    F .text.itcm	00000012 SdioCard::~SdioCard()
+600016cc g     F .text.code	00000002 startup_default_middle_hook
+000093bc g     F .text.itcm	00000062 DedicatedSpiCard::writeSectors(unsigned long, unsigned char const*, unsigned int)
+0000986c g     F .text.itcm	00000078 SharedSpiCard::readRegister(unsigned char, void*)
+0000a580 g     F .text.itcm	000000c0 SdioCard::writeStart(unsigned long)
+0000047c  w    F .text.itcm	00000218 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::events()
+0000c360 g     F .text.itcm	0000061c usb_isr
+0000b74c  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*, void*)#1}::_FUN(void*, void*)
+0000f3cc g     F .text.itcm	0000000c __cxa_atexit
+000068d8 g     F .text.itcm	00000192 ExFatFile::read(void*, unsigned int)
+0000fb38 g     F .text.itcm	00000024 _close_r
+00008d44  w    F .text.itcm	00000042 FsBlockDeviceInterface::readSectorsCallback(unsigned long, unsigned char*, unsigned int, void (*)(unsigned long, unsigned char*, void*), void*)
+000169ac g     F .text.itcm	00000022 .hidden __aeabi_i2d
+0000b7fc g     F .text.itcm	00000108 IntervalTimer::beginCycles(teensy::inplace_function<void (), 16u, 8u>, unsigned long)
+00009640 g     F .text.itcm	00000064 SharedSpiCard::readStop()
+0000b3b0 g     F .text.itcm	00000054 FsCache::sync()
+0000f6cc g     F .text.itcm	00000084 memcmp
+20001764  w    O .data	00000028 vtable for usb_serial_class
+0000b390 g     F .text.itcm	00000012 SdSpiArduinoDriver::send(unsigned char)
+0000fc60 g     F .text.itcm	00000002 __retarget_lock_close_recursive
+20002760 g     O .data	00000008 controlTimer
+0000b1d8 g     F .text.itcm	00000004 sdCsWrite(unsigned char, bool)
+200085e4 g     O .bss	00000004 scale_cpu_cycles_to_microseconds
+000163dc g     F .text.itcm	000000dc __swsetup_r
+20008528 g     O .bss	00000034 controller
+00009980 g     F .text.itcm	0000006c SharedSpiCard::readStart(unsigned long)
+00011844 g     F .text.itcm	0000005a __copybits
+20001eb0 g     O .data	00000408 __malloc_av_
+20008218 g     O .bss	00000004 __atexit
+0000f63c g     F .text.itcm	00000022 __sread
+0000d21c g     F .text.itcm	0000009c usb_serial_flush_output
+0000e004 g     F .text.itcm	0000000c __malloc_lock
+20002800 g     O .data	000002c0 _VectorsRam
+0000b3a4 g     F .text.itcm	0000000a SdSpiArduinoDriver::send(unsigned char const*, unsigned int)
+00013b94 g     F .text.itcm	00000070 _fflush_r
+00013cd8 g     F .text.itcm	00000078 _calloc_r
+00000070  w    F .text.itcm	00000160 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::setBaudRate(unsigned long, FLEXCAN_RXTX)
+00008998 g     F .text.itcm	0000028c FatFile::open(FatFile*, FatLfn_t*, int)
+2000863a g     O .bss	00000001 yield_active_check_flags
+000072b8 g     F .text.itcm	0000006e ExFatFile::sync()
+0000fc64 g     F .text.itcm	00000002 __retarget_lock_acquire_recursive
+20008638 g     O .bss	00000001 usb_high_speed
+0000a4b4 g     F .text.itcm	00000080 SdioCard::isBusy()
+0000f874 g     F .text.itcm	00000086 memset
+0000bdcc g     F .text.itcm	00000010 main
+00001164 g     F .text.itcm	000000a4 handleFeedback(CanProtocol::Feedback const&)
+200083e4 g     O .bss	00000004 __malloc_max_total_mem
+00007800 g     F .text.itcm	000000ba ExFatPartition::bitmapFind(unsigned long, unsigned long)
+0000fc5c g     F .text.itcm	00000002 __retarget_lock_init_recursive
+20238000 g     O .bss.dma	00000062 usb_descriptor_buffer
+00009e58 g     F .text.itcm	0000009c SharedSpiCard::writeSector(unsigned long, unsigned char const*)
+000074c0 g     F .text.itcm	0000028c ExFatFile::write(void const*, unsigned int)
+00000920  w    F .text.itcm	00000260 CanProtocol::serviceDiagnostics()
+00004620 g     F .text.itcm	00000378 stopRun(unsigned long)
+0000f6c4 g     F .text.itcm	00000008 __sclose
+0000cacc g     F .text.itcm	00000060 usb_init_serialnumber
+60001dfc g       .text.code	00000000 __init_array_end
+00013e78 g     F .text.itcm	00000e2c _dtoa_r
+0000da58 g     F .text.itcm	000005ac _malloc_r
+00009abc g     F .text.itcm	00000064 DedicatedSpiCard::readSector(unsigned long, unsigned char*)
+000118e0 g     F .text.itcm	0000001a __ascii_wctomb
+00016a24 g     F .text.itcm	0000005a .hidden __aeabi_l2d
+200081d8 g     O .bss	00000004 FatVolume::m_cwv
+00005ca0  w    F .text.itcm	000000b2 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::filter_match(FLEXCAN_MAILBOX, unsigned long)
+20001830  w    O .data	00000010 SPIClass::beginTransaction(SPISettings)::clk_sel
+0000b684 g     F .text.itcm	00000008 SPIClass::transfer(void const*, void*, unsigned int)
+0000bcb0 g     F .text.itcm	00000054 micros
+00007194 g     F .text.itcm	00000124 ExFatFile::syncDir()
+00010278 g     F .text.itcm	000000ac _malloc_trim_r
+000164b8 g     F .text.itcm	000000f8 _wcsnrtombs_l
+60001e2c g     O .text.progmem	00000004 string0
+0000d1c0 g     F .text.itcm	00000014 usb_serial_write
+00007f50 g     F .text.itcm	00000076 FatFile::fgets(char*, int, char*)
+600016d0  w    F .text.code	00000002 startup_late_hook
+00009ef4 g     F .text.itcm	00000022 DedicatedSpiCard::writeSector(unsigned long, unsigned char const*)
+0000cb38  w    F .text.itcm	00000004 usb_serial_class::available()
+0000fca0 g     F .text.itcm	000002de strcmp
+000081c0 g     F .text.itcm	000000c8 FatFile::sync()
+20000000 g     O .data	00000280 endpoint_queue_head
+60001dfc  w    O .text.progmem	00000016 usb_string_product_name
+0000bc04 g     F .text.itcm	000000ac delay
+00016aa8 g     F .text.itcm	00000040 .hidden __fixunsdfdi
+00016b00 g     F .fini	00000000 _fini
+00009534 g     F .text.itcm	00000084 SharedSpiCard::isBusy()
+60001020 g     O .text.headers	0000000c BootData
+00006a6c g     F .text.itcm	00000076 ExFatFile::fgets(char*, int, char*)
+000039f0  w    F .text.itcm	0000019c FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::begin()
+0000ba34 g     F .text.itcm	00000016 Print::print(long)
+00008288 g     F .text.itcm	00000010 FatFile::close()
+0000c15c g     F .text.itcm	00000004 Panic_Temp_isr
+200016ac  w    O .data	00000024 vtable for FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>
+00016a80 g     F .text.itcm	00000024 .hidden __fixdfdi
+0000f328 g     F .text.itcm	000000a4 strtof
+0000f9cc g     F .text.itcm	0000004e strcspn
+000165b0 g     F .text.itcm	00000028 _wcsnrtombs_r
+0000a0b8  w    F .text.itcm	00000002 SdioCard::~SdioCard()
+00000694  w    F .text.itcm	00000018 StreamFile<FsBaseFile, unsigned long long>::peek()
+0000fbd8 g     F .text.itcm	0000002c _write_r
+0000b750  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*, void*)#3}::_FUN(void*, void*)
+0000aa28 g     F .text.itcm	000000dc SdioCard::erase(unsigned long, unsigned long)
+000101e8 g     F .text.itcm	0000000c nanf
+2000275c g     O .data	00000004 _impure_ptr
+00006ae4 g     F .text.itcm	0000002c ExFatFile::peek()
+00013a60 g     F .text.itcm	00000134 __sflush_r
+200016d0  w    O .data	00000024 vtable for StreamFile<FsBaseFile, unsigned long long>
+000012d0  w    F .text.itcm	00000dcc SaveData::writeDiagnostics(Print&)
+0000f598 g     F .text.itcm	00000044 _fwalk_sglue
+0000a048 g     F .text.itcm	0000000c SdioCard::errorCode() const
+0000b904 g     F .text.itcm	00000084 IntervalTimer::end()
+00008390 g     F .text.itcm	0000000e FatFile::open(FatVolume*, char const*, int)
+0000070c  w    F .text.itcm	00000014 StreamFile<FsBaseFile, unsigned long long>::write(unsigned char const*, unsigned int)
+60001df0 g       .text.code	00000000 __preinit_array_end
+00000348  w    F .text.itcm	00000018 FsFile::~FsFile()
+0000796c g     F .text.itcm	00000036 ExFatPartition::dirCache(DirPos_t*, unsigned char)
+00010e00 g     F .text.itcm	0000002a __ascii_mbtowc
+000115fc g     F .text.itcm	00000064 __ulp
+0000c338 g     F .text.itcm	00000028 usb_stop_sof_interrupts
+200085f8 g     O .bss	00000004 tau_cmd
+00003d94 g     F .text.itcm	00000250 setup
+20001e08 g     O .data	00000084 usb_descriptor_list
+0000a534 g     F .text.itcm	00000020 SdioCard::status()
+00003238  w    F .text.itcm	0000066c SaveData::dumpCsv()
+000101d8 g     F .text.itcm	00000010 nan
+00007d7c g     F .text.itcm	000001d4 FatFile::read(void*, unsigned int)
+00007d34 g     F .text.itcm	00000048 FatFile::openRoot(FatVolume*)
+20005ddc g     O .bss	00000004 ExFatVolume::m_cwv
+20068000 g       .text.csf	00000000 _estack
+000092c0 g     F .text.itcm	00000004 operator new(unsigned int, unsigned long*)
+0000d1d4 g     F .text.itcm	00000048 usb_serial_write_buffer_free
+000001d0  w    F .text.itcm	00000004 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*)#1}::_FUN(void*)
+20002750 g     O .data	0000000c __sglue
+0000cecc g     F .text.itcm	00000100 usb_serial_configure
+0000ba68  w    F .text.itcm	00000018 _write
+20002ac0 g       .data	00000000 _edata
+00007a3c g     F .text.itcm	00000048 ExFatPartition::fatPut(unsigned long, unsigned long)
+2000862e g     O .bss	00000001 external_psram_size
+0000a0b8  w    F .text.itcm	00000002 SdioCard::~SdioCard()
+0000b474 g     F .text.itcm	00000050 FsName::get16()
+00004fb8 g     F .text.itcm	000002bc startRun()
+0000948c  w    F .text.itcm	00000002 DedicatedSpiCard::~DedicatedSpiCard()
+00009a48 g     F .text.itcm	00000072 DedicatedSpiCard::readSectorsCallback(unsigned long, unsigned char*, unsigned int, void (*)(unsigned long, unsigned char*, void*), void*)
+000096bc g     F .text.itcm	0000005c DedicatedSpiCard::setDedicatedSpi(bool)
+00007798 g     F .text.itcm	00000066 ExFatFile::hashName(ExName_t*)
+00007cbc g     F .text.itcm	00000078 FatFile::addDirCluster()
+0000cb40  w    F .text.itcm	00000004 usb_serial_class::availableForWrite()
+000001dc  w    F .text.itcm	00000006 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*, void*)#3}::_FUN(void*, void*)
+0000bf14 g     F .text.itcm	00000066 ultoa
+0000b754  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*)#2}::_FUN(void*)
+00009220 g     F .text.itcm	000000a0 FsBaseFile::open(FsVolume*, char const*, int)
+0000f660 g     F .text.itcm	0000003e __swrite
+0000b6e0 g     F .text.itcm	00000044 EventResponder::runFromInterrupt()
+2000274c g     O .data	00000004 __malloc_trim_threshold
+0000cb30  w    F .text.itcm	00000004 usb_serial_class::peek()
+00009f20  w    F .text.itcm	00000004 SdCardInterface::setDedicatedSpi(bool)
+00014d0c g     F .text.itcm	0000002c fiprintf
+00014d38 g     F .text.itcm	00001248 _vfiprintf_r
+0000b1dc  w    F .text.itcm	00000114 SPIClass::beginTransaction(SPISettings)
+0001147c g     F .text.itcm	00000180 __mdiff
+0000a0a8 g     F .text.itcm	00000010 SdioCard::readOCR(unsigned long*)
+000079f4 g     F .text.itcm	00000046 ExFatPartition::dirSeek(DirPos_t*, unsigned long)
+200022b8 g     O .data	00000200 _impure_data
+00006c04 g     F .text.itcm	000003fc ExFatFile::openPrivate(ExFatFile*, ExName_t*, int)
+0000f58c g     F .text.itcm	0000000c __sfp_lock_release
+0000a640 g     F .text.itcm	000000a4 SdioCard::writeStop()
+000038a4 g     F .text.itcm	0000014c printStatus()
+00006804 g     F .text.itcm	00000014 ExFatFile::close()
+20001940 g     O .data	00000101 _ctype_
+0000c134  w    F .text.itcm	00000004 _read
+60001df0 g       .text.code	00000000 __init_array_start
+200024b8 g     O .data	00000004 F_BUS_ACTUAL
+0000b748  w    F .text.itcm	00000002 teensy::inplace_function_detail::vtable<void>::vtable()::{lambda(void*)#1}::_FUN(void*)
+00003b8c  w    F .text.itcm	00000208 CanProtocol::begin()
+0000d8fc g     F .text.itcm	000000e4 expf
+000165d8 g     F .text.itcm	000000e2 __smakebuf_r
+00000000 g       .text.itcm	00000000 _stext
+00004398  w    F .text.itcm	00000288 CanProtocol::command(float)
+0000da30 g     F .text.itcm	0000000c .hidden __math_oflowf
+200024dc g     O .data	00000004 IntervalTimer::nvic_priorites
+000001dc  w    F .text.itcm	00000006 teensy::inplace_function_detail::vtable<void>::vtable<void (*)()>(teensy::inplace_function_detail::wrapper<void (*)()>)::{lambda(void*, void*)#2}::_FUN(void*, void*)
+00009490  w    F .text.itcm	00000006 SharedSpiCard::end()
+00010100 g     F .text.itcm	000000d8 strlen
+0000f3e8 g     F .text.itcm	00000014 toupper
+00008038 g     F .text.itcm	000000a8 FatFile::seekSet(unsigned long)
+00000360  w    F .text.itcm	00000010 IntervalTimer::~IntervalTimer()
+000105f4 g     F .text.itcm	000005f0 __gethex
+60001dfc g     O .text.progmem	00000016 usb_string_product_name_default
+0000a0ec g     F .text.itcm	0000006c SdioCard::sectorCount()
+00016000 g     F .text.itcm	0000001e __sprint_r
+0000f8fc g     F .text.itcm	000000d0 strchr
+000001e8  w    F .text.itcm	00000004 FlexCAN_T4<(CAN_DEV_TABLE)1075658752, (FLEXCAN_RXQUEUE_TABLE)256, (FLEXCAN_TXQUEUE_TABLE)16>::write(CANFD_message_t const&)
+600016cc  w    F .text.code	00000002 startup_middle_hook
+200017b0 g     O .data	00000070 vtable for SdioCard
+000169d0 g     F .text.itcm	00000042 .hidden __aeabi_f2d
+600016d8 g     F .text.code	0000011c configure_cache
+00009f18  w    F .text.itcm	00000004 SdCardInterface::hasDedicatedSpi()
+00009d10  w    F .text.itcm	0000007a SharedSpiCard::readCSD(csd_t*)
+0000ae74 g     F .text.itcm	000000c0 SdioCard::readStart(unsigned long)
+0000b2f0 g     F .text.itcm	00000012 SdSpiArduinoDriver::activate()
+00016710 g     F .text.itcm	0000027a .hidden __subdf3
+60001df0 g       .text.code	00000000 __preinit_array_start
+0000caa8 g     F .text.itcm	00000020 usb_receive
+000078bc g     F .text.itcm	000000b0 ExFatPartition::bitmapModify(unsigned long, unsigned long, bool)
+00011034 g     F .text.itcm	00000080 __lo0bits
+000080e0 g     F .text.itcm	000000de FatFile::openCachedEntry(FatFile*, unsigned short, int, unsigned char)
+0001c400 g       *ABS*	00000000 _flashimagelen
+000096a4 g     F .text.itcm	00000018 SharedSpiCard::syncDevice()
+0000da3c g     F .text.itcm	0000000a __aeabi_atexit
+00000348  w    F .text.itcm	00000018 FsFile::~FsFile()
+0000d80c g     F .text.itcm	00000024 rtc_get
+00013c10 g     F .text.itcm	00000088 frexp
+70000000 g       .bss.extram	00000000 _extram_start
+0000b724 g     F .text.itcm	00000004 pendablesrvreq_isr
+00000068  w    F .text.itcm	00000004 Print::availableForWrite()
+200024f4 g     O .data	00000254 __global_locale
+20008632 g     O .bss	00000001 startRequest
+0000ab04 g     F .text.itcm	00000288 SdioCard::begin(SdioConfig)
+00004998 g     F .text.itcm	00000620 controlISR()
+0000cfcc g     F .text.itcm	000000dc usb_serial_read
+200083b4 g     O .bss	00000001 __lock___sfp_recursive_mutex
+0000ba80 g     F .text.itcm	00000020 Print::printNumber(unsigned long, unsigned char, unsigned char)
+0000c9e0 g     F .text.itcm	0000006c usb_config_tx
+0000c138  w    F .text.itcm	00000006 _close
+00008d88 g     F .text.itcm	0000011c FatPartition::fatGet(unsigned long, unsigned long*)
+0000da48 g     F .text.itcm	00000010 free
+0000774c g     F .text.itcm	0000004c ExFatFile::cmpName(DirName_t const*, ExName_t*)
+00010e94 g     F .text.itcm	000000a4 __multadd
+00010e80 g     F .text.itcm	00000012 _Bfree
+200027b8  w    O .data	00000016 usb_string_serial_number
+0000afe4 g     F .text.itcm	000000e8 SdioCard::readSector(unsigned long, unsigned char*)
+0000a084 g     F .text.itcm	00000024 SdioCard::readCSD(csd_t*)
+
+

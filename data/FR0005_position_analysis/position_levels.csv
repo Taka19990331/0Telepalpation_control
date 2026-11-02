@@ -1,0 +1,10 @@
+﻿window,position_deg,n,percent
+initial,79.5046082,620,39.61661341853035
+initial,79.5264664,945,60.383386581469644
+post_coast,-519.921936,9,0.8999999999999999
+post_coast,-519.900085,987,98.7
+post_coast,-519.878235,4,0.4
+braking_all_reference,-519.921936,100,0.625
+braking_all_reference,-519.900085,15855,99.09375
+braking_all_reference,-519.878235,45,0.28125
+braking_zero_rows_reference,-519.900085,6292,100.0

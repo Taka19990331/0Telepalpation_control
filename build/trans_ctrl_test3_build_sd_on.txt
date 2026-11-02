@@ -1,0 +1,10 @@
+Used library Version Path
+FlexCAN_T4           C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4
+SdFat        2.1.2   C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\SdFat
+SPI          1.0     C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\SPI
+
+Used platform Version Path
+teensy:avr    1.62.0  C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0
+Error during build: fork/exec C:\Users\Miyam\AppData\Local\Arduino15\packages\builtin\tools\ctags\5.8-arduino11/ctags.exe: {Illegal System DLL Relocation}
+The system DLL %hs was relocated in memory. The application will not run properly.
+The relocation occurred because the DLL %hs occupied an address range reserved for Windows system DLLs. The vendor supplying the DLL should be contacted for a new DLL.

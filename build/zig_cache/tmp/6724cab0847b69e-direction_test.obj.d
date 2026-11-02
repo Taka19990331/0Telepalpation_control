@@ -1,0 +1,35 @@
+build\zig_cache\tmp\6724cab0847b69e-direction_test.obj: \
+  C:/0Telepalpation_control/controller_implementation/trans_ctrl_test2/tests/direction_test.cpp \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/assert.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/crtdefs.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/corecrt.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/_mingw.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/_mingw_mac.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/_mingw_secapi.h \
+  build/host_tools/ziglang/lib/include/vadefs.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/vadefs.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/sdks/_mingw_ddk.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/stdlib.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/corecrt_wstdlib.h \
+  build/host_tools/ziglang/lib/include/limits.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/limits.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/sec_api/stdlib_s.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/malloc.h \
+  build/host_tools/ziglang/lib/include/mm_malloc.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/math.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/stdio.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/corecrt_stdio_config.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/_mingw_off_t.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/swprintf.inl \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/sec_api/stdio_s.h \
+  C:/0Telepalpation_control/controller_implementation/trans_ctrl_test2/control_algorithm.h \
+  build/host_tools/ziglang/lib/include/stdint.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/stdint.h \
+  build/host_tools/ziglang/lib/include/stddef.h \
+  build/host_tools/ziglang/lib/libc/include/any-windows-any/stddef.h \
+  build/host_tools/ziglang/lib/include/__stddef_wchar_t.h \
+  build/host_tools/ziglang/lib/include/__stddef_wint_t.h \
+  C:/0Telepalpation_control/controller_implementation/trans_ctrl_test2/control_config.h \
+  C:/0Telepalpation_control/controller_implementation/trans_ctrl_test2/position_direction.h \
+  C:/0Telepalpation_control/controller_implementation/trans_ctrl_test2/tests/../../trans_ctrl_test1/control_algorithm.h \
+  C:/0Telepalpation_control/controller_implementation/trans_ctrl_test2/tests/../../trans_ctrl_test1/control_config.h
