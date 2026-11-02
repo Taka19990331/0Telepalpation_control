@@ -1,0 +1,2 @@
+coeff 0.993757516280296 -1.9861028487527173 0.993757516280296 -1.9861028487527173 0.9875150325605918
+Python reference only: C++ execution blocked by Windows Application Control (4551).

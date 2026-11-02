@@ -1,0 +1,11 @@
+In file included from C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.60.0\libraries\FlexCAN_T4/FlexCAN_T4.h:558,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_notch1\can_protocol.h:4,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_notch1\trans_ctrl_notch1.ino:5:
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.60.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp: In member function 'bool FlexCAN_T4<_bus, _rxSize, _txSize>::error(CAN_error_t&, bool) [with CAN_DEV_TABLE _bus = CAN2; FLEXCAN_RXQUEUE_TABLE _rxSize = RX_SIZE_256; FLEXCAN_TXQUEUE_TABLE _txSize = TX_SIZE_16]':
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.60.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp:1336:49: warning: 'char* strncpy(char*, const char*, size_t)' output truncated before terminating nul copying 13 bytes from a string of the same length [-Wstringop-truncation]
+ 1336 |   else if ( (error.ESR1 & 0x30) == 0x1 ) strncpy((char*)error.FLT_CONF, "Error Passive", (sizeof(error.FLT_CONF) - 1));
+      |                                          ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Memory Usage on Teensy 4.1:
+  FLASH: code:95156, data:11208, headers:8320   free for files:8011780
+   RAM1: variables:34464, code:92632, padding:5672   free for local variables:391520
+   RAM2: variables:241792  free for malloc/new:282496

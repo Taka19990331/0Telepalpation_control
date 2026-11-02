@@ -1,0 +1,20 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\include\\powerpc-linux-any\\asm\\unistd.h"
+/* SPDX-License-Identifier: GPL-2.0+ WITH Linux-syscall-note */
+/*
+ * This file contains the system call numbers.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
+ */
+#ifndef _ASM_POWERPC_UNISTD_H_
+#define _ASM_POWERPC_UNISTD_H_
+
+#ifndef __powerpc64__
+#include <asm/unistd_32.h>
+#else
+#include <asm/unistd_64.h>
+#endif
+
+#endif /* _ASM_POWERPC_UNISTD_H_ */

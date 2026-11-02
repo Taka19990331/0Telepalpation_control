@@ -1,0 +1,12 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\src\\network\\gethostbyname_r.c"
+#define _GNU_SOURCE
+
+#include <sys/socket.h>
+#include <netdb.h>
+
+int gethostbyname_r(const char *name,
+	struct hostent *h, char *buf, size_t buflen,
+	struct hostent **res, int *err)
+{
+	return gethostbyname2_r(name, AF_INET, h, buf, buflen, res, err);
+}

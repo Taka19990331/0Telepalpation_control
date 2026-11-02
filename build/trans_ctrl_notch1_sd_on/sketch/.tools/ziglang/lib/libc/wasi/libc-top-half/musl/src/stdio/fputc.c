@@ -1,0 +1,8 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\wasi\\libc-top-half\\musl\\src\\stdio\\fputc.c"
+#include <stdio.h>
+#include "putc.h"
+
+int fputc(int c, FILE *f)
+{
+	return do_putc(c, f);
+}

@@ -1,0 +1,8 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\mingw\\libsrc\\usbcamdi-uuid.c"
+/* from usbcamdi.h */
+
+#define INITGUID
+#include <basetyps.h>
+
+DEFINE_GUID(GUID_USBCAMD_INTERFACE, 0x2bcb75c0, 0xb27f, 0x11d1, 0xba, 0x41, 0x0, 0xa0, 0xc9, 0xd, 0x2b, 0x5);
+

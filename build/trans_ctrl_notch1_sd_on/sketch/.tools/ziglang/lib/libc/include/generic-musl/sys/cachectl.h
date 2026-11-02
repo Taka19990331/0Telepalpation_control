@@ -1,0 +1,23 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\include\\generic-musl\\sys\\cachectl.h"
+#ifndef _SYS_CACHECTL_H
+#define _SYS_CACHECTL_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define ICACHE (1<<0)
+#define DCACHE (1<<1)
+#define BCACHE (ICACHE|DCACHE)
+#define CACHEABLE 0
+#define UNCACHEABLE 1
+ 
+int cachectl(void *, int, int);
+int cacheflush(void *, int, int);
+int _flush_cache(void *, int, int);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

@@ -1,0 +1,8 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\src\\stdio\\fgetc.c"
+#include <stdio.h>
+#include "getc.h"
+
+int fgetc(FILE *f)
+{
+	return do_getc(f);
+}

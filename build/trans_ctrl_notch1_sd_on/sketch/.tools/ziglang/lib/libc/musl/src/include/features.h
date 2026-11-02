@@ -1,0 +1,12 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\src\\include\\features.h"
+#ifndef FEATURES_H
+#define FEATURES_H
+
+#include "../../include/features.h"
+
+#define weak __attribute__((__weak__))
+#define hidden __attribute__((__visibility__("hidden")))
+#define weak_alias(old, new) \
+	extern __typeof(old) new __attribute__((__weak__, __alias__(#old)))
+
+#endif

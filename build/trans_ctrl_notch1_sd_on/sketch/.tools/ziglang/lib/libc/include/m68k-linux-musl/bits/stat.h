@@ -1,0 +1,26 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\include\\m68k-linux-musl\\bits\\stat.h"
+/* copied from kernel definition, but with padding replaced
+ * by the corresponding correctly-sized userspace types. */
+
+struct stat {
+	dev_t st_dev;
+	short __st_dev_padding;
+	long __st_ino_truncated;
+	mode_t st_mode;
+	nlink_t st_nlink;
+	uid_t st_uid;
+	gid_t st_gid;
+	dev_t st_rdev;
+	short __st_rdev_padding;
+	off_t st_size;
+	blksize_t st_blksize;
+	blkcnt_t st_blocks;
+	struct {
+		long tv_sec;
+		long tv_nsec;
+	} __st_atim32, __st_mtim32, __st_ctim32;
+	ino_t st_ino;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+};

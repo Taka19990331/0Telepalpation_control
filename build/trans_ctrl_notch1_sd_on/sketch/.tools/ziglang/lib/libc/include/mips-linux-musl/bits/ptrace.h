@@ -1,0 +1,10 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\include\\mips-linux-musl\\bits\\ptrace.h"
+#define PTRACE_GET_THREAD_AREA	25
+#define PTRACE_SET_THREAD_AREA	26
+#define PTRACE_PEEKTEXT_3264	0xc0
+#define PTRACE_PEEKDATA_3264	0xc1
+#define PTRACE_POKETEXT_3264	0xc2
+#define PTRACE_POKEDATA_3264	0xc3
+#define PTRACE_GET_THREAD_AREA_3264	0xc4
+#define PTRACE_GET_WATCH_REGS	0xd0
+#define PTRACE_SET_WATCH_REGS	0xd1

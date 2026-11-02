@@ -1,0 +1,15 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\include\\any-linux-any\\linux\\tc_ematch\\tc_em_nbyte.h"
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
+#ifndef __LINUX_TC_EM_NBYTE_H
+#define __LINUX_TC_EM_NBYTE_H
+
+#include <linux/types.h>
+#include <linux/pkt_cls.h>
+
+struct tcf_em_nbyte {
+	__u16		off;
+	__u16		len:12;
+	__u8		layer:4;
+};
+
+#endif

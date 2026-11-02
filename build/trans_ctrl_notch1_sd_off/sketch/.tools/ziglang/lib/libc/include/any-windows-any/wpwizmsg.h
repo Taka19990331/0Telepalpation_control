@@ -1,0 +1,18 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\include\\any-windows-any\\wpwizmsg.h"
+/**
+ * This file has no copyright assigned and is placed in the Public Domain.
+ * This file is part of the mingw-w64 runtime package.
+ * No warranty is given; refer to the file DISCLAIMER.PD within this package.
+ */
+#define WPWIZ_ERROR_FIRST __MSABI_LONG(0x40042000)
+#define WPWIZ_ERROR_UNKNOWN __MSABI_LONG(0xC0042001)
+#define WPWIZ_ERROR_PROV_QI __MSABI_LONG(0xC0042002)
+#define WPWIZ_ERROR_INIT_FAILED __MSABI_LONG(0xC0042003)
+#define WPWIZ_ERROR_COCREATE_WEBPOST __MSABI_LONG(0xC0042004)
+#define WPWIZ_ERROR_NO_PROVIDERS __MSABI_LONG(0xC0042005)
+#define WPWIZ_ERROR_STATE_PTR __MSABI_LONG(0xC0042006)
+#define WPWIZ_ERROR_WEBPOST_PTR __MSABI_LONG(0xC0042007)
+#define WPWIZ_ERROR_FILE_NOT_FOUND __MSABI_LONG(0xC0042008)
+#define WPWIZ_ERROR_PROPSHEET_ERROR __MSABI_LONG(0xC0042009)
+#define WPWIZ_ERROR_OUTOFMEMORY __MSABI_LONG(0xC004200A)
+#define WPWIZ_ERROR_LAST __MSABI_LONG(0x400420FF)

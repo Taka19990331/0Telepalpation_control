@@ -1,0 +1,11 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\include\\powerpc-openbsd-eabihf\\machine\\atomic.h"
+/*	$OpenBSD: atomic.h,v 1.3 2011/03/23 16:54:36 pirofti Exp $	*/
+
+/* Public Domain */
+
+#ifndef _MACHINE_ATOMIC_H_
+#define _MACHINE_ATOMIC_H_
+
+#include <powerpc/atomic.h>
+
+#endif /* _MACHINE_ATOMIC_H_ */

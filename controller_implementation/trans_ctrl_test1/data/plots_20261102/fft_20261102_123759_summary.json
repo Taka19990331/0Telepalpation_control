@@ -1,0 +1,20 @@
+{
+  "file": "trans_ctrl_test1_20261102_123759.csv",
+  "samples": 28159,
+  "sample_rate_hz": 2000.0,
+  "duration_s": 14.079,
+  "nyquist_hz": 1000.0,
+  "method": "mean removed; Hann window; single-sided amplitude spectrum",
+  "Position [rad]": {
+    "largest_peak_hz": 4.11946446961895,
+    "peak_amplitude": 0.004624189174694286
+  },
+  "Velocity [rad/s]": {
+    "largest_peak_hz": 12.003267161475904,
+    "peak_amplitude": 0.2395644310946961
+  },
+  "RFOB estimated external torque [N m]": {
+    "largest_peak_hz": 12.003267161475904,
+    "peak_amplitude": 0.18022501149757858
+  }
+}

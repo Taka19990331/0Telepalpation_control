@@ -1,0 +1,18 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\src\\linux\\mount.c"
+#include <sys/mount.h>
+#include "syscall.h"
+
+int mount(const char *special, const char *dir, const char *fstype, unsigned long flags, const void *data)
+{
+	return syscall(SYS_mount, special, dir, fstype, flags, data);
+}
+
+int umount(const char *special)
+{
+	return syscall(SYS_umount2, special, 0);
+}
+
+int umount2(const char *special, int flags)
+{
+	return syscall(SYS_umount2, special, flags);
+}

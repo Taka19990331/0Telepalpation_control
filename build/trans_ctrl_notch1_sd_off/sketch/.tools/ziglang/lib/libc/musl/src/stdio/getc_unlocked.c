@@ -1,0 +1,10 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\.tools\\ziglang\\lib\\libc\\musl\\src\\stdio\\getc_unlocked.c"
+#include "stdio_impl.h"
+
+int (getc_unlocked)(FILE *f)
+{
+	return getc_unlocked(f);
+}
+
+weak_alias (getc_unlocked, fgetc_unlocked);
+weak_alias (getc_unlocked, _IO_getc_unlocked);
