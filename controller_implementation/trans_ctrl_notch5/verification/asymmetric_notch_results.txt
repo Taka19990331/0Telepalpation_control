@@ -1,0 +1,11 @@
+Design: RBJ approximation (requested asymmetry not exactly realizable)
+Requested -3 dB edges: 4.000000000 / 34.000000000 Hz
+Design parameters: center 12 Hz, low offset 8 Hz, high offset 22 Hz
+b = [0.957256663290101 -1.90865691075542 0.952757364689059]
+a = [1 -1.90865691075542 0.91001402797916]
+DC=1 (-7.10709343e-13 dB); gain at edges=-2.728986807 / -3.028958874 dB; center=-26.020599913 dB
+Crossings=4.210223654 / 34.177190785 Hz; errors=0.210223654 / 0.177190785 Hz
+Max gain (0..Nyquist)=1 (0 dB); attenuation target=-26.020599913 dB
+Pole radii=0.981324246984, 0.927332663771
+Minimum: 12.000000 Hz / -26.020599913 dB; frequency error 0.000000 Hz
+Phase at low edge / center / high edge: -40.465204915 / -0.000000000 / 42.313011188 deg

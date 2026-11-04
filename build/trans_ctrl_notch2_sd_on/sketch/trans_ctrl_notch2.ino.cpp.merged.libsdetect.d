@@ -51,6 +51,7 @@ trans_ctrl_notch2.ino.cpp.o: \
  C:\0Telepalpation_control\build\trans_ctrl_notch2_sd_on\sketch\can_diagnostics.h \
  C:\0Telepalpation_control\build\trans_ctrl_notch2_sd_on\sketch\control_algorithm.h \
  C:\0Telepalpation_control\build\trans_ctrl_notch2_sd_on\sketch\fixed_notch.h \
+ C:\0Telepalpation_control\build\trans_ctrl_notch2_sd_on\sketch\notch_coefficients.h \
  C:\0Telepalpation_control\build\trans_ctrl_notch2_sd_on\sketch\save_data.h \
  C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\SdFat\src/SdFat.h \
  C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\SdFat\src/common/SysCall.h \

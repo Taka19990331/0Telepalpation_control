@@ -16,6 +16,9 @@ int main() {
   assert(adaptive.notchMode()==NOTCH_ADAPTIVE && adaptive.signals.notchMode==2);
   assert(adaptive.setAngleThresholds(.8f,1.0f));
   assert(adaptive.angleStartDeg()==.8f && adaptive.angleFullDeg()==1.0f);
+  adaptive.signals.angleRms=.9f*0.01745329251994329577f;
+  adaptive.command(true,.75f,0);
+  assert(fabsf(adaptive.signals.gammaTheta-.5f)<1e-5f);
   adaptive.signals.angleRms=1.1f*0.01745329251994329577f;
   for(unsigned i=0;i<12000;++i) adaptive.command(true,.75f,0);
   assert(adaptive.signals.gammaTheta==1.0f && adaptive.signals.gamma>0.99f);

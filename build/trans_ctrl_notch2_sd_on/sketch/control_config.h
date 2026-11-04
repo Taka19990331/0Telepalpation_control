@@ -26,29 +26,32 @@ constexpr float Q_HZ=400.0f; // RFOB Qフィルタ遮断周波数 [Hz]
 constexpr float VELOCITY_HZ=1000.0f; // 角速度LPF遮断周波数 [Hz]
 constexpr bool NOTCH_ENABLED=TRANS_ENABLE_FIXED_NOTCH!=0;
 constexpr double NOTCH_CENTER_HZ=12.0;
-constexpr double NOTCH_BANDWIDTH_HZ=4.0;
+constexpr double NOTCH_LOW_SIDE_HZ=4.0; // lower -3 dB offset; regenerate notch_coefficients.h after editing
+constexpr double NOTCH_HIGH_SIDE_HZ=20.0; // upper -3 dB offset
 constexpr double NOTCH_DEPTH=0.95; // center amplitude = 1-depth = 0.05
 enum NotchMode : uint8_t { NOTCH_OFF=0, NOTCH_FIXED=1, NOTCH_ADAPTIVE=2 };
-constexpr NotchMode INITIAL_NOTCH_MODE = NOTCH_ADAPTIVE;
+constexpr NotchMode INITIAL_NOTCH_MODE = NOTCH_FIXED;
 constexpr float ANGLE_BPF_LOW_HZ=8.0f, ANGLE_BPF_HIGH_HZ=20.0f;
 constexpr float ANGLE_RMS_TAU_S=0.2f;
-constexpr float ANGLE_NOTCH_START_DEG_RMS=0.2f, ANGLE_NOTCH_FULL_DEG_RMS=0.25f;
+constexpr float ANGLE_NOTCH_START_DEG_RMS=0.1f, ANGLE_NOTCH_FULL_DEG_RMS=1.5f;
 constexpr bool ENABLE_SPEED_GATE=true;
 constexpr float SPEED_GATE_FULL_RAD_S=0.3f, SPEED_GATE_ZERO_RAD_S=0.5f;
 constexpr float MEAN_SPEED_LPF_HZ=2.0f;
 constexpr float NOTCH_ATTACK_S=0.05f, NOTCH_RELEASE_S=0.5f, NOTCH_HOLD_S=0.25f;
 constexpr float ANGLE_WRAP_MIN_RAD=-12.5f, ANGLE_WRAP_MAX_RAD=12.5f;
 static_assert(NOTCH_CENTER_HZ>0 && NOTCH_CENTER_HZ<500000.0/CONTROL_PERIOD_US,"Invalid notch frequency");
-static_assert(NOTCH_BANDWIDTH_HZ>0 && NOTCH_DEPTH>=0 && NOTCH_DEPTH<=1,"Invalid notch bandwidth/depth");
+static_assert(NOTCH_LOW_SIDE_HZ>0 && NOTCH_LOW_SIDE_HZ<NOTCH_CENTER_HZ && NOTCH_HIGH_SIDE_HZ>0 && NOTCH_CENTER_HZ+NOTCH_HIGH_SIDE_HZ<500000.0/CONTROL_PERIOD_US && NOTCH_DEPTH>=0 && NOTCH_DEPTH<=1,"Invalid notch bandwidth/depth");
 static_assert(ANGLE_BPF_LOW_HZ>0 && ANGLE_BPF_HIGH_HZ>ANGLE_BPF_LOW_HZ && ANGLE_BPF_HIGH_HZ<500000.0/CONTROL_PERIOD_US,"Invalid angle BPF frequencies");
 static_assert(ANGLE_NOTCH_FULL_DEG_RMS>ANGLE_NOTCH_START_DEG_RMS && SPEED_GATE_ZERO_RAD_S>SPEED_GATE_FULL_RAD_S,"Invalid adaptive notch thresholds");
 static_assert(NOTCH_ATTACK_S>0 && NOTCH_RELEASE_S>0 && ANGLE_RMS_TAU_S>0,"Invalid adaptive notch time constants");
 constexpr float OMEGA_0=0.7f; // 摩擦モデルのゼロ近傍平滑化速度 [rad/s]
 constexpr float J=0.0116806f; // 出力軸換算慣性 [kg m^2]
-struct FrictionParameters { float tc, b; };
-// tc: クーロン摩擦 [Nm], b: 粘性 [Nm s/rad]
-constexpr FrictionParameters POSITIVE={0.459212f,0.00218903f};
-constexpr FrictionParameters NEGATIVE={0.410719f,0.00341074f};
+enum FrictionModel : uint8_t { FRICTION_STRIBECK=0, FRICTION_TANH=1 };
+constexpr FrictionModel FRICTION_MODEL=FRICTION_STRIBECK;
+struct FrictionParameters { float tc, ts, vs, b; };
+// tc: クーロン摩擦 [Nm], ts: 静止摩擦 [Nm], vs: Stribeck速度 [rad/s], b: 粘性 [Nm s/rad]
+constexpr FrictionParameters POSITIVE={0.459212f,0.526341f,0.474762f,0.00218903f};
+constexpr FrictionParameters NEGATIVE={0.410719f,0.527041f,0.473325f,0.00341074f};
 constexpr uint8_t MOTOR_ID=2; // AK80モータID [CANノード番号]
 constexpr unsigned CAN_BUS=2; // 接続CANポート [1=CAN1, 2=CAN2, 3=CAN3]
 constexpr uint32_t CAN_BAUD=1000000; // CAN通信速度 [bit/s]
@@ -78,3 +81,4 @@ static_assert(LOG_RING_ROWS>=LOG_BATCH_ROWS && LOG_BATCH_ROWS>0,"Invalid log rin
 static_assert(LOG_DECIMATION==1,"Keep every 2 kHz sample");
 static_assert(TORQUE_LIMIT>0 && TORQUE_LIMIT<=TORQUE_MAX && -TORQUE_LIMIT>=TORQUE_MIN,"Invalid torque limit");
 }
+

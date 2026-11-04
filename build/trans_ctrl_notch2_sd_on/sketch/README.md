@@ -3,7 +3,7 @@
 
 Teensy 4.1 / AK80-8 ID2 / CAN2 / 1 Mbps 用の角度振幅依存RFOBノッチ制御です。固定ノッチが動作する `trans_ctrl_notch1` を複製して作成しました。複製元には変更を加えていません。
 
-初期モードは `NOTCH_ADAPTIVE`、制御はOFF、Kr=0.75、Kf=0、トルク上限1.0 Nm、周期500 µsです。`S` による再開始時も初期モードへ戻ります。`NOTCH OFF`、`NOTCH FIXED`、`NOTCH ADAPTIVE` は制御OFF中に変更できます。角度しきい値はプログラム実行中に `ANGLE_START <deg_RMS>` / `ANGLE_FULL <deg_RMS>` で調整できます。値は正数かつ開始値<全適用値である必要があります。ADAPTIVE運転中の変更はAttack/Releaseで適用率へ滑らかに反映します。`STATUS`で現在値を表示します。従来の `S`、`ON`、`OFF`、`KR`、`KF`、`BIAS`、`STATUS`、`X`、`D` コマンドも維持しています。
+初期モードは `NOTCH_OFF`、初期摩擦モデルはStribeck型、制御はOFF、Kr=0.75、Kf=0、トルク上限1.0 Nm、周期500 µsです。摩擦モデルは `control_config.h` の `FRICTION_MODEL` で `FRICTION_STRIBECK` / `FRICTION_TANH` を選択できます。Stribeck型は `trans_ctrl_test2` と同じ式・係数です。`S` による再開始時も初期ノッチモードへ戻ります。`NOTCH OFF`、`NOTCH FIXED`、`NOTCH ADAPTIVE` は制御OFF中に変更できます。角度しきい値はプログラム実行中に `ANGLE_START <deg_RMS>` / `ANGLE_FULL <deg_RMS>` で調整できます。値は正数かつ開始値<全適用値である必要があります。ADAPTIVE運転中の変更はAttack/Releaseで適用率へ滑らかに反映します。`STATUS`で現在値を表示します。従来の `S`、`ON`、`OFF`、`KR`、`KF`、`BIAS`、`STATUS`、`X`、`D` コマンドも維持しています。
 
 角度検出器は新しいCANフィードバックフレームごとに1回更新します。角度は±12.5 radの折り返しを除去してから、8 Hz 4次Butterworth高域通過部と20 Hz 4次Butterworth低域通過部（合計8 biquadセクション）を通し、0.2秒LPFでRMS化します。BPF係数は2 kHz設計です。角速度の平均は2 Hz LPFです。
 

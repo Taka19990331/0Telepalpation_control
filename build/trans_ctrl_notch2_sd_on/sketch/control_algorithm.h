@@ -91,6 +91,12 @@ class Controller {
   static float friction(float w) {
     if(!isfinite(w)) return NAN;
     const auto &p=w>0 ? ControlConfig::POSITIVE : ControlConfig::NEGATIVE;
+    if(ControlConfig::FRICTION_MODEL==ControlConfig::FRICTION_STRIBECK) {
+      if(w==0) return 0;
+      const float r=w/p.vs;
+      const float magnitude=p.tc+(p.ts-p.tc)*expf(-r*r);
+      return (w>0 ? magnitude : -magnitude)+p.b*w;
+    }
     return p.tc*tanhf(w/ControlConfig::OMEGA_0)+p.b*w;
   }
   bool finiteState() const {

@@ -106,16 +106,17 @@ inline bool start() {
   logFile.println("#design,AK80-8_transparency_v3_adaptive_notch_binary");
   using namespace ControlConfig;
   auto meta=[&](const char *name,double value) { logFile.print(name); logFile.print(','); logFile.println(value,9); };
-  logFile.println("#friction_model,tanh_coulomb_viscous");
+  logFile.print("#friction_model,");
+  logFile.println(FRICTION_MODEL==FRICTION_STRIBECK ? "stribeck" : "tanh_coulomb_viscous");
   meta("#omega_0_rad_s",OMEGA_0);
   meta("#period_us",CONTROL_PERIOD_US); meta("#log_period_us",LOG_PERIOD_US);
   meta("#motor_id",MOTOR_ID); meta("#can_bus",CAN_BUS); meta("#can_baud",CAN_BAUD);
   meta("#J",J); meta("#velocity_lpf_hz",VELOCITY_HZ); meta("#rfob_q_hz",Q_HZ);
   meta("#fixed_notch_enabled",NOTCH_ENABLED);
   meta("#fixed_notch_center_hz",NOTCH_CENTER_HZ);
-  meta("#fixed_notch_bandwidth_hz",NOTCH_BANDWIDTH_HZ);
+  meta("#fixed_notch_low_side_hz",NOTCH_LOW_SIDE_HZ); meta("#fixed_notch_high_side_hz",NOTCH_HIGH_SIDE_HZ);
   meta("#fixed_notch_depth",NOTCH_DEPTH);
-  logFile.println("#fixed_notch_design,RBJ_Q_f0_over_BW_dry_wet");
+  logFile.println("#fixed_notch_design,asymmetric_pole_shift_biquad_dry_wet");
   meta("#initial_notch_mode",INITIAL_NOTCH_MODE); meta("#angle_bpf_low_hz",ANGLE_BPF_LOW_HZ); meta("#angle_bpf_high_hz",ANGLE_BPF_HIGH_HZ);
   logFile.println("#angle_bpf_design,4th_order_butterworth_highpass_cascaded_with_4th_order_butterworth_lowpass_8_biquad_sections");
   meta("#angle_rms_tau_s",ANGLE_RMS_TAU_S); meta("#angle_notch_start_deg_rms",ANGLE_NOTCH_START_DEG_RMS); meta("#angle_notch_full_deg_rms",ANGLE_NOTCH_FULL_DEG_RMS);
@@ -250,3 +251,4 @@ inline bool service() { return false; }
 inline void dumpCsv() { Serial.println("ERROR,SD logging disabled; use STATUS diagnostics"); }
 #endif
 }
+

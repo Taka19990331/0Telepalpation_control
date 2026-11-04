@@ -24,8 +24,8 @@ constexpr uint32_t CONTROL_PERIOD_US=500; // MIT指令周期 [us]
 constexpr float Q_HZ=400.0f; // RFOB Qフィルタ遮断周波数 [Hz]
 constexpr float VELOCITY_HZ=1000.0f; // 角速度LPF遮断周波数 [Hz]
 constexpr bool NOTCH_ENABLED=TRANS_ENABLE_FIXED_NOTCH!=0;
-constexpr double NOTCH_CENTER_HZ=12.0;
-constexpr double NOTCH_BANDWIDTH_HZ=6.0;
+constexpr double NOTCH_CENTER_HZ=18.0; // initially 12
+constexpr double NOTCH_BANDWIDTH_HZ=10.0;
 constexpr double NOTCH_DEPTH=0.95; // center amplitude = 1-depth = 0.05
 enum NotchMode : uint8_t { NOTCH_OFF=0, NOTCH_FIXED=1, NOTCH_ADAPTIVE=2 };
 constexpr NotchMode INITIAL_NOTCH_MODE = NOTCH_FIXED;

@@ -20,7 +20,7 @@ constexpr float TORQUE_LIMIT=1.0f; // 指令トルク絶対値上限 [Nm]
 constexpr uint32_t CONTROL_PERIOD_US=500; // MIT指令周期 [us]
 constexpr float Q_HZ=400.0f; // RFOB Qフィルタ遮断周波数 [Hz]
 constexpr float VELOCITY_HZ=1000.0f; // 角速度LPF遮断周波数 [Hz]
-constexpr float OMEGA_0=0.7f; // 摩擦モデルのゼロ近傍平滑化速度 [rad/s]
+constexpr float OMEGA_0=0.2f; // 摩擦モデルのゼロ近傍平滑化速度 [rad/s]
 constexpr float J=0.0116806f; // 出力軸換算慣性 [kg m^2]
 struct FrictionParameters { float tc, b; };
 // tc: クーロン摩擦 [Nm], b: 粘性 [Nm s/rad]

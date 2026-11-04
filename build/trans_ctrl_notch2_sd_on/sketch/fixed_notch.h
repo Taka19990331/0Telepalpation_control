@@ -2,18 +2,16 @@
 #pragma once
 #include <math.h>
 #include "control_config.h"
+#include "notch_coefficients.h"
 namespace ControlAlgorithm {
-// RBJ notch blended with the dry input: H=(1-depth)+depth*Hnotch.
-// Q=f0/BW. BW is the underlying full-notch -3 dB bandwidth (Hz).
+// Asymmetric pole-shift biquad: H=(1-depth)+depth*Hnotch.
+// Offline fitted coefficients; two states, no added block delay.
 // Double states avoid cancellation at low f0/fs. No trigonometry in update().
 class FixedNotch {
  public:
   FixedNotch() {
-    const double w=6.2831853071795864769*ControlConfig::NOTCH_CENTER_HZ*
-      ControlConfig::CONTROL_PERIOD_US*1e-6;
-    const double alpha=sin(w)*ControlConfig::NOTCH_BANDWIDTH_HZ/(2*ControlConfig::NOTCH_CENTER_HZ);
-    b0=1/(1+alpha); b1=-2*cos(w)/(1+alpha); b2=b0;
-    a1=b1; a2=(1-alpha)/(1+alpha);
+    b0=NotchCoefficients::COEF_B0; b1=NotchCoefficients::COEF_B1; b2=NotchCoefficients::COEF_B2;
+    a1=NotchCoefficients::COEF_A1; a2=NotchCoefficients::COEF_A2;
   }
   void reset() { z1=z2=0; initialized=false; }
   bool finiteState() const { return isfinite(z1)&&isfinite(z2)&&isfinite(b0)&&isfinite(b1)&&isfinite(b2)&&isfinite(a1)&&isfinite(a2); }
@@ -30,3 +28,5 @@ class FixedNotch {
   bool initialized=false;
 };
 }
+
+
