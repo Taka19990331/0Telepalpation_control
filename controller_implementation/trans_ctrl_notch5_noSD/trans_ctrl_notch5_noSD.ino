@@ -1,0 +1,202 @@
+#include <Arduino.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <errno.h>
+#include "can_protocol.h"
+#include "control_algorithm.h"
+#if !defined(ARDUINO_TEENSY41)
+#error "Select Teensy 4.1"
+#endif
+// Single source of truth for applied runtime settings; configuration contains only defaults.
+struct RuntimeSettings {
+  bool enabled=ControlConfig::INITIAL_ENABLED;
+  float Kr=ControlConfig::INITIAL_K_R, Kf=ControlConfig::INITIAL_K_F;
+};
+static volatile RuntimeSettings runtime;
+volatile float tau_cmd=0;
+volatile bool active=false, startRequest=false;
+volatile uint32_t runStart=0, statusCode=0;
+static bool timerReady=false;
+static bool awaitingFirstFeedback=true;
+ControlAlgorithm::Controller controller;
+IntervalTimer controlTimer;
+
+void stopRun(uint32_t reason) {
+  CanProtocol::capture=false;
+  active=false; startRequest=false; runtime.enabled=false; tau_cmd=0; statusCode=reason;
+  controller.zeroOutput(); // Preserve observer/numeric fault until explicit S restart.
+  CanDiagnostics::stopUs=micros()-CanDiagnostics::origin; CanDiagnostics::stopReason=reason;
+  CanDiagnostics::stopZero=CanProtocol::command(0); CanDiagnostics::stopDisable=CanProtocol::disable();
+  CanDiagnostics::latest=CanProtocol::snapshot(true);
+}
+// CAN and timer have the same priority: each frame is processed exactly once,
+// without overwriting an unprocessed frame when several arrive in one timer period.
+void handleFeedback(const CanProtocol::Feedback &f) {
+  if(!active || CanProtocol::motorFault || CanProtocol::communicationFault) return;
+  // A first reply arriving after the startup deadline must not hide a timeout
+  // by replacing the feedback timestamp before the next control interrupt.
+  if(awaitingFirstFeedback && uint32_t(f.rxUs-runStart)>ControlConfig::FEEDBACK_TIMEOUT_US) {
+    CanProtocol::communicationFault=true; return;
+  }
+  awaitingFirstFeedback=false;
+  if(CanProtocol::numericFault || !isfinite(f.position)) { controller.trip(); return; }
+  controller.feedback(f.position,f.velocity,f.torque,f.rxUs); // Also while runtime.enabled==false.
+}
+void controlISR() {
+  const uint32_t now=micros();
+  if(startRequest) {
+    startRequest=false; runStart=now;
+    // Before active, the original observer ignored startup replies. Do not feed
+    // their pre-origin timestamps to the unsigned startup-deadline check.
+    CanDiagnostics::rxStartupDiscarded=CanProtocol::rxHead-CanProtocol::rxTail;
+    CanProtocol::rxTail=CanProtocol::rxHead;
+    active=true;
+  }
+  if(!active) return;
+  CanDiagnostics::enter(now);
+  struct TimingGuard { ~TimingGuard() { CanDiagnostics::leave(); } } timingGuard;
+  for(uint32_t n=0;n<ControlConfig::RX_BUDGET && CanProtocol::processFeedback(now);++n) {}
+  if(CanProtocol::rxHead!=CanProtocol::rxTail) ++CanDiagnostics::rxBudgetHits;
+  const auto &f=CanProtocol::feedback;
+  const uint32_t age=f.valid ? uint32_t(now-f.rxUs) : uint32_t(now-runStart);
+  uint32_t fault=0;
+  if(CanProtocol::motorFault) fault=7;
+  else if(CanDiagnostics::rxOverflow || CanDiagnostics::rxHardwareOverruns) fault=9;
+  else if(CanProtocol::communicationFault || age>ControlConfig::FEEDBACK_TIMEOUT_US) fault=6;
+  if(CanProtocol::numericFault || controller.faulted() ||
+     (f.valid && (!isfinite(f.position)||!isfinite(f.velocity)||!isfinite(f.torque)))) {
+    controller.trip(); fault=8;
+  }
+  tau_cmd=controller.command(runtime.enabled && f.valid && !fault,runtime.Kr,runtime.Kf);
+  if(controller.faulted() || !isfinite(tau_cmd)) { controller.trip(); tau_cmd=0; fault=8; }
+  const bool txOK=CanProtocol::command(tau_cmd);
+  if(!txOK && CanDiagnostics::firstFailure.valid) {
+    auto &fail=CanDiagnostics::firstFailure;
+    fail.age=age; fail.rxPending=CanProtocol::rxHead-CanProtocol::rxTail;
+    fail.rxOverflow=CanDiagnostics::rxOverflow; fail.rxMax=CanDiagnostics::rxQueueMax;
+  }
+  if(!txOK && !fault) fault=2;
+  if(fault) stopRun(fault);
+}
+void startRun() {
+  if(!timerReady || active || startRequest) return;
+  noInterrupts();
+  CanDiagnostics::reset(micros());
+  CanProtocol::resetRx(true);
+  controller.reset(); runtime.Kr=ControlConfig::INITIAL_K_R; runtime.Kf=ControlConfig::INITIAL_K_F;
+  runtime.enabled=ControlConfig::INITIAL_ENABLED; tau_cmd=0; statusCode=0;
+  awaitingFirstFeedback=true;
+  CanProtocol::feedback=CanProtocol::Feedback{};
+  CanProtocol::motorFault=CanProtocol::communicationFault=CanProtocol::numericFault=false;
+  const bool enabled=CanProtocol::enable(); const bool zero=CanProtocol::command(0);
+  if(!enabled || !zero) stopRun(2);
+  else startRequest=true;
+  interrupts();
+}
+void printStatus() {
+  noInterrupts();
+  const bool enabled=runtime.enabled, running=active, ready=active && controller.ready(), numeric=controller.faulted()||CanProtocol::numericFault;
+  const float Kr=runtime.Kr, Kf=runtime.Kf, torque=tau_cmd;
+  const float angleStart=controller.angleStartDeg(), angleFull=controller.angleFullDeg();
+  const uint32_t fault=statusCode;
+  const uint8_t notchMode=uint8_t(controller.notchMode());
+  interrupts();
+  Serial.print("STATUS,ON,"); Serial.print(enabled?1:0);
+  Serial.print(",Kr,"); Serial.print(Kr,7); Serial.print(",Kf,"); Serial.print(Kf,7);
+  Serial.print(",RUNNING,"); Serial.print(running?1:0); Serial.print(",OBSERVER_READY,"); Serial.print(ready?1:0);
+  Serial.print(",NUMERIC_FAULT,"); Serial.print(numeric?1:0); Serial.print(",FAULT,"); Serial.print(fault);
+  Serial.print(",NOTCH_MODE,"); Serial.print(unsigned(notchMode));
+  Serial.print(",ANGLE_START_deg_RMS,"); Serial.print(angleStart,5);
+  Serial.print(",ANGLE_FULL_deg_RMS,"); Serial.print(angleFull,5);
+  Serial.print(",tau_cmd_Nm,"); Serial.println(torque,7);
+}
+void processCommand(char *line) {
+  while(isspace((unsigned char)*line)) ++line;
+  char *endLine=line+strlen(line);
+  while(endLine>line && isspace((unsigned char)endLine[-1])) *--endLine=0;
+  for(char *p=line;*p;++p) *p=toupper((unsigned char)*p);
+  if(!strcmp(line,"S")) startRun(); // Explicit reinitialization/recovery after stop.
+  else if(!strcmp(line,"STATUS")) printStatus();
+  else if(!strcmp(line,"ON")) {
+    noInterrupts();
+    const bool allowed=active && !statusCode && !controller.faulted() && !CanProtocol::numericFault &&
+      !CanProtocol::motorFault && !CanProtocol::communicationFault;
+    if(allowed) runtime.enabled=true; // Observer is NOT reset; readiness gates output in ISR.
+    interrupts();
+    if(!allowed) Serial.println("ERROR,ON requires running session; use S to initialize");
+  } else if(!strcmp(line,"OFF")) {
+    noInterrupts(); runtime.enabled=false; tau_cmd=0; controller.zeroOutput();
+    if(active && !CanProtocol::command(0)) stopRun(2);
+    interrupts(); // Keep observer running while OFF.
+  } else if(!strcmp(line,"BIAS")) {
+    noInterrupts();
+    const auto &f=CanProtocol::feedback;
+    const bool allowed=active && !runtime.enabled && !controller.faulted() && f.valid &&
+      !CanProtocol::motorFault && !CanProtocol::communicationFault && !CanProtocol::numericFault &&
+      uint32_t(micros()-f.rxUs)<=ControlConfig::FEEDBACK_TIMEOUT_US && isfinite(f.torque) &&
+      fabsf(f.velocity)<ControlConfig::BIAS_STATIONARY_SPEED;
+    if(allowed) { controller.torqueBias=f.torque; controller.reset(); }
+    interrupts();
+    if(!allowed) Serial.println("ERROR,BIAS requires healthy OFF stationary feedback");
+  } else if(!strncmp(line,"NOTCH ",6)) {
+    const bool allowed=!runtime.enabled;
+    ControlConfig::NotchMode mode;
+    if(!strcmp(line+6,"OFF")) mode=ControlConfig::NOTCH_OFF;
+    else if(!strcmp(line+6,"FIXED")) mode=ControlConfig::NOTCH_FIXED;
+    else if(!strcmp(line+6,"ADAPTIVE")) mode=ControlConfig::NOTCH_ADAPTIVE;
+    else { Serial.println("ERROR,NOTCH expects OFF, FIXED, or ADAPTIVE"); return; }
+    if(allowed) { noInterrupts(); controller.setNotchMode(mode); interrupts(); }
+    else Serial.println("ERROR,NOTCH mode can only change while control is OFF");
+  } else if(!strncmp(line,"ANGLE_START ",12)||!strncmp(line,"ANGLE_FULL ",11)) {
+    const bool isStart=line[6]=='S';
+    const char *arg=line+(isStart?12:11);
+    char *end=nullptr; errno=0; const float value=strtof(arg,&end);
+    while(end && isspace((unsigned char)*end)) ++end;
+    if(end==arg || !end || *end || errno==ERANGE || !isfinite(value)) {
+      Serial.println("ERROR,invalid angle threshold; finite degrees RMS required"); return;
+    }
+    noInterrupts();
+    const float start=isStart?value:controller.angleStartDeg();
+    const float full=isStart?controller.angleFullDeg():value;
+    const bool changed=controller.setAngleThresholds(start,full);
+    const float currentStart=controller.angleStartDeg(), currentFull=controller.angleFullDeg();
+    interrupts();
+    if(changed) { Serial.print("OK,ANGLE_START_deg_RMS,"); Serial.print(currentStart,5); Serial.print(",ANGLE_FULL_deg_RMS,"); Serial.println(currentFull,5); }
+    else Serial.println("ERROR,require 0 < ANGLE_START < ANGLE_FULL (deg RMS); previous settings retained");
+  } else if((!strncmp(line,"KR",2)||!strncmp(line,"KF",2)) && isspace((unsigned char)line[2])) {
+    char *end=nullptr; errno=0; const float value=strtof(line+3,&end);
+    while(end && isspace((unsigned char)*end)) ++end;
+    if(end==line+3 || !end || *end || errno==ERANGE || !isfinite(value)) {
+      Serial.println("ERROR,invalid gain; finite float required"); return;
+    }
+    noInterrupts(); if(line[1]=='R') runtime.Kr=value; else runtime.Kf=value; interrupts();
+  } else Serial.println("ERROR,unknown command");
+}
+void setup() {
+  Serial.begin(ControlConfig::SERIAL_BAUD); CanProtocol::feedbackHandler=handleFeedback; CanProtocol::begin();
+  controlTimer.priority(ControlConfig::ISR_PRIORITY);
+  timerReady=controlTimer.begin(controlISR,ControlConfig::CONTROL_PERIOD_US);
+  Serial.print("READY,ID,"); Serial.print(ControlConfig::MOTOR_ID); Serial.print(",CAN,"); Serial.print(ControlConfig::CAN_BUS);
+  Serial.print(",TIMER,"); Serial.println(timerReady?"OK":"ERROR");
+  Serial.println("Commands: S, ON, OFF, KR <value>, KF <value>, NOTCH OFF|FIXED|ADAPTIVE, ANGLE_START <deg_RMS>, ANGLE_FULL <deg_RMS>, STATUS, BIAS, X (newline; X immediate)");
+}
+void loop() {
+  static char line[ControlConfig::COMMAND_BUFFER_BYTES]; static size_t used=0; static bool overflow=false;
+  while(Serial.available()) {
+    const char c=Serial.read();
+    // Immediate stop only as a standalone command, not inside an invalid gain token.
+    if((c=='x'||c=='X') && used==0 && !overflow) { noInterrupts(); stopRun(1); interrupts(); }
+    else if(c=='\r'||c=='\n') {
+      if(overflow) Serial.println("ERROR,command too long");
+      else if(used) { line[used]=0; processCommand(line); }
+      used=0; overflow=false;
+    } else if(used<sizeof(line)-1 && !overflow) line[used++]=c;
+    else overflow=true;
+  }
+  static uint32_t lastDiagnosticUs=0;
+  if(active && uint32_t(micros()-lastDiagnosticUs)>=100000) {
+    noInterrupts(); CanDiagnostics::latest=CanProtocol::snapshot(); interrupts();
+    lastDiagnosticUs=micros();
+  }
+  CanProtocol::serviceDiagnostics();
+}

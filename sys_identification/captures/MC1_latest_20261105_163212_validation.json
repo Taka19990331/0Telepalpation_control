@@ -1,0 +1,16 @@
+﻿{
+    "valid":  false,
+    "source_file":  null,
+    "rows":  0,
+    "summary_rows":  null,
+    "status":  null,
+    "config":  {
+
+               },
+    "errors":  [
+                   "ERROR,SD_FILE_INCOMPLETE_OR_UNSUPPORTED",
+                   "Incomplete MC1 response; this firmware may not support the requested download command",
+                   "SUMMARY count  differs from received rows 0",
+                   "Run status is  / "
+               ]
+}

@@ -396,7 +396,7 @@ void serviceLog() {
   Serial.print(",StopFlags,"); Serial.print(stopFlags);
   Serial.print(",BufferObservedMax_rows,"); Serial.print(highWater);
   Serial.print(",WriteMax_us,"); Serial.println(maxWriteUs);
-  Serial.println(restartLocked ? "STOP_UNCONFIRMED; POWER_OFF_AND_CHECK_BUS" : "READY: s=start, x=stop, d=download");
+  Serial.println(restartLocked ? "STOP_UNCONFIRMED; POWER_OFF_AND_CHECK_BUS" : "READY: s=start, x=stop, d=latest download, p=previous download");
   if (IS_60 && !NO_MOTOR_TEST) Serial.println("AK60_STOP_IS_ZERO_TORQUE_KEEPALIVE_NOT_MODE_EXIT");
   runState = IDLE;
 }
@@ -443,22 +443,40 @@ void printConfig(const Header &h) {
   Serial.print(",CANPort,"); Serial.print(h.canPort);
   Serial.print(",MotorProtocol,"); Serial.println(h.motorProtocol);
 }
-void downloadLog() {
+void downloadLog(bool previous = false) {
   if (recording) { Serial.println("ERROR,BUSY"); return; }
   // cardReady=false after write trouble does not prohibit a best-effort read.
-  if (!lastSaved[0]) for (int n = 9999; n >= 0; --n) {
+  char selected[16] = {};
+  int newest = -1;
+  if (lastSaved[0]) newest = atoi(lastSaved+2);
+  else for (int n = 9999; n >= 0; --n) {
     snprintf(filename, sizeof(filename), "MC%04d.BIN", n);
-    if (sd.exists(filename)) { strcpy(lastSaved, filename); break; }
+    if (sd.exists(filename)) { newest = n; break; }
+  }
+  if (newest >= 0) {
+    if (!previous) {
+      snprintf(selected, sizeof(selected), "MC%04d.BIN", newest);
+    } else {
+      for (int n = 9999; n >= 0; --n) {
+        if (n == newest) continue;
+        snprintf(filename, sizeof(filename), "MC%04d.BIN", n);
+        if (sd.exists(filename)) { strcpy(selected, filename); break; }
+      }
+    }
   }
   FsFile input;
-  if (!lastSaved[0] || !input.open(lastSaved, O_RDONLY)) {
-    Serial.println("ERROR,NO_SAVED_FILE"); return;
+  if (!selected[0] || !input.open(selected, O_RDONLY)) {
+    Serial.println(previous ? "ERROR,NO_PREVIOUS_FILE" : "ERROR,NO_SAVED_FILE"); return;
   }
   Header h; Footer f;
   bool valid = input.read(&h, sizeof(h)) == sizeof(h) && memcmp(h.magic, "CHIRPMC1", 8) == 0 &&
       h.rowBytes == sizeof(Sample) && h.periodUs && h.expectedRows &&
-      h.holdPolicy == ((CYCLE_COUNT<<16)|2) && h.averageUs == h.preUs && h.averageRows <= h.expectedRows &&
-      h.expectedRows == LOGGED_STEPS+CYCLE_COUNT*MAX_AVERAGE_EXTRA_STEPS+1;
+      (h.holdPolicy & 0xffff) == 2 && (h.holdPolicy >> 16) != 0 &&
+      h.averageUs == h.preUs && h.averageRows <= h.expectedRows &&
+      h.preUs % h.periodUs == 0 && h.sweepUs % h.periodUs == 0 && h.postUs % h.periodUs == 0 &&
+      uint64_t(h.expectedRows) == uint64_t(h.holdPolicy >> 16) *
+          ((uint64_t(h.preUs) + h.sweepUs) / h.periodUs) +
+          uint64_t(h.holdPolicy >> 16) * MAX_AVERAGE_EXTRA_STEPS + 1;
   if (valid) valid = input.fileSize() >= sizeof(Header)+sizeof(Footer) &&
       input.seekSet(input.fileSize()-sizeof(Footer)) && input.read(&f,sizeof(f)) == sizeof(f) &&
       memcmp(f.magic,"ENDMC001",8) == 0 && f.rows <= h.expectedRows &&
@@ -466,26 +484,26 @@ void downloadLog() {
   if (!valid || !input.seekSet(sizeof(Header))) {
     input.close(); Serial.println("ERROR,SD_FILE_INCOMPLETE_OR_UNSUPPORTED"); return;
   }
-  Serial.print("SOURCE_FILE,"); Serial.println(lastSaved);
+  Serial.print("SOURCE_FILE,"); Serial.println(selected);
   Serial.print("CHIRP_BEGIN,VERSION,MC1,REASON,"); Serial.println(f.status == COMPLETE ? "COMPLETE" : "ABORTED");
   printConfig(h);
   Serial.print("RESULT,Status,"); Serial.print(f.status);
   Serial.print(",StopFlags,"); Serial.println(f.stopFlags);
   Serial.println("DATA,index,nominal_us,actual_us,period_us,phase,position_deg,speed_rad_s,feedback_torque_estimate_Nm,chirp_Nm,pd_Nm,command_Nm,torque_limited,feedback_age_us,feedback_sequence,can_tx_accepted,ISR_us,motor_error,feedback_raw");
-  uint32_t previous = 0;
+  uint32_t previousActualUs = 0;
   for (uint32_t i=0; i<f.rows; ++i) {
     Sample r;
     if (input.read(&r,sizeof(r)) != sizeof(r)) { Serial.println("ERROR,SD_READ"); break; }
     Serial.print("DATA,"); Serial.print(r.index);
     Serial.print(','); Serial.print(uint64_t(r.index)*h.periodUs);
     Serial.print(','); Serial.print(r.actualUs);
-    Serial.print(','); Serial.print(i ? r.actualUs-previous : 0);
+    Serial.print(','); Serial.print(i ? r.actualUs-previousActualUs : 0);
     Serial.print(','); Serial.print(r.phase);
     const float values[] = {r.positionDeg,r.speedRadS,r.feedbackTorqueEstimateNm,r.chirpNm,r.pdNm,r.commandNm};
     for (float value : values) { Serial.print(','); Serial.print(value,9); }
     const uint32_t fields[] = {r.limited,r.feedbackAgeUs,r.feedbackSequence,r.txAccepted,r.executionUs,r.motorError,r.feedbackRaw};
     for (uint32_t value : fields) { Serial.print(','); Serial.print(value); }
-    Serial.println(); previous=r.actualUs;
+    Serial.println(); previousActualUs=r.actualUs;
     if (!Serial) { input.close(); return; }
   }
   input.close(); Serial.print("SUMMARY,Count,"); Serial.println(f.rows); Serial.println("CHIRP_END");
@@ -526,7 +544,7 @@ void setup() {
   Serial.print(NO_MOTOR_TEST ? "CHIRP_MULTI_CYCLE,NO_MOTOR_TEST,MOTOR," : "CHIRP_MULTI_CYCLE,MOTOR,");
   Serial.print(MOTOR_SELECT); Serial.print(",CAN,"); Serial.print(CAN_PORT_NUMBER);
   Serial.print(",ID,"); Serial.println(MOTOR_ID);
-  Serial.println(cardReady && timerReady ? "SD_OK; READY: s=start, x=stop, d=download" : "ERROR,SD_OR_TIMER_INIT");
+  Serial.println(cardReady && timerReady ? "SD_OK; READY: s=start, x=stop, d=latest download, p=previous download" : "ERROR,SD_OR_TIMER_INIT");
 }
 void loop() {
   bool start = false;
@@ -535,6 +553,7 @@ void loop() {
     if (c=='x' || c=='X') { userStopRequested=true; start=false; }
     else if ((c=='s' || c=='S') && !userStopRequested) start=true;
     else if (c=='d' || c=='D') downloadLog();
+    else if (c=='p' || c=='P') downloadLog(true);
   }
   if (start && !recording) startRun();
   if (!recording) userStopRequested=false;

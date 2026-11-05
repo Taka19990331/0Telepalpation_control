@@ -4,7 +4,7 @@
 #include <float.h>
 
 // Select hardware here: "80A" = CAN1/ID1, "80B" = CAN2/ID2, "60" = CAN3/ID3.
-constexpr char MOTOR_SELECT[] = "80B";
+constexpr char MOTOR_SELECT[] = "80A";
 constexpr bool sameText(const char *a, const char *b) {
   return *a == *b && (*a == '\0' || sameText(a+1,b+1));
 }
@@ -27,7 +27,7 @@ constexpr double END_AMPLITUDE_NM = 10.0; // Default 2.5
 constexpr double AMPLITUDE_EXPONENT = 1.0;
 constexpr double PRE_HOLD_DURATION_S = 1.0;
 constexpr double POST_HOLD_DURATION_S = 2.0;
-constexpr uint32_t CYCLE_COUNT = 10;
+constexpr uint32_t CYCLE_COUNT = 15;
 
 // P: virtual spring about the average position measured during zero-torque startup.
 // 0.00278 Nm/deg gives about 1 Nm at 360 deg; this trial uses three times that.
