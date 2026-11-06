@@ -3,6 +3,7 @@
 #include <IntervalTimer.h>
 #include <SdFat.h>
 #include <FlexCAN_T4.h>
+#include "C:/0Telepalpation_control/SDlog/LogProtocol.h"
 #include "fric_config.h"
 #include "motor_protocol.h"
 
@@ -338,6 +339,12 @@ void fetchFile(){
   uint8_t b[256];while(f.available()){int n=f.read(b,sizeof(b));if(n<=0)break;size_t off=0;while(off<size_t(n)){size_t w=Serial.write(b+off,n-off);if(!w){f.close();return;}off+=w;}}
   f.close();Serial.println("\nTRANSFER_END");Serial.flush();
 }
+void fetchCommon(bool previous){
+  if(previous){Serial.println("LOG,1,ERROR,PREVIOUS_UNSUPPORTED");return;}
+  if(recording||!fileComplete||!sd.exists(pendingName)){Serial.println("LOG,1,ERROR,NO_FILE_OR_BUSY");return;}
+  FsFile f;if(!f.open(pendingName,O_RDONLY)){Serial.println("LOG,1,ERROR,OPEN");return;}
+  SDlog::sendFile(f,"fric_exp_1LSBmethod","CSV-RAW",pendingName,startEpoch);f.close();
+}
 const char *runStateName(uint8_t s){
   switch(s){case IDLE:return "IDLE";case WAIT_FEEDBACK:return "WAIT_FEEDBACK";case SWEEPING:return "SWEEPING";case STOPPING:return "STOPPING";case STOPPED:return "STOPPED";default:return "UNKNOWN";}
 }
@@ -357,7 +364,10 @@ void printStatus(){
   Serial.print(',');Serial.print(stopOk);Serial.print(',');Serial.print(disableOk);Serial.print(',');Serial.print(busy);Serial.print(',');Serial.println(pending);
 }
 void handleLine(char *line){
-  if(!strncmp(line,"START,",6)){char *date=strchr(line+6,',');if(date){*date++=0;strncpy(startDateTime,date,sizeof(startDateTime)-1);startDateTime[sizeof(startDateTime)-1]=0;}else strcpy(startDateTime,"epoch_only");uint32_t epoch=strtoul(line+6,nullptr,10);bool ok=startRun(epoch);Serial.println(ok?"STARTED":"ERROR,START_REJECTED_SD_OR_BUSY");}
+  if(!strcmp(line,"LOG,1,IDENTIFY")) Serial.println("LOG,1,IDENTIFY,fric_exp_1LSBmethod,CSV-RAW");
+  else if(!strcmp(line,"LOG,1,FETCH,LATEST")) fetchCommon(false);
+  else if(!strcmp(line,"LOG,1,FETCH,PREVIOUS")) fetchCommon(true);
+  else if(!strncmp(line,"START,",6)){char *date=strchr(line+6,',');if(date){*date++=0;strncpy(startDateTime,date,sizeof(startDateTime)-1);startDateTime[sizeof(startDateTime)-1]=0;}else strcpy(startDateTime,"epoch_only");uint32_t epoch=strtoul(line+6,nullptr,10);bool ok=startRun(epoch);Serial.println(ok?"STARTED":"ERROR,START_REJECTED_SD_OR_BUSY");}
   else if(!strcmp(line,"STATUS")){printStatus();}
   else if(!strcmp(line,"ABORT")){abortRequested=true;Serial.println("ABORT_ACCEPTED");}
   else if(!strcmp(line,"FETCH")){fetchFile();}

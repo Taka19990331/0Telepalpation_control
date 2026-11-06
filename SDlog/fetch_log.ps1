@@ -30,14 +30,36 @@ try {
   $serial.ReadBufferSize = 4194304
   $serial.DtrEnable = $false; $serial.RtsEnable = $false
   $serial.ReadTimeout = 1000; $serial.WriteTimeout = 10000; $serial.NewLine = "`n"
-  $serial.Open(); Start-Sleep -Milliseconds 500; $serial.DiscardInBuffer()
+  $serial.Open(); Start-Sleep -Milliseconds 500
   $serial.Write("LOG,1,IDENTIFY`n")
-  $identity = $null; $deadline = [DateTime]::UtcNow.AddSeconds(15)
+  $identity = $null; $deadline = [DateTime]::UtcNow.AddMinutes(3); $recoveringTransfer=$false
   while ([DateTime]::UtcNow -lt $deadline) {
     try { $line = $serial.ReadLine().Trim() } catch [TimeoutException] { continue }
-    if ($line) { Write-Host "DEVICE: $line" }
-    if ($line -match '^LOG,1,IDENTIFY,([^,]+),([^,]+)$') { $identity = $line.Split(','); break }
-    if ($line -match '^(LOG,1,)?ERROR,') { throw "Device: $line" }
+    if ($line -match '^LOG,1,IDENTIFY,([^,]+),([^,]+)$') { Write-Host "DEVICE: $line"; $identity = $line.Split(','); break }
+    if ($line -match '^LOG,1,BLOCK,([0-9]+),([0-9]+),([0-9A-Fa-f]+)$') {
+      if(-not $recoveringTransfer) { Write-Host 'An interrupted transfer was in progress; draining verified blocks before retrying IDENTIFY.'; $recoveringTransfer=$true }
+      $length=[int]::Parse($Matches[2]); $blockCrc=[Convert]::ToUInt32($Matches[3],16)
+      if($length -le 0 -or $length -gt 4096){throw "Invalid orphan block length: $line"}
+      $block=[byte[]]::new($length); $received=0; $blockDeadline=[DateTime]::UtcNow.AddSeconds(60)
+      while($received -lt $length -and [DateTime]::UtcNow -lt $blockDeadline) {
+        try { $n=$serial.Read($block,$received,$length-$received); if($n -gt 0){$received+=$n} }
+        catch [TimeoutException] { continue }
+      }
+      if($received -ne $length){throw "Timed out draining interrupted block at offset $($Matches[1])."}
+      if([SDlogCrc32]::Compute($block) -eq $blockCrc){$serial.Write('+')}
+      else {$serial.Write('-')}
+      continue
+    }
+    if($line -match '^LOG,1,END,[0-9]+,[0-9A-Fa-f]+$') {
+      if($recoveringTransfer) { Write-Host 'Interrupted transfer drained; retrying IDENTIFY.'; $recoveringTransfer=$false }
+      Start-Sleep -Milliseconds 100; $serial.Write("LOG,1,IDENTIFY`n"); $serial.BaseStream.Flush(); continue
+    }
+    if($line -match '^(LOG,1,)?ERROR,') {
+      if($recoveringTransfer -or $line -match 'ACK_TIMEOUT') {
+        Start-Sleep -Milliseconds 100; $serial.Write("LOG,1,IDENTIFY`n"); $serial.BaseStream.Flush(); continue
+      }
+      throw "Device rejected IDENTIFY: $line"
+    } elseif($line) { Write-Host "DEVICE: $line" }
   }
   if (-not $identity) { throw 'No common logging identity response. Ensure a _LOGtest firmware is running.' }
   $firmware = $identity[3]; $schema = $identity[4]
@@ -69,7 +91,10 @@ try {
   $index=1
   while((Test-Path -LiteralPath $outputPath) -or
         (Test-Path -LiteralPath (Join-Path $dataDir (".$base.$safeName.partial"))) -or
-        (Test-Path -LiteralPath (Join-Path $dataDir (".$base.$safeName.payload")))) {
+        (Test-Path -LiteralPath (Join-Path $dataDir (".$base.$safeName.payload"))) -or
+        (Test-Path -LiteralPath (Join-Path $dataDir (".$base.$safeName.csv"))) -or
+        (Test-Path -LiteralPath (Join-Path $dataDir ($base+'_steps.csv'))) -or
+        (Test-Path -LiteralPath (Join-Path $dataDir ($base+'_metadata.json')))) {
     $base = "{0}_{1:D2}" -f "${firmware}_${stamp}",$index
     $outputPath = Join-Path $dataDir ($base+'.csv')
     $index++
@@ -121,7 +146,7 @@ try {
 
   switch ($schema) {
     'CHIRPMC1' {
-      $converter=Join-Path $root 'sys_identification\chirp_multi-cycle_LOGtest\convert_multi_cycle.py'
+      $converter=Join-Path $root ("sys_identification\{0}\convert_multi_cycle.py" -f $firmware)
       & python $converter $payloadPath
       if($LASTEXITCODE -ne 0){throw "Chirp conversion failed with exit code $LASTEXITCODE"}
       $converted=[IO.Path]::ChangeExtension($payloadPath,'.csv')
@@ -134,6 +159,80 @@ try {
       $converter=Join-Path $root 'controller_implementation\trans_ctrl_test3_LOGtest\convert_trans_log.py'
       & python $converter $payloadPath -o $outputPath
       if($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $outputPath)){throw "Controller conversion failed with exit code $LASTEXITCODE"}
+    }
+    'TCBIN3' {
+      $converter=Join-Path $root 'controller_implementation\trans_ctrl_notch5\convert_trans_log.py'
+      & python $converter $payloadPath -o $outputPath
+      if($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $outputPath)){throw "Controller conversion failed with exit code $LASTEXITCODE"}
+    }
+    'GRAVPD1' {
+      $reader=[IO.File]::OpenText($payloadPath)
+      try {
+        $metadata=@{}; $expectedHeader='time_us,m1_angle_rad,m1_velocity_rad_s,m1_command_torque_Nm,m1_feedback_torque_Nm,m2_angle_rad,m2_velocity_rad_s,m2_command_torque_Nm,m2_feedback_torque_Nm'
+        $headerSeen=$false; $dataEnded=$false; $rowCount=0; $declaredRows=$null
+        $numberPattern='^-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$'
+        while(($line=$reader.ReadLine()) -ne $null) {
+          if($line.StartsWith('#')) {
+            if($line -match '^#rows,([0-9]+)$') { $declaredRows=[long]::Parse($Matches[1]); $dataEnded=$true; continue }
+            if($line -match '^#([^,]+),(.*)$') { $metadata[$Matches[1]]=$Matches[2] }
+            continue
+          }
+          if($dataEnded) { throw 'GRAVPD1 has data after its completion footer.' }
+          if(-not $headerSeen) {
+            if($line -cne $expectedHeader) { throw 'GRAVPD1 data header does not match the expected nine columns.' }
+            $headerSeen=$true; continue
+          }
+          $fields=$line.Split(',')
+          if($fields.Length -ne 9) { throw "GRAVPD1 row $rowCount does not contain nine fields." }
+          foreach($field in $fields) { if($field -cnotmatch $numberPattern) { throw "GRAVPD1 row $rowCount contains a non-numeric field." } }
+          $rowCount++
+        }
+        foreach($key in @('firmware','schema','control_period_us','motor1_id','motor1_can_bus','motor2_id','motor2_can_bus','kp_Nm_per_deg','kd_Nm_per_rad_s','torque_limit_Nm','MIT_kp','MIT_kd','target_angle_m1_rad','target_angle_m2_rad','stop_reason')) {
+          if(-not $metadata.ContainsKey($key)) { throw "GRAVPD1 is missing metadata '$key'." }
+        }
+        if($metadata['firmware'] -cne 'gravity_estimate_PD' -or $metadata['schema'] -cne 'GRAVPD1') { throw 'GRAVPD1 metadata does not match its schema identity.' }
+        if(-not $headerSeen -or $null -eq $declaredRows -or $declaredRows -ne $rowCount) { throw 'GRAVPD1 header or completion row count is missing or inconsistent.' }
+      } finally { $reader.Dispose() }
+      Move-Item -LiteralPath $payloadPath -Destination $outputPath; $payloadPath=$null
+    }
+    {$_ -in 'CHIRPSD6','CHIRPSI1'} {
+      $converter=Join-Path $root 'sys_identification\convert_sd_chirp.py'
+      & python $converter $payloadPath
+      if($LASTEXITCODE -ne 0){throw "Chirp conversion failed with exit code $LASTEXITCODE"}
+      $converted=[IO.Path]::ChangeExtension($payloadPath,'.csv')
+      if(-not (Test-Path -LiteralPath $converted)){throw 'Chirp converter did not produce CSV.'}
+      Move-Item -LiteralPath $converted -Destination $outputPath
+      Remove-Item -LiteralPath ([IO.Path]::ChangeExtension($payloadPath,'.config.json')) -ErrorAction SilentlyContinue
+    }
+    {$_ -in 'CONSTVL1','STEPTOR1','VELRAMP1'} {
+      $converter=Join-Path $root 'SDlog\convert_motion_log.py'
+      & python $converter $payloadPath -o $outputPath
+      if($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $outputPath)){throw "Motion-log conversion failed with exit code $LASTEXITCODE"}
+    }
+    'FRIC001' {
+      $converter=Join-Path $root 'fric_identification\convert_friction.py'
+      & python $converter $payloadPath
+      if($LASTEXITCODE -ne 0){throw "Friction conversion failed with exit code $LASTEXITCODE"}
+      $converted=[IO.Path]::ChangeExtension($payloadPath,'.csv')
+      if(-not (Test-Path -LiteralPath $converted)){throw 'Friction converter did not produce CSV.'}
+      Move-Item -LiteralPath $converted -Destination $outputPath
+      $steps=[IO.Path]::ChangeExtension($payloadPath,'.steps.csv')
+      if(Test-Path -LiteralPath $steps){Move-Item -LiteralPath $steps -Destination (Join-Path $dataDir ($base+'_steps.csv'))}
+      $metadata=[IO.Path]::ChangeExtension($payloadPath,'.metadata.json')
+      if(Test-Path -LiteralPath $metadata){Move-Item -LiteralPath $metadata -Destination (Join-Path $dataDir ($base+'_metadata.json'))}
+    }
+    {$_ -in 'CSV-RAW','CSV-FRIC1'} {
+      $reader=[IO.File]::OpenText($payloadPath)
+      try {
+        $firstLine=$reader.ReadLine(); $hasComma=$false; $hasFooter=$false
+        if($firstLine -and $firstLine.Contains(',')){$hasComma=$true}
+        while(($line=$reader.ReadLine()) -ne $null) {
+          if($line.Contains(',')){$hasComma=$true}
+          if($line -match '^# result=' -or $line -match '^#rows,'){$hasFooter=$true}
+        }
+      } finally { $reader.Dispose() }
+      if(-not $hasComma -or -not $hasFooter){throw "CSV payload failed header/footer validation; CRC-verified payload retained at $payloadPath"}
+      Move-Item -LiteralPath $payloadPath -Destination $outputPath; $payloadPath=$null
     }
     'CSV-FRIC2' {
       $reader=[IO.File]::OpenText($payloadPath)

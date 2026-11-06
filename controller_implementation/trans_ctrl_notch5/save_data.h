@@ -1,6 +1,8 @@
 #pragma once
 #include <Arduino.h>
 #include "control_config.h"
+#include "C:/0Telepalpation_control/SDlog/LogProtocol.h"
+#define SDLOG_FIRMWARE_ID "trans_ctrl_notch5"
 #include <stddef.h>
 #if TRANS_ENABLE_SD_LOGGING
 #include <SdFat.h>
@@ -89,7 +91,17 @@ inline bool begin() {
   cardReady=sd.begin(SdioConfig(FIFO_SDIO));
   if(cardReady) for(int n=int(ControlConfig::LOG_FILE_COUNT)-1;n>=0;--n) {
     snprintf(latestFile,sizeof(latestFile),"TC%04d.BIN",n);
-    if(sd.exists(latestFile)) return true;
+    if(sd.exists(latestFile)) {
+      FsFile probe;
+      if(probe.open(latestFile,O_RDONLY)) {
+        char line[64]; bool compatible=false;
+        while(probe.fgets(line,sizeof(line))>0) {
+          if(sizeof(Record)==152 && (!strcmp(line,"#binary,TCBIN3,152\n") || !strcmp(line,"#binary,TCBIN3,152\r\n"))) { compatible=true; break; }
+          if(sizeof(Record)==120 && (!strcmp(line,"#binary,TCBIN2,120\n") || !strcmp(line,"#binary,TCBIN2,120\r\n"))) { compatible=true; break; }
+        }
+        probe.close(); if(compatible) return true;
+      }
+    }
   }
   latestFile[0]=0; return cardReady;
 }
@@ -204,6 +216,45 @@ inline bool readHeader(FsFile &f,Print *out=nullptr) {
     if(out) out->print(line);
   }
   return false;
+}
+inline void identifyCommon() {
+  Serial.print("LOG,1,IDENTIFY,"); Serial.print(SDLOG_FIRMWARE_ID); Serial.print(',');
+  Serial.println(sizeof(Record)==152 ? "TCBIN3" : "TCBIN2");
+}
+inline void sendCommon(bool previous=false) {
+  if(recording || finalizeRequest || !latestFile[0]) { Serial.println("LOG,1,ERROR,NO_FILE_OR_BUSY"); return; }  char selectedName[16]; strcpy(selectedName,latestFile);
+  if(previous) {
+    int current=atoi(latestFile+2); bool found=false;
+    for(int n=current-1;n>=0;--n) {
+      snprintf(selectedName,sizeof(selectedName),"TC%04d.BIN",n);
+      if(!sd.exists(selectedName)) continue;
+      FsFile probe; if(!probe.open(selectedName,O_RDONLY)) continue;
+      const bool compatible=readHeader(probe); probe.close(); if(compatible) { found=true; break; }
+    }
+    if(!found) { Serial.println("LOG,1,ERROR,NO_PREVIOUS_FILE"); return; }
+  }
+  FsFile f; if(!f.open(selectedName,O_RDONLY)) { Serial.println("LOG,1,ERROR,OPEN"); return; }
+  if(!readHeader(f)) { f.close(); Serial.println("LOG,1,ERROR,HEADER"); return; }
+  Record r; uint32_t rows=0; bool complete=false;
+  while(f.read(&r,sizeof(r))==sizeof(r) && valid(r)) {
+    if(r.sequence==UINT32_MAX) { complete=r.sample.timestamp==rows; break; }
+    if(r.sequence!=rows) break; ++rows;
+  }
+  if(complete) {
+    char line[ControlConfig::CSV_BUFFER_BYTES], expectedRows[40], expectedStatus[40];
+    snprintf(expectedRows,sizeof(expectedRows),"#rows,%lu",(unsigned long)rows);
+    snprintf(expectedStatus,sizeof(expectedStatus),"#status,%lu",(unsigned long)r.sample.fault);
+    bool hasRows=false,hasStatus=false;
+    while(f.fgets(line,sizeof(line))>0) {
+      line[strcspn(line,"\r\n")]=0;
+      hasRows|=!strcmp(line,expectedRows); hasStatus|=!strcmp(line,expectedStatus);
+    }
+    complete=hasRows && hasStatus;
+  }
+  if(!complete) { f.close(); Serial.println("LOG,1,ERROR,INCOMPLETE_OR_CORRUPT"); return; }
+  f.seekSet(0);
+  SDlog::sendFile(f,SDLOG_FIRMWARE_ID,sizeof(Record)==152?"TCBIN3":"TCBIN2",selectedName);
+  f.close();
 }
 inline void dumpCsv() {
   if(recording || finalizeRequest || !latestFile[0]) return;

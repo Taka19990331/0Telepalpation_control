@@ -30,8 +30,19 @@ LOG,1,END,<byte_length>,<crc32>
 | Firmware ID | Schema | 保存形式 | 変換 |
 |---|---|---|---|
 | `chirp_multi-cycle_LOGtest` | `CHIRPMC1` | MC1バイナリ | `convert_multi_cycle.py` |
+| `gravity_estimate_PD` | `GRAVPD1` | CSV | メタデータ・列・行数を検証してそのまま保存 |
 | `fric_exp_1LSBmethod2_LOGtest` | `CSV-FRIC2` | CSV | 検証後そのまま保存 |
 | `trans_ctrl_test3_LOGtest` | `TCBIN2` | TCBIN2バイナリ | `convert_trans_log.py` |
+
+同じ受信器は各通常版にも対応しています。
+
+| 分類 | 対象プログラム | スキーマ |
+|---|---|---|
+| 制御 | `gravity_estimate_PD`、`trans_ctrl_notch1`～`trans_ctrl_notch5`、`trans_ctrl_test1`～`trans_ctrl_test3`、`trans_ctrl_test2_startup_diag`、`trans_ctrl_test3_LOGtest` | GRAVPD1/TCBIN2/TCBIN3 |
+| 摩擦同定 | `fric_identification`、`fric_ConstVel`、`fric_ConstVel2`、`fric_exp_1LSBmethod`、`fric_exp_1LSBmethod2`、`fric_exp_1LSBmethod2_LOGtest`、`fric_StepTor`、`fric_VelRamp` | FRIC001/CONSTVL1/CSV-RAW/CSV-FRIC2/STEPTOR1/VELRAMP1 |
+| システム同定 | `chirp_multi-cycle`、`chirp_multi-cycle_LOGtest`、`chirp_sd_test`、`chirp_simplified_test1` | CHIRPMC1/CHIRPSD6/CHIRPSI1 |
+
+上記はテスト複製を含むSD有効の22スケッチです。`noSD`の2スケッチとSD記録を持たないタイマーテストは対象外です。すべて取得CSVは共通の`data`フォルダにプログラム名と取得日時で保存します。PREVIOUS取得は複数ログを選択できるスケッチで使えます。
 
 ## テスト複製
 

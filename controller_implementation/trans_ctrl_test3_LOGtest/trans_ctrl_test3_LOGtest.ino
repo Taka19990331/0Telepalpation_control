@@ -128,7 +128,8 @@ void processCommand(char *line) {
   for(char *p=line;*p;++p) *p=toupper((unsigned char)*p);
   if(!strcmp(line,"S")) startRun(); // Explicit reinitialization/recovery after stop.
   else if(!strcmp(line,"LOG,1,IDENTIFY")) Serial.println("LOG,1,IDENTIFY,trans_ctrl_test3_LOGtest,TCBIN2");
-  else if(!strcmp(line,"LOG,1,FETCH,LATEST")) { if(!active && !startRequest) SaveData::dumpCsv(); else Serial.println("LOG,1,ERROR,BUSY"); }
+  else if(!strcmp(line,"LOG,1,FETCH,LATEST")) { if(!active && !startRequest) SaveData::sendCommon(false); else Serial.println("LOG,1,ERROR,BUSY"); }
+  else if(!strcmp(line,"LOG,1,FETCH,PREVIOUS")) { if(!active && !startRequest) SaveData::sendCommon(true); else Serial.println("LOG,1,ERROR,BUSY"); }
   else if(!strcmp(line,"LOG,1,TESTDATA")) { if(!SaveData::createTestFixture()) Serial.println("LOG,1,ERROR,TESTDATA_CREATE_FAILED"); }
   else if(!strcmp(line,"D")) { if(!active && !startRequest) SaveData::dumpCsv(); }
   else if(!strcmp(line,"STATUS")) printStatus();

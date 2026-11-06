@@ -2,6 +2,7 @@
 #include <util/atomic.h>
 #include <IntervalTimer.h>
 #include <SdFat.h>
+#include "C:/0Telepalpation_control/SDlog/LogProtocol.h"
 #include <FlexCAN_T4.h>
 #include "chirp_config.h"
 #include "motor_protocol.h"
@@ -40,6 +41,7 @@ FsFile logFile;
 IntervalTimer controlTimer;
 Header runHeader;
 char filename[16], lastSaved[16] = {};
+bool commonFetchRequested=false;
 
 // Preserve interrupt state in foreground critical sections. CAN RX and timer have
 // equal priority and cannot preempt each other: feedback copies inside the timer
@@ -448,6 +450,11 @@ void downloadLog() {
   if (!valid || !input.seekSet(sizeof(Header))) {
     input.close(); Serial.println("ERROR,SD_FILE_INCOMPLETE_OR_UNSUPPORTED"); return;
   }
+  if(commonFetchRequested) {
+    commonFetchRequested=false;
+    SDlog::sendFile(input,"chirp_simplified_test1","CHIRPSI1",lastSaved);
+    input.close(); return;
+  }
   Serial.print("SOURCE_FILE,"); Serial.println(lastSaved);
   Serial.print("CHIRP_BEGIN,VERSION,SI1,REASON,"); Serial.println(f.status == COMPLETE ? "COMPLETE" : "ABORTED");
   printConfig(h);
@@ -471,6 +478,11 @@ void downloadLog() {
     if (!Serial) { input.close(); return; }
   }
   input.close(); Serial.print("SUMMARY,Count,"); Serial.println(f.rows); Serial.println("CHIRP_END");
+}
+
+void commonFetch(bool previous) {
+  if(previous) { Serial.println("LOG,1,ERROR,PREVIOUS_UNSUPPORTED"); return; }
+  commonFetchRequested=true; downloadLog(); commonFetchRequested=false;
 }
 
 bool setupCAN() {
@@ -514,6 +526,7 @@ void loop() {
   bool start = false;
   for (unsigned i=0; i<32 && Serial.available(); ++i) {
     const char c=Serial.read();
+    if(SDlog::consumeCommandByte(c,"chirp_simplified_test1","CHIRPSI1",commonFetch)) continue;
     if (c=='x' || c=='X') { userStopRequested=true; start=false; }
     else if ((c=='s' || c=='S') && !userStopRequested) start=true;
     else if (c=='d' || c=='D') downloadLog();

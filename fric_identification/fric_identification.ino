@@ -2,6 +2,7 @@
 #include <util/atomic.h>
 #include <IntervalTimer.h>
 #include <SdFat.h>
+#include "C:/0Telepalpation_control/SDlog/LogProtocol.h"
 #include <FlexCAN_T4.h>
 #include "friction_core.h"
 #include "motor_protocol.h"
@@ -19,6 +20,7 @@ Engine engine; Observation feedback={};
 volatile uint32_t head=0,tail=0,rxFault=OK;
 volatile bool active=false,finished=false,startRequested=false,userStop=false,ioStop=false;
 bool cardReady=false,canReady=false,timerReady=false,recording=false,ioFailed=false;
+bool commonFetchRequested=false;
 volatile bool restartLocked=false;
 uint32_t firstUs=0,previousUs=0,exitUs=0,exitStage=0,exitAcknowledged=0,startStage=0;
 uint32_t highWater=0,maxWriteUs=0,configBytes=0;
@@ -255,6 +257,11 @@ bool downloadLatest() {
     memcmp(footer.magic,"ENDFR001",8)==0 && footer.rows<=EXPECTED_ROWS &&
     size==sizeof(Header)+h.configBytes+uint64_t(footer.rows)*sizeof(Sample)+sizeof(Footer);
   if(!valid || !input.seekSet(0)) { input.close(); Serial.println("ERROR,INVALID_LOG"); return false; }
+  if(commonFetchRequested) {
+    commonFetchRequested=false;
+    SDlog::sendFile(input,"fric_identification","FRIC001",source);
+    input.close(); return true;
+  }
   // Protocol: ASCII size header, exactly size binary bytes, ASCII end marker.
   Serial.print("FRICTION_BIN,"); Serial.print(source); Serial.print(','); Serial.println(uint32_t(size));
   uint8_t buffer[512]; uint64_t remaining=size;
@@ -268,6 +275,11 @@ bool downloadLatest() {
   }
   input.close(); Serial.print("\nFRICTION_END,"); Serial.print(source); Serial.print(','); Serial.println(uint32_t(size));
   Serial.flush(); return true;
+}
+void commonFetch(bool previous) {
+  if(previous) { Serial.println("LOG,1,ERROR,PREVIOUS_UNSUPPORTED"); return; }
+  commonFetchRequested=true;
+  if(!downloadLatest()) commonFetchRequested=false;
 }
 bool downloadLatestCsv() {
   if(recording || active || !cardReady) { Serial.println("ERROR,BUSY_OR_NO_SD"); return false; }
@@ -339,6 +351,7 @@ void setup() {
 void loop() {
   for(unsigned n=0;n<32 && Serial.available();++n) {
     char c=Serial.read();
+    if(SDlog::consumeCommandByte(c,"fric_identification","FRIC001",commonFetch)) continue;
     if(c=='x'||c=='X') userStop=true;
     if((c=='s'||c=='S')&&!userStop) startRun();
     if(c=='d'||c=='D') downloadLatest();

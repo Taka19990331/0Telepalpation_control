@@ -2,6 +2,7 @@
 #include <FlexCAN_T4.h>
 #include <IntervalTimer.h>
 #include <SdFat.h>
+#include "C:/0Telepalpation_control/SDlog/LogProtocol.h"
 #include <math.h>
 #include <string.h>
 #include "velramp_config.h"
@@ -210,6 +211,19 @@ void serviceLog() {
     }
   }
 }
+void commonFetch(bool previous) {
+  if(previous) { Serial.println("LOG,1,ERROR,PREVIOUS_UNSUPPORTED"); return; }
+  if(recording || !lastFilename[0]) { Serial.println("LOG,1,ERROR,NO_FILE_OR_BUSY"); return; }
+  FsFile f; if(!f.open(lastFilename,O_RDONLY)) { Serial.println("LOG,1,ERROR,OPEN"); return; }
+  Header h; Footer end;
+  bool ok=f.fileSize()>=sizeof(Header)+sizeof(Footer) && f.read(&h,sizeof(h))==sizeof(h) &&
+      !memcmp(h.magic,"VELRAMP1",8) && h.rowBytes==sizeof(Sample);
+  if(ok) ok=f.seekSet(f.fileSize()-sizeof(Footer)) && f.read(&end,sizeof(end))==sizeof(end) &&
+      !memcmp(end.magic,"ENDVR001",8) && end.rows==h.rows &&
+      f.fileSize()==sizeof(Header)+uint64_t(h.rows)*sizeof(Sample)+sizeof(Footer);
+  if(!ok) { f.close(); Serial.println("LOG,1,ERROR,INCOMPLETE_OR_CORRUPT"); return; }
+  f.seekSet(0); SDlog::sendFile(f,"fric_VelRamp","VELRAMP1",lastFilename); f.close();
+}
 void outputCsv() {
   if (recording || !lastFilename[0]) return;
   FsFile f;
@@ -261,6 +275,7 @@ void setup() {
 void loop() {
   while (Serial.available()) {
     const char c=Serial.read();
+    if(SDlog::consumeCommandByte(c,"fric_VelRamp","VELRAMP1",commonFetch)) continue;
     if ((c=='s'||c=='S') && !recording && !active) startRun();
     else if (c=='d'||c=='D') outputCsv();
     else if ((c=='x'||c=='X') && active) { noInterrupts(); statusCode=1; active=false; finalizePending=true; interrupts(); sendMit(0,0); sendSpecial(0xfd); }

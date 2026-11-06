@@ -3,7 +3,7 @@
 #include <math.h>
 
 // AK80-8 / Teensy 4.1. Motor ID 1 uses CAN1; ID 2 uses CAN2.
-constexpr uint32_t MOTOR_ID = 1, CAN_BITRATE = 1000000;
+constexpr uint32_t MOTOR_ID = 2, CAN_BITRATE = 1000000;
 static_assert(MOTOR_ID==1 || MOTOR_ID==2, "AK80 Motor ID 1 uses CAN1; ID 2 uses CAN2");
 constexpr uint32_t CAN_PORT_NUMBER = MOTOR_ID;
 constexpr uint32_t PERIOD_US = 500, ISR_PRIORITY = 192;

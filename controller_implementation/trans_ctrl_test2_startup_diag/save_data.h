@@ -1,6 +1,8 @@
 #pragma once
 #include <Arduino.h>
 #include "control_config.h"
+#include "C:/0Telepalpation_control/SDlog/LogProtocol.h"
+#define SDLOG_FIRMWARE_ID "trans_ctrl_test2_startup_diag"
 #include <stddef.h>
 #if TRANS_ENABLE_SD_LOGGING
 #include <SdFat.h>
@@ -106,9 +108,9 @@ inline bool begin() {
     FsFile root, entry;
     if(!root.open("/")) { cardReady=false; }
     else {
-      char name[16];
+      char name[16]; int latestCompatible=-1;
       while(entry.openNext(&root,O_RDONLY)) {
-        const size_t len=entry.getName(name,sizeof(name)); entry.close();
+        const size_t len=entry.getName(name,sizeof(name));
         if(len==10 && name[0]=='T' && name[1]=='C' && name[6]=='.' &&
            name[7]=='B' && name[8]=='I' && name[9]=='N') {
           uint32_t index=0; bool digits=true;
@@ -116,13 +118,21 @@ inline bool begin() {
             if(name[i]<'0'||name[i]>'9') { digits=false; break; }
             index=index*10+uint32_t(name[i]-'0');
           }
-          if(digits && index<ControlConfig::LOG_FILE_COUNT) markSlotUsed(index);
+          if(digits && index<ControlConfig::LOG_FILE_COUNT) {
+            markSlotUsed(index);
+            char line[64]; bool compatible=false;
+            while(entry.fgets(line,sizeof(line))>0)
+              if(!strcmp(line,"#binary,TCBIN2,120\n") || !strcmp(line,"#binary,TCBIN2,120\r\n")) { compatible=true; break; }
+            if(compatible && int(index)>latestCompatible) latestCompatible=int(index);
+          }
         }
+        entry.close();
       }
       root.close();
       for(uint32_t n=0;n<ControlConfig::LOG_FILE_COUNT;++n) {
-        if(slotUsed(n)) { nextFileIndex=n+1; snprintf(latestFile,sizeof(latestFile),"TC%04u.BIN",unsigned(n)); }
+        if(slotUsed(n)) nextFileIndex=n+1;
       }
+      if(latestCompatible>=0) snprintf(latestFile,sizeof(latestFile),"TC%04d.BIN",latestCompatible);
       nextFileIndex=0;
       while(nextFileIndex<ControlConfig::LOG_FILE_COUNT && slotUsed(nextFileIndex)) ++nextFileIndex;
     }
@@ -244,6 +254,45 @@ inline bool readHeader(FsFile &f,Print *out=nullptr) {
     if(out) out->print(line);
   }
   return false;
+}
+inline void identifyCommon() {
+  Serial.print("LOG,1,IDENTIFY,"); Serial.print(SDLOG_FIRMWARE_ID); Serial.print(',');
+  Serial.println(sizeof(Record)==152 ? "TCBIN3" : "TCBIN2");
+}
+inline void sendCommon(bool previous=false) {
+  if(recording || finalizeRequest || !latestFile[0]) { Serial.println("LOG,1,ERROR,NO_FILE_OR_BUSY"); return; }  char selectedName[16]; strcpy(selectedName,latestFile);
+  if(previous) {
+    int current=atoi(latestFile+2); bool found=false;
+    for(int n=current-1;n>=0;--n) {
+      snprintf(selectedName,sizeof(selectedName),"TC%04d.BIN",n);
+      if(!sd.exists(selectedName)) continue;
+      FsFile probe; if(!probe.open(selectedName,O_RDONLY)) continue;
+      const bool compatible=readHeader(probe); probe.close(); if(compatible) { found=true; break; }
+    }
+    if(!found) { Serial.println("LOG,1,ERROR,NO_PREVIOUS_FILE"); return; }
+  }
+  FsFile f; if(!f.open(selectedName,O_RDONLY)) { Serial.println("LOG,1,ERROR,OPEN"); return; }
+  if(!readHeader(f)) { f.close(); Serial.println("LOG,1,ERROR,HEADER"); return; }
+  Record r; uint32_t rows=0; bool complete=false;
+  while(f.read(&r,sizeof(r))==sizeof(r) && valid(r)) {
+    if(r.sequence==UINT32_MAX) { complete=r.sample.timestamp==rows; break; }
+    if(r.sequence!=rows) break; ++rows;
+  }
+  if(complete) {
+    char line[ControlConfig::CSV_BUFFER_BYTES], expectedRows[40], expectedStatus[40];
+    snprintf(expectedRows,sizeof(expectedRows),"#rows,%lu",(unsigned long)rows);
+    snprintf(expectedStatus,sizeof(expectedStatus),"#status,%lu",(unsigned long)r.sample.fault);
+    bool hasRows=false,hasStatus=false;
+    while(f.fgets(line,sizeof(line))>0) {
+      line[strcspn(line,"\r\n")]=0;
+      hasRows|=!strcmp(line,expectedRows); hasStatus|=!strcmp(line,expectedStatus);
+    }
+    complete=hasRows && hasStatus;
+  }
+  if(!complete) { f.close(); Serial.println("LOG,1,ERROR,INCOMPLETE_OR_CORRUPT"); return; }
+  f.seekSet(0);
+  SDlog::sendFile(f,SDLOG_FIRMWARE_ID,sizeof(Record)==152?"TCBIN3":"TCBIN2",selectedName);
+  f.close();
 }
 inline void dumpCsv() {
   if(recording || finalizeRequest || !latestFile[0]) return;

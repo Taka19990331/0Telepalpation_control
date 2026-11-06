@@ -164,6 +164,9 @@ void processCommand(char *line) {
   char *endLine=line+strlen(line);
   while(endLine>line && isspace((unsigned char)endLine[-1])) *--endLine=0;
   for(char *p=line;*p;++p) *p=toupper((unsigned char)*p);
+  if(!strcmp(line,"LOG,1,IDENTIFY")) SaveData::identifyCommon();
+  else if(!strcmp(line,"LOG,1,FETCH,LATEST")) SaveData::sendCommon(false);
+  else if(!strcmp(line,"LOG,1,FETCH,PREVIOUS")) SaveData::sendCommon(true);
   if(!strcmp(line,"S")) { startCommandUs=micros(); Serial.println("COMMAND,S,RECEIVED"); startRun(); } // Explicit reinitialization/recovery after stop.
   else if(!strcmp(line,"D")) { if(!active && !startRequest) SaveData::dumpCsv(); }
   else if(!strcmp(line,"STATUS")) printStatus();
