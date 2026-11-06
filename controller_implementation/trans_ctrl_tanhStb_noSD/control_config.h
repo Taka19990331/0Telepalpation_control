@@ -23,8 +23,10 @@ constexpr float INITIAL_K_R1=0.95f; // Motor ID1 RFOBフィードバックゲイ
 constexpr float INITIAL_K_R2=0.95f; // Motor ID2 RFOBフィードバックゲイン初期設定 [無次元]
 constexpr float INITIAL_K_F1=0.0f; // Motor ID1 摩擦FFゲイン初期設定 [無次元]
 constexpr float INITIAL_K_F2=0.0f; // Motor ID2 摩擦FFゲイン初期設定 [無次元]
+constexpr float G_FF1=0.01182f; // Motor ID1 重力補償FFトルク [Nm]
+constexpr float G_FF2=-1.60443f; // Motor ID2 重力補償FFトルク [Nm]
 // KR/KF: 有限なfloat値のみ許可。追加のゲイン範囲制限なし。
-constexpr float TORQUE_LIMIT=1.0f; // 指令トルク絶対値上限 [Nm]
+constexpr float TORQUE_LIMIT=2.0f; // 指令トルク絶対値上限 [Nm]（M2バイアスFFを出力可能な値）
 constexpr uint32_t CONTROL_PERIOD_US=500; // MIT指令周期 [us] 500 for 2kHz
 constexpr float Q_HZ=400.0f; // RFOB Qフィルタ遮断周波数 [Hz]
 constexpr uint8_t VELOCITY_MOVING_AVERAGE_SAMPLES=5; // 角速度5点移動平均のサンプル数

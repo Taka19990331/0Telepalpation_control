@@ -6,7 +6,7 @@
 namespace ControlAlgorithm {
 struct Signals {
   float velocity=0, friction=0, input=0, state=0, external=0;
-  float torqueR=0, torqueF=0, unsaturated=0, command=0;
+  float torqueR=0, torqueF=0, torqueGFF=0, unsaturated=0, command=0;
   float angleBpf=0, angleRms=0, meanSpeed=0, gammaTheta=0, gammaSpeed=1, gamma=0;
   float notchInput=0, notchOutput=0;
   uint8_t notchMode=ControlConfig::INITIAL_NOTCH_MODE;
@@ -79,7 +79,7 @@ class Controller {
   void reset() { mode=ControlConfig::INITIAL_NOTCH_MODE; signals=Signals{}; signals.notchMode=uint8_t(mode); initialized=false; numericFault=false; lastUs=0; notch.reset(); velocityNotch.reset(); detector.reset(); latestRawVelocity=0; for(uint8_t i=0;i<ControlConfig::VELOCITY_MOVING_AVERAGE_SAMPLES;++i) velocitySamples[i]=0; velocitySum=0; velocityIndex=0; velocityCount=0; appliedGamma=0; holdSeconds=0; }
   bool ready() const { return initialized && !numericFault; }
   bool faulted() const { return numericFault; }
-  void zeroOutput() { signals.torqueR=signals.torqueF=signals.unsaturated=signals.command=0; signals.saturated=false; }
+  void zeroOutput() { signals.torqueR=signals.torqueF=signals.torqueGFF=signals.unsaturated=signals.command=0; signals.saturated=false; }
   void trip() { numericFault=true; zeroOutput(); }
   void setNotchMode(ControlConfig::NotchMode m) { mode=m; signals.notchMode=uint8_t(m); appliedGamma=0; holdSeconds=0; }
   ControlConfig::NotchMode notchMode() const { return mode; }
@@ -103,7 +103,7 @@ class Controller {
     return notch.finiteState()&&velocityNotch.finiteState()&&detector.finiteState()&&
       isfinite(torqueBias)&&isfinite(latestRawVelocity)&&isfinite(velocitySum)&&isfinite(appliedGamma)&&isfinite(holdSeconds)&&
       isfinite(signals.velocity)&&isfinite(signals.friction)&&isfinite(signals.input)&&isfinite(signals.state)&&isfinite(signals.external)&&
-      isfinite(signals.torqueR)&&isfinite(signals.torqueF)&&isfinite(signals.unsaturated)&&isfinite(signals.command)&&
+      isfinite(signals.torqueR)&&isfinite(signals.torqueF)&&isfinite(signals.torqueGFF)&&isfinite(signals.unsaturated)&&isfinite(signals.command)&&
       isfinite(signals.angleBpf)&&isfinite(signals.angleRms)&&isfinite(signals.meanSpeed)&&isfinite(signals.gammaTheta)&&isfinite(signals.gammaSpeed)&&isfinite(signals.gamma)&&isfinite(signals.notchInput)&&isfinite(signals.notchOutput);
   }
   // Called exactly once per new CAN feedback frame; BPF is designed for 2 kHz sampling.
@@ -173,7 +173,8 @@ class Controller {
     if(!enabled||!ready()) { zeroOutput(); return 0; }
     signals.torqueR=Kr*raw;
     signals.torqueF=Kf*friction(signals.velocity,FF_FRICTION_MODEL);
-    signals.unsaturated=signals.torqueR+signals.torqueF+dampingTorque;
+    signals.torqueGFF=(motor.id==1 ? G_FF1 : G_FF2);
+    signals.unsaturated=signals.torqueR+signals.torqueF+dampingTorque+signals.torqueGFF;
     if(!finiteState()) { trip(); return 0; }
     signals.command=fmaxf(-TORQUE_LIMIT,fminf(TORQUE_LIMIT,signals.unsaturated));
     signals.saturated=signals.command!=signals.unsaturated;

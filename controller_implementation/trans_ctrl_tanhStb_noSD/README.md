@@ -8,4 +8,6 @@ RFOB velocity uses a 5-point moving average instead of the velocity LPF. The not
 
 Open this folder as an Arduino sketch and select **Teensy 4.1**. Configuration defaults remain in `control_config.h`.
 
+When control is ON, a constant gravity feed-forward torque is added independently of the friction feed-forward: M1 `+0.01182 Nm`, M2 `−1.60443 Nm`. Adjust `G_FF1` and `G_FF2` near the top of the user settings in `control_config.h`. The total torque limit is `±2.0 Nm` so the configured M2 torque can be sent.
+
 
