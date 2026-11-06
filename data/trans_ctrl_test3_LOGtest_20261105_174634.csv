@@ -1,0 +1,5 @@
+#test_fixture,LOGtest_only,no_CAN
+timestamp_us,position_rad,velocity_raw_rad_s,velocity_filtered_rad_s,feedback_torque_Nm,torque_bias_Nm,feedback_age_us,friction_model_Nm,rfob_input_Nm,rfob_filter_state_Nm,external_torque_est_Nm,torque_RFOB_Nm,torque_FF_Nm,torque_cmd_unsat_Nm,torque_cmd_Nm,K_R,K_F,control_enabled,torque_saturated,motor_error,fault_code,tx_queue_count,isr_interval_us,previous_isr_duration_us,can_snapshot_time_us,can_esr1,can_ecr,can_write_success,can_write_failure
+1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#rows,1
+#status,0

@@ -54,8 +54,8 @@ struct FrictionParameters { float tc, ts, vs, b; };
 // tc: クーロン摩擦 [Nm], ts: 静止摩擦 [Nm], vs: Stribeck速度 [rad/s], b: 粘性 [Nm s/rad]
 constexpr FrictionParameters POSITIVE={0.459212f,0.526341f,0.474762f,0.00218903f};
 constexpr FrictionParameters NEGATIVE={0.410719f,0.527041f,0.473325f,0.00341074f};
-constexpr uint8_t MOTOR_ID=1; // AK80モータID [CANノード番号]
-constexpr unsigned CAN_BUS=1; // 接続CANポート [1=CAN1, 2=CAN2, 3=CAN3]
+constexpr uint8_t MOTOR_ID=2; // AK80モータID [CANノード番号]
+constexpr unsigned CAN_BUS=2; // 接続CANポート [1=CAN1, 2=CAN2, 3=CAN3]
 constexpr uint32_t CAN_BAUD=1000000; // CAN通信速度 [bit/s]
 constexpr float POSITION_MIN=-12.5f, POSITION_MAX=12.5f; // MIT位置エンコード範囲 [rad]
 constexpr float VELOCITY_MIN=-37.5f, VELOCITY_MAX=37.5f; // MIT速度エンコード範囲 [rad/s]
