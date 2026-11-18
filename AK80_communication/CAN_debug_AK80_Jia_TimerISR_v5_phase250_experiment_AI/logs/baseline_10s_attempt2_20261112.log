@@ -1,0 +1,6 @@
+# PORT=COM3
+# BAUD=115200
+# DURATION_SECONDS=10
+# Only serial commands S, X, STATUS are allowlisted.
+# CAPTURE_FAILED=TimeoutError: v5 READY line not observed; S was not sent
+# S_COMMAND_ATTEMPTED=0

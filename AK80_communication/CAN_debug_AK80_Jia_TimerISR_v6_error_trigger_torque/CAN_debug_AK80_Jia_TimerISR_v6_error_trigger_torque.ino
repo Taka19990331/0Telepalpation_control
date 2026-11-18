@@ -1,0 +1,1593 @@
+/*
+ * CAN_debug_AK80_Jia_TimerISR_v6_error_trigger_torque.ino
+ * Teensy 4.1 / FlexCAN_T4 / Jia Mode1 (MIT) / IntervalTimer
+ *
+ * Source policy:
+ *  - CAN protocol, send packing, polling read/write: working Jia sketch.
+ *  - Physical ranges, motor selection, period, diagnosis: supplied diagnostic sketch.
+ *  - No onReceive(), no enableMBInterrupt(), no CAN events() for RX.
+ *  - Timer ISR polls RX continuously in IDLE (no TX), drains stale mailboxes.
+ *  - In RUNNING it polls RX (100 us) and sends MIT torque commands (500 us).
+ *  - S: zero torque; P: single four-pulse baseline test; A: repeated four-pulse test.
+ *  - A captures 1 kHz ring around CAN errors observed WHILE a torque pulse is on.
+ *  - CAN error detection is not a reason to bypass motion/RX/TX safety stops.
+ *  - Auto run stops after at most 30s, or 350 ms after qualified error.
+ *  - TRACE: 1 kHz paired ring-buffer dump after X/automatic stop.
+ *  - FB torque is MOTOR-REPORTED, not physical torque measurement.
+ *  - First S can reinitialize the CAN peripheral after motor power-on.
+ *  - loop() handles Serial, prints buffered diagnostic events and stop requests.
+ *
+ * Commands: S, P, A, X, STATUS, TRACE, HISTORY, EVENTS, RESET, HELP
+ * CAUTION: MIT zero torque requires kp=kd=t=0. CAN stop is best effort.
+ *          This software is not an independent emergency-stop mechanism.
+ */
+
+#include <Arduino.h>
+#include <FlexCAN_T4.h>
+#include <IntervalTimer.h>
+#include <ctype.h>
+#include <string.h>
+#include <math.h>
+
+// ==================== SETTINGS (from newer diagnostic program) ====================
+constexpr bool MOTOR1_ON = true;           // CAN1, motor ID 1
+constexpr bool MOTOR2_ON = true;           // CAN2, motor ID 2
+constexpr uint8_t MOTOR_ID[2] = {1, 2};
+constexpr uint32_t CAN_BAUD = 1000000;
+constexpr uint32_t COMMAND_PERIOD_US = 500; // 2 kHz torque command
+constexpr uint32_t RX_POLL_PERIOD_US = 100; // 10 kHz RX polling; 5 polls/TX
+constexpr uint32_t PRINT_INTERVAL_MS = 1000;
+constexpr uint32_t RX_WARNING_US = 5000;
+constexpr uint32_t RX_TIMEOUT_US = 500000;
+constexpr uint32_t HISTORY_INTERVAL_US = 10000;
+constexpr uint16_t HISTORY_SIZE = 200;     // 2 s / motor
+constexpr uint16_t EVENT_SIZE = 128;
+constexpr uint8_t RX_BUDGET_PER_TICK = 4;  // per motor per RX-poll tick
+constexpr bool STOP_ON_RX_HW_OVERRUN = true; // strict for nonzero-torque tests
+constexpr uint16_t TX_QUEUE_WARNING = 8;  // diagnostics only
+constexpr uint32_t JITTER_WARNING_US = 50;
+constexpr uint32_t SERIAL_BAUD = 115200;
+constexpr uint8_t TIMER_ISR_PRIORITY = 96; // lower number = higher priority
+constexpr uint8_t CAN_IRQ_PRIORITY = 128;  // enable TX-completion processing
+
+// ==================== POWER-UP / PRE-START DIAGNOSTICS ====================
+constexpr bool IDLE_RX_DRAIN = true;         // Poll RX while waiting for S, NO TX
+constexpr bool REINIT_CAN_ON_FIRST_S = false; // Verified: idle RX drain works without CAN reinit
+
+// ==================== BOUNDED TORQUE-PULSE TEST ====================
+// S starts ONLY zero-torque TX. P explicitly starts these short pulses.
+// MIT kp=kd=0; zero torque does NOT brake/hold the moving arm.
+constexpr float TEST_TORQUE_NM = 0.6f; // absolute requested bound
+constexpr uint32_t PULSE_US = 25000;   // 25 ms = 50 frames at 2 kHz
+constexpr uint32_t STEP_US = 150000;   // 125 ms zero between pulse onsets
+constexpr uint32_t PROBE_END_US = 4 * STEP_US; // 600 ms
+constexpr uint32_t POST_CAPTURE_US = 200000; // capture response after last pulse
+constexpr uint32_t PROBE_RX_STALE_US = 2500; // fault if feedback this old during probe
+constexpr uint32_t PROBE_MIN_RX_FRAMES = 200; // require prior valid feedback
+constexpr float PROBE_MAX_V_RAD_S = 5.0f; // conservative independent bounds
+constexpr float PROBE_MAX_DELTA_P_RAD = 0.50f;
+constexpr uint32_t PROBE_TXQ_FAULT = 1; // no queued command tolerated during probe
+constexpr uint16_t TRACE_SIZE = 2048; // 2.048 seconds @1 kHz
+
+// Repeated torque experiment. A is EXPLICIT opt-in, never implied by S.
+// Short 25-ms pulses only. 4 pulses / 800ms, all other commands zero.
+constexpr uint32_t AUTO_CYCLE_US = PROBE_END_US + POST_CAPTURE_US; // 800ms
+constexpr uint32_t AUTO_MAX_US = 30000000;      // maximum 30 seconds, even without error
+constexpr uint32_t AUTO_POST_TRIGGER_US = 350000; // keep following data for 350ms
+constexpr float AUTO_MAX_FB_T_NM = 2.0f;       // estimated motor feedback safety limit
+static_assert(AUTO_CYCLE_US % COMMAND_PERIOD_US == 0, "auto cycle must align to TX");
+static_assert(AUTO_MAX_US % COMMAND_PERIOD_US == 0, "auto timeout must align to TX");
+static_assert(PULSE_US % COMMAND_PERIOD_US == 0, "pulse steps align to TX");
+static_assert(STEP_US % COMMAND_PERIOD_US == 0, "pulse steps align to TX");
+static_assert(PROBE_END_US % COMMAND_PERIOD_US == 0, "probe end aligns to TX");
+
+constexpr float POSITION_MIN = -12.5f, POSITION_MAX = 12.5f;
+constexpr float VELOCITY_MIN = -37.5f, VELOCITY_MAX = 37.5f; // corrected range
+constexpr float TORQUE_MIN = -32.0f, TORQUE_MAX = 32.0f;
+constexpr float MIT_KP_MAX = 500.0f, MIT_KD_MAX = 5.0f;
+static_assert(MOTOR1_ON || MOTOR2_ON, "Enable at least one motor");
+static_assert(COMMAND_PERIOD_US > 0, "Invalid timer period");
+static_assert(RX_POLL_PERIOD_US > 0 && COMMAND_PERIOD_US % RX_POLL_PERIOD_US == 0,
+              "COMMAND_PERIOD_US must be multiple of RX_POLL_PERIOD_US");
+
+static inline bool motorOn(uint8_t i) {
+  return i == 0 ? MOTOR1_ON : (i == 1 ? MOTOR2_ON : false);
+}
+
+using Can1Type = FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16>;
+using Can2Type = FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16>;
+static Can1Type can1;
+static Can2Type can2;
+static IntervalTimer commandTimer;
+
+enum RunState : uint8_t { IDLE, RUNNING, FAULT_STOPPED };
+enum TxKind : uint8_t {
+  PERIODIC_COMMAND, START_ENABLE, START_ZERO, STOP_ZERO, STOP_DISABLE, TX_KIND_COUNT
+};
+enum FaultKind : uint8_t {
+  FAULT_NONE, FAULT_TX_FAIL, FAULT_RX_TIMEOUT, FAULT_BUS_OFF,
+  FAULT_RX_HW_OVERRUN, FAULT_ISR_OVERRUN, FAULT_MOTOR_ERROR,
+  FAULT_PROBE_RX_STALE, FAULT_PROBE_MOTION, FAULT_PROBE_TX_BACKLOG
+};
+enum EventKind : uint8_t {
+  EV_CAN_ERROR, EV_CAN_CLEAR, EV_RX_GAP_BEGIN, EV_RX_GAP_END,
+  EV_RX_REJECT, EV_RX_HW_OVERRUN, EV_TX_BACKLOG, EV_TX_FAILURE,
+  EV_FAULT, EV_START, EV_STOP, EV_CAN_IRQ_SNAPSHOT,
+  EV_PROBE_START, EV_PROBE_END, EV_AUTO_START, EV_AUTO_TRIGGER, EV_AUTO_DONE
+};
+
+struct MotorStats {
+  uint32_t rxRaw = 0, rxValid = 0, rxRejected = 0;
+  uint32_t rejectId = 0, rejectPayload = 0, rejectDlc = 0, rejectFormat = 0;
+  uint32_t rxHwOverrun = 0;
+  uint32_t rxNoncanonical = 0;
+  bool hasBadFrame = false;
+  uint32_t firstBadId = 0;
+  uint8_t firstBadPayloadId = 0, firstBadLen = 0, firstBadFlags = 0;
+  uint32_t lastRxUs = 0, maxRxGapUs = 0;
+  bool sawRx = false, rxGapActive = false, txBacklogActive = false;
+  uint32_t rxGapStartUs = 0, maxWarningDurationUs = 0;
+  uint8_t motorError = 0;
+  float positionRad = 0, velocityRadS = 0, torqueNm = 0;
+  uint32_t txAccepted[TX_KIND_COUNT] = {0};
+  uint32_t txQueued[TX_KIND_COUNT] = {0};
+  uint32_t txFailures[TX_KIND_COUNT] = {0};
+  int16_t lastTxResult = 0;
+  uint32_t txQueueNow = 0, txQueueMax = 0;
+  uint32_t esr1 = 0, esrSeen = 0, ecr = 0;
+  uint32_t canErrorEvents = 0, canErrorSamples = 0;
+  uint32_t canIrqSnapshots = 0, lastIrqSignature = 0, lastIrqLogUs = 0;
+  uint32_t lastCanSignature = 0;
+  uint8_t maxTec = 0, maxRec = 0;
+  uint32_t historyStampUs = 0;
+};
+
+
+// Sampled at 1 kHz inside the ISR, printed only after X/fault.
+// Entries are paired across motors so errors can be correlated with motion.
+struct TraceRow {
+  uint32_t us;
+  uint32_t rxAge[2], rxCount[2], irqSnapshots[2];
+  float cmd[2], pos[2], vel[2], torqueFb[2];
+  uint8_t tec[2], rec[2], txq[2], probeStep;
+};
+static TraceRow traceBuffer[TRACE_SIZE];
+static volatile uint16_t traceHead = 0, traceCount = 0;
+static volatile bool traceFrozen = false;
+static volatile bool probeRequested = false, probeActive = false;
+static volatile bool probeFinished = false;
+static uint32_t probeStartUs = 0, probeTick = 0;
+static float probeStartPos[2] = {0, 0};
+static float commandNm[2] = {0, 0}; // as-encoded on-wire value during pulse
+static uint8_t currentProbeStep = 255; // 255 = no pulse sequence
+
+// ISR/loop shared auto-capture control. One capture per run; no Serial in ISR.
+enum AutoFinish : uint8_t { AUTO_NOT_FINISHED=0, AUTO_ERROR_CAPTURED=1, AUTO_TIMED_OUT=2 };
+enum AutoTriggerSource : uint8_t { AUTO_SRC_NONE=0, AUTO_SRC_ISR_ESR=1, AUTO_SRC_IRQ_QUEUE=2 };
+static volatile bool autoRequested = false, autoActive = false;
+static volatile bool autoTriggered = false, autoStopPending = false;
+static volatile bool autoPulseActive = false;
+static volatile uint8_t autoPulseMotor = 255;
+static volatile AutoFinish autoFinish = AUTO_NOT_FINISHED;
+static uint32_t autoStartUs = 0, autoTick = 0, autoLastElapsedUs = 0;
+static uint32_t autoKeepPulseUntilUs = 0, autoTriggerUs = 0;
+static uint32_t autoTriggerEsr = 0, autoTriggerEcr = 0;
+static uint8_t autoTriggerMotor = 255, autoTriggerTorqueMotor = 255;
+static AutoTriggerSource autoTriggerSource = AUTO_SRC_NONE;
+static float autoStartPos[2] = {0,0};
+static uint32_t autoPulseCount = 0;
+
+struct HistoryRow {
+  uint32_t us, tx, txFail, rx, reject, rxHwOverrun, rxAgeUs;
+  uint32_t esr1, txQueue, maxIsrUs, maxJitterUs;
+  uint8_t tec, rec;
+  float p, v, t, cmdNm;
+  bool faultRow;
+};
+
+struct HistoryBuffer {
+  HistoryRow data[HISTORY_SIZE];
+  uint16_t head = 0, count = 0;
+  bool frozen = false;
+};
+
+struct Event {
+  uint32_t us, esr, ecr, value;
+  uint8_t motor, kind;
+};
+
+struct FaultSnapshot {
+  bool valid = false;
+  FaultKind kind = FAULT_NONE;
+  uint8_t motor = 255, motorError = 0;
+  uint32_t us = 0, esr = 0, ecr = 0, rxAge = UINT32_MAX;
+  uint32_t rxRaw = 0, rxValid = 0, tx = 0, txFail = 0;
+  uint32_t txQueue = 0, maxIsr = 0, maxJitter = 0;
+};
+
+struct TxFailure {
+  bool valid = false;
+  uint32_t us = 0, esr = 0, ecr = 0, rxAge = UINT32_MAX;
+  uint32_t queueBefore = 0, queueAfter = 0;
+  int result = 0;
+  uint8_t motor = 255, kind = 0;
+};
+
+// Explicit prototypes keep Arduino sketch preprocessing from moving function
+// declarations ahead of the custom enum/struct types above.
+static inline bool motorOn(uint8_t i);
+static uint16_t floatToUint(float value, float lo, float hi, uint8_t bits);
+static float uintToFloat(uint16_t value, float lo, float hi, uint8_t bits);
+static uint32_t busBase(uint8_t i);
+static uint32_t ecrValue(uint8_t i);
+static uint32_t esrValue(uint8_t i);
+static uint32_t txQueue(uint8_t i);
+static int writeRaw(uint8_t i, const CAN_message_t &m);
+static void pushEvent(EventKind kind, uint8_t i, uint32_t us,
+                      uint32_t esr, uint32_t ecr, uint32_t value);
+static void addHistory(uint8_t i, uint32_t now, bool asFault);
+static void latchFault(FaultKind kind, uint8_t i, uint32_t now);
+static bool sendFrame(uint8_t i, const CAN_message_t &msg, TxKind kind);
+static bool sendSpecial(uint8_t i, uint8_t code, TxKind kind);
+static bool sendZeroTorque(uint8_t i, TxKind kind);
+static bool sendTorqueCommand(uint8_t i, float torqueNm, TxKind kind);
+static void updateProbe(uint32_t now);
+static void updateAuto(uint32_t now);
+static void triggerAuto(uint8_t motor, uint32_t now, uint32_t esr, uint32_t ecr, AutoTriggerSource source);
+static void finishAuto(AutoFinish how, uint32_t now);
+static void captureTrace(uint32_t now);
+static void printTrace();
+static void requestProbe();
+static void requestAuto();
+static void parseFeedback(uint8_t i, const CAN_message_t &msg, uint32_t now);
+static void readMotor(uint8_t i);
+static void readIdleMotor(uint8_t i);
+static bool startIdleTimer();
+static void reinitSelectedCan();
+static void sampleCan(uint8_t i, uint32_t now);
+static void commandISR();
+static const char *stateName(RunState s);
+static const char *faultName(FaultKind k);
+static const char *txKindName(uint8_t k);
+static const char *eventName(uint8_t k);
+static const char *canStateName(uint32_t esr);
+static void printErrorNames(uint32_t esr);
+static void eventPrefix(uint32_t timeUs, uint8_t motor);
+static void printEvent(const Event &ev);
+static void printNewEvents(uint8_t budget);
+static void drainCanErrorSnapshots();
+static void discardOldCanErrors();
+static void printStatus();
+static void printHistory();
+static void printEvents();
+static void printFaultReport();
+static void sendStopRequests();
+static void stopTimer();
+static void serviceFault();
+static void resetSession();
+static void stopManually();
+static void beginSession();
+static void handleCommand(char *line);
+static void readSerial();
+void setup();
+void loop();
+
+static MotorStats motors[2];
+static HistoryBuffer histories[2];
+static Event events[EVENT_SIZE];
+static volatile uint32_t eventWriteSeq = 0;
+static uint32_t eventPrintSeq = 0;
+static uint32_t eventLostForPrint = 0;
+static FaultSnapshot fault;
+static TxFailure firstTxFailure;
+static volatile RunState state = IDLE;
+static volatile bool faultPending = false;
+static bool timerActive = false, faultOutputDone = false;
+static bool firstStartSinceBoot = true;
+static uint32_t idleRxRaw[2] = {0, 0};
+static uint32_t idleRxHwOverrun[2] = {0, 0};
+static uint32_t idleLastRxUs[2] = {0, 0};
+static uint32_t idleLastId[2] = {0, 0};
+static volatile uint32_t idleTimerTicks = 0;
+static volatile uint32_t idleMaxIsrUs = 0;
+static uint32_t reinitCount = 0;
+static uint32_t sessionStartUs = 0, lastPrintMs = 0;
+static uint32_t prevTx[2] = {0, 0}, prevRx[2] = {0, 0};
+static volatile uint32_t ticks = 0, maxIsrUs = 0, isrOverruns = 0;
+static volatile uint32_t rxPollTicks = 0, maxRxPollUs = 0, rxPollOverruns = 0;
+static volatile uint32_t maxRxPollGapUs = 0;
+static uint8_t txDivider = 0;
+static uint32_t lastRxPollUs = 0;
+static volatile uint32_t maxTickGapUs = 0, maxJitterUs = 0, lateTicks = 0;
+static uint32_t lastTickUs = 0;
+
+// ==================== BASE CONVERSIONS ====================
+static uint16_t floatToUint(float value, float lo, float hi, uint8_t bits) {
+  value = constrain(value, lo, hi);
+  return static_cast<uint16_t>((value - lo) * float((1UL << bits) - 1) / (hi - lo));
+}
+
+static float uintToFloat(uint16_t value, float lo, float hi, uint8_t bits) {
+  return float(value) * (hi - lo) / float((1UL << bits) - 1) + lo;
+}
+
+static uint32_t busBase(uint8_t i) { return i == 0 ? CAN1 : CAN2; }
+static uint32_t ecrValue(uint8_t i) { return FLEXCANb_ECR(busBase(i)); }
+static uint32_t esrValue(uint8_t i) { return FLEXCANb_ESR1(busBase(i)); }
+static uint32_t txQueue(uint8_t i) {
+  return i == 0 ? can1.getTXQueueCount() : can2.getTXQueueCount();
+}
+static int writeRaw(uint8_t i, const CAN_message_t &m) {
+  return i == 0 ? can1.write(m) : can2.write(m);
+}
+
+static const uint32_t CAN_ERROR_MASK =
+  FLEXCAN_ESR_ACK_ERR | FLEXCAN_ESR_BIT0_ERR | FLEXCAN_ESR_BIT1_ERR |
+  FLEXCAN_ESR_STF_ERR | FLEXCAN_ESR_FRM_ERR | FLEXCAN_ESR_CRC_ERR;
+
+// ISR only while running. loop() can reset these buffers only after timer.end().
+static void pushEvent(EventKind kind, uint8_t i, uint32_t us,
+                      uint32_t esr, uint32_t ecr, uint32_t value = 0) {
+  Event &ev = events[eventWriteSeq % EVENT_SIZE];
+  ev.us = us; ev.motor = i; ev.kind = static_cast<uint8_t>(kind);
+  ev.esr = esr; ev.ecr = ecr; ev.value = value;
+  asm volatile("" ::: "memory");
+  ++eventWriteSeq;
+}
+
+static void addHistory(uint8_t i, uint32_t now, bool asFault = false) {
+  HistoryBuffer &hb = histories[i];
+  if (hb.frozen && !asFault) return;
+  MotorStats &d = motors[i];
+  HistoryRow &h = hb.data[hb.head];
+  h.us = now;
+  h.tx = d.txAccepted[PERIODIC_COMMAND];
+  h.txFail = d.txFailures[PERIODIC_COMMAND];
+  h.rx = d.rxValid;
+  h.reject = d.rxRejected;
+  h.rxHwOverrun = d.rxHwOverrun;
+  h.rxAgeUs = d.sawRx ? now - d.lastRxUs : UINT32_MAX;
+  h.esr1 = d.esr1;
+  h.txQueue = d.txQueueNow;
+  h.maxIsrUs = maxIsrUs;
+  h.maxJitterUs = maxJitterUs;
+  h.tec = d.ecr & 255U;
+  h.rec = (d.ecr >> 8) & 255U;
+  h.p = d.positionRad; h.v = d.velocityRadS; h.t = d.torqueNm;
+  h.cmdNm = commandNm[i];
+  h.faultRow = asFault;
+  hb.head = (hb.head + 1) % HISTORY_SIZE;
+  if (hb.count < HISTORY_SIZE) ++hb.count;
+}
+
+static void latchFault(FaultKind kind, uint8_t i, uint32_t now) {
+  if (state != RUNNING) return;
+  MotorStats &d = motors[i];
+  fault.valid = true;
+  fault.kind = kind; fault.motor = i; fault.motorError = d.motorError;
+  fault.us = now; fault.esr = d.esr1; fault.ecr = d.ecr;
+  fault.rxAge = d.sawRx ? (now - d.lastRxUs) : UINT32_MAX;
+  fault.rxRaw = d.rxRaw; fault.rxValid = d.rxValid;
+  fault.tx = d.txAccepted[PERIODIC_COMMAND];
+  fault.txFail = d.txFailures[PERIODIC_COMMAND];
+  fault.txQueue = d.txQueueNow;
+  const uint32_t partialIsrUs = now - lastTickUs;
+  fault.maxIsr = (partialIsrUs > maxIsrUs) ? partialIsrUs : maxIsrUs;
+  fault.maxJitter = maxJitterUs;
+  pushEvent(EV_FAULT, i, now, d.esr1, d.ecr, static_cast<uint32_t>(kind));
+  for (uint8_t n = 0; n < 2; ++n) if (motorOn(n)) {
+    addHistory(n, now, true);
+    histories[n].frozen = true;
+  }
+  probeActive = false; probeRequested = false;
+  autoRequested = false; autoActive = false; autoPulseActive = false; autoStopPending = false;
+  traceFrozen = true;
+  state = FAULT_STOPPED; // immediately stop all periodic TX
+  faultPending = true;
+}
+
+// ==================== CAN TX (Jia Mode1) ====================
+static bool sendFrame(uint8_t i, const CAN_message_t &msg, TxKind kind) {
+  MotorStats &d = motors[i];
+  const uint32_t before = txQueue(i);
+  const int result = writeRaw(i, msg);
+  const uint32_t now = micros();
+  const uint32_t after = txQueue(i);
+  d.lastTxResult = static_cast<int16_t>(result);
+  d.txQueueNow = after;
+  if (after > d.txQueueMax) d.txQueueMax = after;
+
+  // FlexCAN_T4 may queue a frame. 1 = mailbox accepted; -1 = queued in
+  // library versions exposing that code. 0 / -2 = not accepted.
+  // CAUTION: some versions convert internal negative queue results to bool 1.
+  const bool accepted = (result == 1 || result == -1);
+  if (accepted) {
+    ++d.txAccepted[kind];
+    if (result == -1) ++d.txQueued[kind];
+  } else {
+    ++d.txFailures[kind];
+    if (!firstTxFailure.valid) {
+      firstTxFailure.valid = true;
+      firstTxFailure.us = now; firstTxFailure.motor = i;
+      firstTxFailure.kind = kind; firstTxFailure.result = result;
+      firstTxFailure.queueBefore = before; firstTxFailure.queueAfter = after;
+      firstTxFailure.esr = esrValue(i); firstTxFailure.ecr = ecrValue(i);
+      firstTxFailure.rxAge = d.sawRx ? (now - d.lastRxUs) : UINT32_MAX;
+    }
+    pushEvent(EV_TX_FAILURE, i, now, esrValue(i), ecrValue(i),
+              static_cast<uint32_t>(result));
+    if (kind == PERIODIC_COMMAND) {
+      d.esr1 = esrValue(i); d.ecr = ecrValue(i);
+      latchFault(FAULT_TX_FAIL, i, now);
+    }
+  }
+  if (kind == PERIODIC_COMMAND && probeActive && after >= PROBE_TXQ_FAULT) {
+    d.esr1 = esrValue(i); d.ecr = ecrValue(i);
+    latchFault(FAULT_PROBE_TX_BACKLOG, i, now);
+  }
+  if (kind == PERIODIC_COMMAND) {
+    if (after >= TX_QUEUE_WARNING && !d.txBacklogActive) {
+      d.txBacklogActive = true;
+      pushEvent(EV_TX_BACKLOG, i, now, esrValue(i), ecrValue(i), after);
+    } else if (after < TX_QUEUE_WARNING) {
+      d.txBacklogActive = false;
+    }
+  }
+  return accepted;
+}
+
+static bool sendSpecial(uint8_t i, uint8_t code, TxKind kind) {
+  CAN_message_t msg{};
+  msg.id = MOTOR_ID[i]; msg.len = 8;
+  msg.flags.extended = 0; msg.flags.remote = 0;
+  for (uint8_t k = 0; k < 7; ++k) msg.buf[k] = 0xFF;
+  msg.buf[7] = code; // 0xFC enter MIT, 0xFD exit MIT
+  return sendFrame(i, msg, kind);
+}
+
+static bool sendTorqueCommand(uint8_t i, float torqueNm, TxKind kind) {
+  // Same verified Jia Mode1 packing as the supplied v4. kp=kd=0 always.
+  // Quantize toward zero if the nearest lower code would exceed 0.6 Nm.
+  torqueNm = constrain(torqueNm, -TEST_TORQUE_NM, TEST_TORQUE_NM);
+  const uint16_t p = floatToUint(0, POSITION_MIN, POSITION_MAX, 16);
+  const uint16_t v = floatToUint(0, VELOCITY_MIN, VELOCITY_MAX, 12);
+  const uint16_t kp = floatToUint(0, 0, MIT_KP_MAX, 12);
+  const uint16_t kd = floatToUint(0, 0, MIT_KD_MAX, 12);
+  uint16_t t = floatToUint(torqueNm, TORQUE_MIN, TORQUE_MAX, 12);
+  if (torqueNm > 0 && uintToFloat(t, TORQUE_MIN, TORQUE_MAX, 12) > torqueNm) --t;
+  if (torqueNm < 0 && uintToFloat(t, TORQUE_MIN, TORQUE_MAX, 12) < torqueNm) ++t;
+  CAN_message_t msg{};
+  msg.id = MOTOR_ID[i]; msg.len = 8;
+  msg.flags.extended = 0; msg.flags.remote = 0;
+  msg.buf[0] = p >> 8;
+  msg.buf[1] = p & 0xFF;
+  msg.buf[2] = v >> 4;
+  msg.buf[3] = ((v & 0x0F) << 4) | (kp >> 8);
+  msg.buf[4] = kp & 0xFF;
+  msg.buf[5] = kd >> 4;
+  msg.buf[6] = ((kd & 0x0F) << 4) | (t >> 8);
+  msg.buf[7] = t & 0xFF;
+  commandNm[i] = (torqueNm == 0.0f) ? 0.0f : uintToFloat(t, TORQUE_MIN, TORQUE_MAX, 12);
+  return sendFrame(i, msg, kind);
+}
+
+static bool sendZeroTorque(uint8_t i, TxKind kind) {
+  return sendTorqueCommand(i, 0.0f, kind);
+}
+
+// S always sends zero. The P command starts one sequence:
+//   M1 +0.6 Nm  0-25 ms,  M1 -0.6 Nm 150-175 ms,
+//   M2 +0.6 Nm 300-325 ms, M2 -0.6 Nm 450-475 ms.
+// Everything else is zero, still transmitted at 2 kHz to BOTH buses.
+// Stop/zero does not provide mechanical braking.
+static void updateProbe(uint32_t now) {
+  if (probeRequested && !probeActive) {
+    probeRequested = false;
+    probeActive = true;
+    probeFinished = false;
+    probeStartUs = now;
+    probeTick = 0;
+    pushEvent(EV_PROBE_START, MOTOR1_ON ? 0 : 1, now, 0, 0, 0);
+    for (uint8_t i = 0; i < 2; ++i) probeStartPos[i] = motors[i].positionRad;
+    traceFrozen = false; // preserve preceding baseline ring samples
+  }
+  if (!probeActive) { currentProbeStep = 255; return; }
+  const uint32_t t = probeTick * COMMAND_PERIOD_US;
+  currentProbeStep = t < PROBE_END_US ? (t / STEP_US) : 4;
+  // Safety checks include the zero intervals and post-pulse response interval.
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    const MotorStats &d = motors[i];
+    const uint32_t age = d.sawRx ? (now - d.lastRxUs) : UINT32_MAX;
+    if (age > PROBE_RX_STALE_US) { latchFault(FAULT_PROBE_RX_STALE, i, now); return; }
+    if (fabsf(d.positionRad - probeStartPos[i]) > PROBE_MAX_DELTA_P_RAD ||
+        fabsf(d.velocityRadS) > PROBE_MAX_V_RAD_S) {
+      latchFault(FAULT_PROBE_MOTION, i, now); return;
+    }
+    if (txQueue(i) >= PROBE_TXQ_FAULT) {
+      latchFault(FAULT_PROBE_TX_BACKLOG, i, now); return;
+    }
+  }
+  if (t >= PROBE_END_US + POST_CAPTURE_US) {
+    probeActive = false;
+    probeFinished = true;
+    traceFrozen = true;
+    pushEvent(EV_PROBE_END, MOTOR1_ON ? 0 : 1, now, 0, 0, 0);
+    currentProbeStep = 255;
+  }
+  ++probeTick;
+}
+
+// Qualify an error only if a nonzero pulse was being sent at detection time.
+// IRQ queue timestamps reflect when loop() DRAINS the queue, not the original
+// hardware error edge. The source is retained in the capture metadata.
+static void triggerAuto(uint8_t motor, uint32_t now, uint32_t esr,
+                        uint32_t ecr, AutoTriggerSource source) {
+  if (!autoActive || autoTriggered || !autoPulseActive ||
+      !(esr & CAN_ERROR_MASK)) return;
+  autoTriggered = true;
+  autoTriggerUs = now;
+  autoTriggerMotor = motor;
+  autoTriggerTorqueMotor = autoPulseMotor;
+  autoTriggerSource = source;
+  autoTriggerEsr = esr; autoTriggerEcr = ecr;
+  // Finish ONLY the pulse that was active at detection, never start another.
+  const uint32_t t = autoLastElapsedUs;
+  const uint32_t cycleOrigin = (t / AUTO_CYCLE_US) * AUTO_CYCLE_US;
+  const uint32_t cyclePhase = t % AUTO_CYCLE_US;
+  const uint32_t stepOrigin = (cyclePhase / STEP_US) * STEP_US;
+  autoKeepPulseUntilUs = cycleOrigin + stepOrigin + PULSE_US;
+  pushEvent(EV_AUTO_TRIGGER, motor, now, esr, ecr, static_cast<uint32_t>(source));
+}
+
+static void finishAuto(AutoFinish how, uint32_t now) {
+  if (!autoActive) return;
+  autoActive = false; autoRequested = false;
+  autoPulseActive = false; autoPulseMotor = 255;
+  currentProbeStep = 255;
+  autoFinish = how;
+  traceFrozen = true;
+  autoStopPending = true; // loop stops timer and sends MIT EXIT before printing
+  pushEvent(EV_AUTO_DONE, MOTOR1_ON ? 0 : 1, now, 0, 0, static_cast<uint32_t>(how));
+}
+
+// Called each 500us TX tick. This is a bounded, balanced test, NOT a hold
+// torque command: each 800ms cycle contains four 25ms pulses, one at a time.
+static void updateAuto(uint32_t now) {
+  if (autoRequested && !autoActive) {
+    autoRequested = false; autoActive = true;
+    autoTriggered = false; autoStopPending = false;
+    autoPulseActive = false; autoPulseMotor = 255;
+    autoFinish = AUTO_NOT_FINISHED; autoStartUs = now;
+    autoTick = 0; autoLastElapsedUs = 0; autoPulseCount = 0;
+    autoTriggerUs = 0; autoTriggerMotor = 255; autoTriggerTorqueMotor = 255;
+    autoTriggerSource = AUTO_SRC_NONE; autoTriggerEsr = autoTriggerEcr = 0;
+    traceFrozen = false; // ring baseline collected already
+    for (uint8_t i = 0; i < 2; ++i) autoStartPos[i] = motors[i].positionRad;
+    pushEvent(EV_AUTO_START, MOTOR1_ON ? 0 : 1, now, 0, 0, 0);
+  }
+  if (!autoActive) return;
+  const uint32_t elapsed = autoTick * COMMAND_PERIOD_US;
+  autoLastElapsedUs = elapsed;
+  // Critical motion and communications checks continue even after a CAN error.
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    const MotorStats &d = motors[i];
+    const uint32_t age = d.sawRx ? now - d.lastRxUs : UINT32_MAX;
+    if (age > PROBE_RX_STALE_US) { latchFault(FAULT_PROBE_RX_STALE, i, now); return; }
+    if (fabsf(d.positionRad - autoStartPos[i]) > PROBE_MAX_DELTA_P_RAD ||
+        fabsf(d.velocityRadS) > PROBE_MAX_V_RAD_S ||
+        fabsf(d.torqueNm) > AUTO_MAX_FB_T_NM) {
+      latchFault(FAULT_PROBE_MOTION, i, now); return;
+    }
+    if (txQueue(i) >= PROBE_TXQ_FAULT) {
+      latchFault(FAULT_PROBE_TX_BACKLOG, i, now); return;
+    }
+  }
+  if (autoTriggered && now - autoTriggerUs >= AUTO_POST_TRIGGER_US) {
+    finishAuto(AUTO_ERROR_CAPTURED, now);
+    return;
+  }
+  if (elapsed >= AUTO_MAX_US) {
+    finishAuto(AUTO_TIMED_OUT, now);
+    return;
+  }
+  const uint32_t phase = elapsed % AUTO_CYCLE_US;
+  currentProbeStep = phase < PROBE_END_US ? phase / STEP_US : 4;
+  const bool inPulse = currentProbeStep < 4 && (phase % STEP_US) < PULSE_US;
+  const bool mayPulse = !autoTriggered || elapsed < autoKeepPulseUntilUs;
+  autoPulseActive = inPulse && mayPulse;
+  autoPulseMotor = autoPulseActive ? (currentProbeStep < 2 ? 0 : 1) : 255;
+  if (autoPulseActive && (phase % STEP_US) == 0) ++autoPulseCount;
+  ++autoTick;
+}
+
+static void captureTrace(uint32_t now) {
+  if (traceFrozen) return;
+  TraceRow &r = traceBuffer[traceHead];
+  r.us = now;
+  r.probeStep = currentProbeStep;
+  for (uint8_t i = 0; i < 2; ++i) {
+    const MotorStats &d = motors[i];
+    r.rxAge[i] = d.sawRx ? now - d.lastRxUs : UINT32_MAX;
+    r.rxCount[i] = d.rxValid;
+    r.irqSnapshots[i] = d.canIrqSnapshots;
+    r.cmd[i] = commandNm[i];
+    r.pos[i] = d.positionRad; r.vel[i] = d.velocityRadS;
+    r.torqueFb[i] = d.torqueNm;
+    r.tec[i] = d.ecr & 255U; r.rec[i] = (d.ecr >> 8) & 255U;
+    r.txq[i] = d.txQueueNow > 255 ? 255 : static_cast<uint8_t>(d.txQueueNow);
+  }
+  traceHead = (traceHead + 1) % TRACE_SIZE;
+  if (traceCount < TRACE_SIZE) ++traceCount;
+}
+
+// ==================== CAN RX (polling, called ONLY in timer ISR) ====================
+static void parseFeedback(uint8_t i, const CAN_message_t &msg, uint32_t now) {
+  MotorStats &d = motors[i];
+  ++d.rxRaw;
+  if (msg.flags.overrun) {
+    ++d.rxHwOverrun;
+    pushEvent(EV_RX_HW_OVERRUN, i, now, esrValue(i), ecrValue(i), d.rxHwOverrun);
+    // Hardware overrun indicates lost RX frame(s). During zero-torque diagnosis,
+    // allow the test to continue when explicitly configured, to quantify it.
+    if (STOP_ON_RX_HW_OVERRUN) {
+      d.esr1 = esrValue(i); d.ecr = ecrValue(i);
+      latchFault(FAULT_RX_HW_OVERRUN, i, now);
+      return;
+    }
+  }
+
+  // Preserve Jia Mode1's acceptance rule: correct CAN ID OR payload ID.
+  // The newer diagnostic sketch required BOTH and could reject working Jia RX.
+  // The bus remains dedicated to a single motor; print noncanonical counts.
+  const bool idOK = (msg.id == MOTOR_ID[i]);
+  const bool payloadOK = (msg.buf[0] == MOTOR_ID[i]);
+  if (msg.flags.extended || msg.flags.remote) {
+    ++d.rejectFormat;
+  } else if (msg.len < 6 || msg.len > 8) {
+    ++d.rejectDlc;
+  } else if (!idOK && !payloadOK) {
+    ++d.rejectId;
+  } else {
+    if (!idOK || !payloadOK) ++d.rxNoncanonical;
+    const uint16_t p = (uint16_t(msg.buf[1]) << 8) | msg.buf[2];
+    const uint16_t v = (uint16_t(msg.buf[3]) << 4) | (msg.buf[4] >> 4);
+    const uint16_t t = (uint16_t(msg.buf[4] & 0x0F) << 8) | msg.buf[5];
+    d.positionRad = uintToFloat(p, POSITION_MIN, POSITION_MAX, 16);
+    d.velocityRadS = uintToFloat(v, VELOCITY_MIN, VELOCITY_MAX, 12);
+    d.torqueNm = uintToFloat(t, TORQUE_MIN, TORQUE_MAX, 12);
+    d.motorError = msg.len >= 8 ? msg.buf[7] : 0;
+    if (d.sawRx) {
+      const uint32_t gap = now - d.lastRxUs;
+      if (gap > d.maxRxGapUs) d.maxRxGapUs = gap;
+    }
+    if (d.rxGapActive) {
+      const uint32_t duration = now - d.rxGapStartUs;
+      if (duration > d.maxWarningDurationUs) d.maxWarningDurationUs = duration;
+      pushEvent(EV_RX_GAP_END, i, now, d.esr1, d.ecr, duration);
+      d.rxGapActive = false;
+    }
+    d.lastRxUs = now;
+    d.sawRx = true;
+    ++d.rxValid;
+    if (d.motorError != 0) latchFault(FAULT_MOTOR_ERROR, i, now);
+    return;
+  }
+
+  ++d.rxRejected;
+  if (!d.hasBadFrame) {
+    d.hasBadFrame = true;
+    d.firstBadId = msg.id;
+    d.firstBadPayloadId = msg.buf[0];
+    d.firstBadLen = msg.len;
+    d.firstBadFlags = (msg.flags.extended ? 1 : 0) |
+                      (msg.flags.remote ? 2 : 0) |
+                      (msg.flags.overrun ? 4 : 0);
+  }
+  if (d.rxRejected == 1 || (d.rxRejected % 100) == 0)
+    pushEvent(EV_RX_REJECT, i, now, esrValue(i), ecrValue(i), d.rxRejected);
+}
+
+static void readMotor(uint8_t i) {
+  for (uint8_t n = 0; n < RX_BUDGET_PER_TICK && state == RUNNING; ++n) {
+    // FlexCAN_T4 only sets flags.overrun on overrun; reset for each read.
+    CAN_message_t msg{};
+    const int got = (i == 0) ? can1.read(msg) : can2.read(msg);
+    if (!got) break;
+    parseFeedback(i, msg, micros());
+  }
+}
+
+// During IDLE / FAULT_STOPPED, drain only: no motor commands, no feedback
+// parsing and no session timeout. This prevents stale RX mailbox content
+// from surviving until the first S after powering the motor later.
+static void readIdleMotor(uint8_t i) {
+  for (uint8_t n = 0; n < RX_BUDGET_PER_TICK; ++n) {
+    CAN_message_t msg{};
+    const int got = (i == 0) ? can1.read(msg) : can2.read(msg);
+    if (!got) break;
+    ++idleRxRaw[i];
+    if (msg.flags.overrun) ++idleRxHwOverrun[i];
+    idleLastRxUs[i] = micros();
+    idleLastId[i] = msg.id;
+  }
+}
+
+static void sampleCan(uint8_t i, uint32_t now) {
+  MotorStats &d = motors[i];
+  d.ecr = ecrValue(i); d.esr1 = esrValue(i);
+  const uint8_t tec = d.ecr & 255U, rec = (d.ecr >> 8) & 255U;
+  if (tec > d.maxTec) d.maxTec = tec;
+  if (rec > d.maxRec) d.maxRec = rec;
+  const uint32_t errors = d.esr1 & CAN_ERROR_MASK;
+  if (errors) {
+    ++d.canErrorSamples; d.esrSeen |= d.esr1;
+    // Avoid triggering repeatedly from an unchanged latched ESR1.
+    if (!(d.lastCanSignature & CAN_ERROR_MASK))
+      triggerAuto(i, now, d.esr1, d.ecr, AUTO_SRC_ISR_ESR);
+  }
+  const uint32_t signature = errors |
+    (uint32_t(FLEXCAN_ESR_get_fault_code(d.esr1)) << 24);
+  if (signature != d.lastCanSignature) {
+    ++d.canErrorEvents;
+    pushEvent(signature ? EV_CAN_ERROR : EV_CAN_CLEAR, i, now,
+              d.esr1, d.ecr, signature);
+    d.lastCanSignature = signature;
+  }
+  if (FLEXCAN_ESR_get_fault_code(d.esr1) == CAN_ERROR_BUS_OFF) {
+    latchFault(FAULT_BUS_OFF, i, now);
+    return;
+  }
+  const uint32_t age = d.sawRx ? now - d.lastRxUs : now - sessionStartUs;
+  if (age >= RX_WARNING_US && !d.rxGapActive) {
+    d.rxGapActive = true; d.rxGapStartUs = now;
+    pushEvent(EV_RX_GAP_BEGIN, i, now, d.esr1, d.ecr, age);
+  }
+  if (age >= RX_TIMEOUT_US) latchFault(FAULT_RX_TIMEOUT, i, now);
+}
+
+// ==================== HIGH PRIORITY TIMER ISR ====================
+static void commandISR() {
+  const uint32_t begin = micros();
+  if (state != RUNNING) {
+    ++idleTimerTicks;
+    if (IDLE_RX_DRAIN) {
+      if (MOTOR1_ON) readIdleMotor(0);
+      if (MOTOR2_ON) readIdleMotor(1);
+    }
+    const uint32_t idleDuration = micros() - begin;
+    if (idleDuration > idleMaxIsrUs) idleMaxIsrUs = idleDuration;
+    return;
+  }
+  ++rxPollTicks;
+  if (lastRxPollUs != 0) {
+    const uint32_t gap = begin - lastRxPollUs;
+    if (gap > maxRxPollGapUs) maxRxPollGapUs = gap;
+  }
+  lastRxPollUs = begin;
+
+  // Receive frequently, with a strict bounded budget. Jia polling remains
+  // unchanged; there are no CAN receive callbacks or RX mailbox IRQs.
+  if (MOTOR1_ON) readMotor(0);
+  if (state == RUNNING && MOTOR2_ON) readMotor(1);
+
+  // Only every Nth RX poll performs the 2 kHz controller + TX cycle.
+  // This avoids the 500-us blind interval which could cause RX MB overrun.
+  if (++txDivider >= COMMAND_PERIOD_US / RX_POLL_PERIOD_US) {
+    txDivider = 0;
+    ++ticks;
+    if (lastTickUs != 0) {
+      const uint32_t delta = begin - lastTickUs;
+      if (delta > maxTickGapUs) maxTickGapUs = delta;
+      const uint32_t jitter = delta > COMMAND_PERIOD_US ?
+        delta - COMMAND_PERIOD_US : COMMAND_PERIOD_US - delta;
+      if (jitter > maxJitterUs) maxJitterUs = jitter;
+      if (jitter > JITTER_WARNING_US) ++lateTicks;
+    }
+    lastTickUs = begin;
+    if (state == RUNNING && MOTOR1_ON) sampleCan(0, micros());
+    if (state == RUNNING && MOTOR2_ON) sampleCan(1, micros());
+    // Both waveforms are mutually exclusive, update only in TX scheduler.
+    if (state == RUNNING) {
+      updateProbe(micros());
+      if (state == RUNNING) updateAuto(micros());
+    }
+    float torque[2] = {0.0f, 0.0f};
+    if (state == RUNNING && probeActive && currentProbeStep < 4) {
+      const uint32_t phaseUs = ((probeTick - 1) * COMMAND_PERIOD_US) % STEP_US;
+      if (phaseUs < PULSE_US) {
+        const uint8_t target = (currentProbeStep < 2) ? 0 : 1;
+        if (motorOn(target))
+          torque[target] = (currentProbeStep % 2 == 0) ? TEST_TORQUE_NM : -TEST_TORQUE_NM;
+      }
+    }
+    if (state == RUNNING && autoActive && autoPulseActive && autoPulseMotor < 2) {
+      const uint8_t target = autoPulseMotor;
+      if (motorOn(target))
+        torque[target] = (currentProbeStep % 2 == 0) ? TEST_TORQUE_NM : -TEST_TORQUE_NM;
+    }
+    if (state == RUNNING && MOTOR1_ON) sendTorqueCommand(0, torque[0], PERIODIC_COMMAND);
+    if (state == RUNNING && MOTOR2_ON) sendTorqueCommand(1, torque[1], PERIODIC_COMMAND);
+
+    const uint32_t now = micros();
+    if (state == RUNNING) {
+      // Paired 1 kHz capture of CMD/FB/error state without USB printing in ISR.
+      if ((ticks % 2) == 0) captureTrace(now);
+      for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+        MotorStats &d = motors[i];
+        if (now - d.historyStampUs >= HISTORY_INTERVAL_US) {
+          d.historyStampUs = now;
+          addHistory(i, now);
+        }
+      }
+    }
+  }
+  const uint32_t duration = micros() - begin;
+  if (duration > maxIsrUs) maxIsrUs = duration;
+  if (duration > maxRxPollUs) maxRxPollUs = duration;
+  if (duration > RX_POLL_PERIOD_US) {
+    ++rxPollOverruns;
+    ++isrOverruns;
+    if (state == RUNNING)
+      latchFault(FAULT_ISR_OVERRUN, MOTOR1_ON ? 0 : 1, micros());
+  }
+}
+
+// ==================== PRINTING / NON-REALTIME LOOP ====================
+static const char *stateName(RunState s) {
+  return s == RUNNING ? "RUNNING" : (s == FAULT_STOPPED ? "FAULT_STOPPED" : "IDLE");
+}
+static const char *faultName(FaultKind k) {
+  switch (k) {
+    case FAULT_TX_FAIL: return "TX_FAIL";
+    case FAULT_RX_TIMEOUT: return "RX_TIMEOUT";
+    case FAULT_BUS_OFF: return "BUS_OFF";
+    case FAULT_RX_HW_OVERRUN: return "RX_HW_OVERRUN";
+    case FAULT_ISR_OVERRUN: return "ISR_OVERRUN";
+    case FAULT_MOTOR_ERROR: return "MOTOR_ERROR";
+    case FAULT_PROBE_RX_STALE: return "PROBE_RX_STALE";
+    case FAULT_PROBE_MOTION: return "PROBE_MOTION_LIMIT";
+    case FAULT_PROBE_TX_BACKLOG: return "PROBE_TX_BACKLOG";
+    default: return "NONE";
+  }
+}
+static const char *txKindName(uint8_t k) {
+  switch (k) {
+    case PERIODIC_COMMAND: return "PERIODIC_COMMAND";
+    case START_ENABLE: return "START_ENABLE";
+    case START_ZERO: return "START_ZERO";
+    case STOP_ZERO: return "STOP_ZERO";
+    case STOP_DISABLE: return "STOP_DISABLE";
+    default: return "UNKNOWN";
+  }
+}
+static const char *eventName(uint8_t k) {
+  switch (k) {
+    case EV_CAN_ERROR: return "CAN_ERROR";
+    case EV_CAN_CLEAR: return "CAN_ERROR_BITS_CLEAR";
+    case EV_RX_GAP_BEGIN: return "RX_GAP_BEGIN";
+    case EV_RX_GAP_END: return "RX_GAP_END";
+    case EV_RX_REJECT: return "RX_REJECT";
+    case EV_RX_HW_OVERRUN: return "RX_HW_OVERRUN";
+    case EV_TX_BACKLOG: return "TX_BACKLOG";
+    case EV_TX_FAILURE: return "TX_FAILURE";
+    case EV_FAULT: return "FAULT";
+    case EV_START: return "START";
+    case EV_STOP: return "STOP";
+    case EV_CAN_IRQ_SNAPSHOT: return "CAN_IRQ_ERROR_SNAPSHOT";
+    case EV_PROBE_START: return "PROBE_START";
+    case EV_PROBE_END: return "PROBE_END";
+    case EV_AUTO_START: return "AUTO_START";
+    case EV_AUTO_TRIGGER: return "AUTO_TRIGGER";
+    case EV_AUTO_DONE: return "AUTO_DONE";
+    default: return "UNKNOWN";
+  }
+}
+static const char *canStateName(uint32_t esr) {
+  switch (FLEXCAN_ESR_get_fault_code(esr)) {
+    case CAN_ERROR_ACTIVE: return "ERROR_ACTIVE";
+    case CAN_ERROR_PASSIVE: return "ERROR_PASSIVE";
+    case CAN_ERROR_BUS_OFF: return "BUS_OFF";
+    default: return "UNKNOWN";
+  }
+}
+static void printErrorNames(uint32_t esr) {
+  bool any = false;
+#define PRINT_ERR(mask, name) if (esr & (mask)) { if (any) Serial.print('|'); Serial.print(name); any = true; }
+  PRINT_ERR(FLEXCAN_ESR_ACK_ERR, "ACK");
+  PRINT_ERR(FLEXCAN_ESR_BIT0_ERR, "BIT0");
+  PRINT_ERR(FLEXCAN_ESR_BIT1_ERR, "BIT1");
+  PRINT_ERR(FLEXCAN_ESR_STF_ERR, "STUFF");
+  PRINT_ERR(FLEXCAN_ESR_FRM_ERR, "FORM");
+  PRINT_ERR(FLEXCAN_ESR_CRC_ERR, "CRC");
+#undef PRINT_ERR
+  if (!any) Serial.print('-');
+}
+static void eventPrefix(uint32_t timeUs, uint8_t motor) {
+  Serial.print('[');
+  Serial.print((timeUs - sessionStartUs) / 1000000.0f, 3);
+  Serial.print("s] M"); Serial.print(motor + 1); Serial.print(' ');
+}
+static void printEvent(const Event &ev) {
+  eventPrefix(ev.us, ev.motor);
+  Serial.print(eventName(ev.kind));
+  if (ev.kind == EV_RX_GAP_BEGIN) {
+    Serial.print(" RX_AGE_ms="); Serial.print(ev.value / 1000.0f, 3);
+  } else if (ev.kind == EV_RX_GAP_END) {
+    Serial.print(" WARNING_WINDOW_ms="); Serial.print(ev.value / 1000.0f, 3);
+  } else if (ev.kind == EV_FAULT) {
+    Serial.print(" REASON="); Serial.print(faultName(static_cast<FaultKind>(ev.value)));
+  } else if (ev.kind == EV_AUTO_TRIGGER) {
+    Serial.print(" SOURCE="); Serial.print(ev.value == AUTO_SRC_ISR_ESR ? "ISR_ESR" : "IRQ_QUEUE");
+  } else if (ev.kind == EV_AUTO_DONE) {
+    Serial.print(" RESULT="); Serial.print(ev.value == AUTO_ERROR_CAPTURED ? "ERROR_CAPTURED" : "TIMEOUT");
+  } else if (ev.kind == EV_TX_FAILURE) {
+    Serial.print(" RESULT="); Serial.print(static_cast<int32_t>(ev.value));
+  } else if (ev.kind == EV_TX_BACKLOG || ev.kind == EV_RX_REJECT ||
+             ev.kind == EV_RX_HW_OVERRUN) {
+    Serial.print(" COUNT="); Serial.print(ev.value);
+  }
+  Serial.print(" TEC/REC="); Serial.print(ev.ecr & 255U);
+  Serial.print('/'); Serial.print((ev.ecr >> 8) & 255U);
+  Serial.print(" ESR1=0x"); Serial.print(ev.esr, HEX);
+  Serial.print(" STATE="); Serial.print(canStateName(ev.esr));
+  Serial.print(" ERR="); printErrorNames(ev.esr);
+  Serial.println();
+}
+
+static void printNewEvents(uint8_t budget = 8) {
+  while (budget--) {
+    Event ev{};
+    noInterrupts();
+    const uint32_t end = eventWriteSeq;
+    if (eventPrintSeq == end) { interrupts(); break; }
+    if (end - eventPrintSeq > EVENT_SIZE) {
+      eventLostForPrint += end - eventPrintSeq - EVENT_SIZE;
+      eventPrintSeq = end - EVENT_SIZE;
+    }
+    ev = events[eventPrintSeq % EVENT_SIZE];
+    ++eventPrintSeq;
+    interrupts();
+    printEvent(ev);
+  }
+}
+
+// Read FlexCAN_T4's queued hardware error snapshots in loop(). This is
+// diagnostic-queue consumption only: no CAN RX/TX is performed from loop().
+// The queue preserves some short-lived ESR1 errors missed by 500-us polling.
+static void drainCanErrorSnapshots() {
+  if (state != RUNNING) return;
+  for (uint8_t i = 0; i < 2 && state == RUNNING; ++i) if (motorOn(i)) {
+    for (uint8_t n = 0; n < 4 && state == RUNNING; ++n) {
+      CAN_error_t err;
+      const bool available = (i == 0) ? can1.error(err, false) : can2.error(err, false);
+      if (!available) break;
+      const uint32_t now = micros();
+      const uint32_t signature = (err.ESR1 & CAN_ERROR_MASK) |
+        (uint32_t(FLEXCAN_ESR_get_fault_code(err.ESR1)) << 24);
+      noInterrupts();
+      MotorStats &d = motors[i];
+      ++d.canIrqSnapshots;
+      d.esrSeen |= err.ESR1;
+      const bool important = signature != 0 &&
+        (signature != d.lastIrqSignature || now - d.lastIrqLogUs >= 10000);
+      if (important) {
+        // Queue observations have uncertain event timestamps. Mark as such.
+        triggerAuto(i, now, err.ESR1, err.ECR, AUTO_SRC_IRQ_QUEUE);
+        pushEvent(EV_CAN_IRQ_SNAPSHOT, i, now, err.ESR1, err.ECR, signature);
+        d.lastIrqLogUs = now;
+        ++d.canErrorEvents;
+      }
+      d.lastIrqSignature = signature;
+      const uint8_t tec = err.ECR & 255U, rec = (err.ECR >> 8) & 255U;
+      if (tec > d.maxTec) d.maxTec = tec;
+      if (rec > d.maxRec) d.maxRec = rec;
+      if (FLEXCAN_ESR_get_fault_code(err.ESR1) == CAN_ERROR_BUS_OFF &&
+          state == RUNNING) {
+        d.esr1 = err.ESR1; d.ecr = err.ECR;
+        latchFault(FAULT_BUS_OFF, i, now);
+      }
+      interrupts();
+    }
+  }
+}
+
+// Discard diagnostic error snapshots accumulated before this test.
+// Does not clear the underlying hardware ESR1 register.
+static void discardOldCanErrors() {
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    for (uint8_t k = 0; k < 64; ++k) {
+      CAN_error_t stale;
+      if (!(i == 0 ? can1.error(stale, false) : can2.error(stale, false))) break;
+    }
+  }
+}
+
+static void printStatus() {
+  MotorStats snap[2];
+  uint32_t snapTicks, snapMaxIsr, snapOverruns, snapGap, snapJitter, snapLate;
+  uint32_t snapRxPollTicks, snapRxPollMaxGap, snapRxPollOverruns;
+  RunState snapState;
+  noInterrupts();
+  snap[0] = motors[0]; snap[1] = motors[1];
+  snapTicks = ticks; snapMaxIsr = maxIsrUs; snapOverruns = isrOverruns;
+  snapGap = maxTickGapUs; snapJitter = maxJitterUs; snapLate = lateTicks;
+  snapRxPollTicks = rxPollTicks; snapRxPollMaxGap = maxRxPollGapUs; snapRxPollOverruns = rxPollOverruns;
+  snapState = state;
+  interrupts();
+  const uint32_t now = micros();
+  Serial.print("STATE,"); Serial.print(stateName(snapState));
+  Serial.print(",PERIOD_US,"); Serial.print(COMMAND_PERIOD_US);
+  Serial.print(",RX_POLL_US,"); Serial.print(RX_POLL_PERIOD_US);
+  Serial.print(",RX_POLL_TICKS,"); Serial.print(snapRxPollTicks);
+  Serial.print(",RX_POLL_GAP_MAX_US,"); Serial.print(snapRxPollMaxGap);
+  Serial.print(",RX_POLL_OVERRUNS,"); Serial.print(snapRxPollOverruns);
+  Serial.print(",TICKS,"); Serial.print(snapTicks);
+  Serial.print(",ISR_MAX_US,"); Serial.print(snapMaxIsr);
+  Serial.print(",OVERRUN,"); Serial.print(snapOverruns);
+  Serial.print(",TICK_GAP_MAX_US,"); Serial.print(snapGap);
+  Serial.print(",JITTER_MAX_US,"); Serial.print(snapJitter);
+  Serial.print(",JITTER_GT_50US,"); Serial.print(snapLate);
+  Serial.print(",EVENT_PRINT_LOST,"); Serial.println(eventLostForPrint);
+  Serial.print("PROBE,ACTIVE,"); Serial.print(probeActive ? 1 : 0);
+  Serial.print(",FINISHED,"); Serial.print(probeFinished ? 1 : 0);
+  Serial.print(",STEP,"); Serial.print(currentProbeStep);
+  Serial.print(",TRACE_COUNT,"); Serial.print(traceCount);
+  Serial.print(",TRACE_FROZEN,"); Serial.println(traceFrozen ? 1 : 0);
+  Serial.print("AUTO,REQUESTED,"); Serial.print(autoRequested ? 1 : 0);
+  Serial.print(",ACTIVE,"); Serial.print(autoActive ? 1 : 0);
+  Serial.print(",TRIGGERED,"); Serial.print(autoTriggered ? 1 : 0);
+  Serial.print(",FINISH,"); Serial.print(static_cast<int>(autoFinish));
+  Serial.print(",PULSE_COUNT,"); Serial.print(autoPulseCount);
+  Serial.print(",TRIGGER_MOTOR,"); Serial.println(autoTriggerMotor == 255 ? 0 : autoTriggerMotor+1);
+  Serial.print("PRESTART,IDLE_RX_DRAIN,"); Serial.print(IDLE_RX_DRAIN ? 1 : 0);
+  Serial.print(",FIRST_S_PENDING,"); Serial.print(firstStartSinceBoot ? 1 : 0);
+  Serial.print(",CAN_REINIT_COUNT,"); Serial.print(reinitCount);
+  Serial.print(",IDLE_TIMER_TICKS,"); Serial.print(idleTimerTicks);
+  Serial.print(",IDLE_ISR_MAX_US,"); Serial.println(idleMaxIsrUs);
+  for (uint8_t i=0; i<2; ++i) if (motorOn(i)) {
+    Serial.print("PRESTART_M"); Serial.print(i+1);
+    Serial.print(",IDLE_RX_RAW,"); Serial.print(idleRxRaw[i]);
+    Serial.print(",IDLE_RX_OVERRUN,"); Serial.print(idleRxHwOverrun[i]);
+    Serial.print(",IDLE_LAST_ID,0x"); Serial.print(idleLastId[i], HEX);
+    Serial.print(",IDLE_LAST_RX_US,"); Serial.println(idleLastRxUs[i]);
+  }
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    const MotorStats &d = snap[i];
+    Serial.print("M"); Serial.print(i + 1);
+    Serial.print(" TX:"); Serial.print(d.txAccepted[PERIODIC_COMMAND]);
+    Serial.print(" RX:"); Serial.print(d.rxValid);
+    Serial.print(" RX_RAW:"); Serial.print(d.rxRaw);
+    Serial.print(" TX_FAIL:"); Serial.print(d.txFailures[PERIODIC_COMMAND]);
+    Serial.print(" TX_QUEUED:"); Serial.print(d.txQueued[PERIODIC_COMMAND]);
+    Serial.print(" TXQ:"); Serial.print(d.txQueueNow);
+    Serial.print(" TXQ_MAX:"); Serial.print(d.txQueueMax);
+    Serial.print(" AGE_ms:");
+    if (d.sawRx) Serial.print((now - d.lastRxUs) / 1000.0f, 2);
+    else Serial.print("NEVER");
+    Serial.print(" RX_GAP_MAX_us:"); Serial.print(d.maxRxGapUs);
+    Serial.print(" RX_REJECT:"); Serial.print(d.rxRejected);
+    Serial.print(" RX_HW_OVERRUN:"); Serial.print(d.rxHwOverrun);
+    Serial.print(" RX_NONCANONICAL:"); Serial.print(d.rxNoncanonical);
+    Serial.print(" TEC/REC:"); Serial.print(d.ecr & 255U);
+    Serial.print('/'); Serial.print((d.ecr >> 8) & 255U);
+    Serial.print(" MAX:"); Serial.print(d.maxTec);
+    Serial.print('/'); Serial.print(d.maxRec);
+    Serial.print(" MOTOR_ERROR:"); Serial.print(d.motorError);
+    Serial.print(" ESR1:0x"); Serial.print(d.esr1, HEX);
+    Serial.print(" ERROR_SEEN:0x"); Serial.print(d.esrSeen, HEX);
+    Serial.print(" CAN_EVENTS:"); Serial.print(d.canErrorEvents);
+    Serial.print(" CAN_IRQ_SNAPSHOTS:"); Serial.println(d.canIrqSnapshots);
+    Serial.print("  COMMAND M"); Serial.print(i+1);
+    Serial.print(" CMD_Nm:"); Serial.println(commandNm[i], 6);
+    Serial.print("  PHYSICAL M"); Serial.print(i + 1);
+    Serial.print(" P_rad:"); Serial.print(d.positionRad, 6);
+    Serial.print(" V_rad_s:"); Serial.print(d.velocityRadS, 6);
+    Serial.print(" T_Nm:"); Serial.println(d.torqueNm, 6);
+    Serial.print("  START_FAIL(enable/zero):");
+    Serial.print(d.txFailures[START_ENABLE]); Serial.print('/');
+    Serial.print(d.txFailures[START_ZERO]);
+    Serial.print(" STOP_FAIL(zero/disable):");
+    Serial.print(d.txFailures[STOP_ZERO]); Serial.print('/');
+    Serial.print(d.txFailures[STOP_DISABLE]);
+    Serial.print(" REJECT(id/payload/dlc/format):");
+    Serial.print(d.rejectId); Serial.print('/');
+    Serial.print(d.rejectPayload); Serial.print('/');
+    Serial.print(d.rejectDlc); Serial.print('/');
+    Serial.println(d.rejectFormat);
+    if (d.hasBadFrame) {
+      Serial.print("  FIRST_REJECT M"); Serial.print(i+1);
+      Serial.print(" ID=0x"); Serial.print(d.firstBadId, HEX);
+      Serial.print(" BUF0=0x"); Serial.print(d.firstBadPayloadId, HEX);
+      Serial.print(" DLC="); Serial.print(d.firstBadLen);
+      Serial.print(" FLAGS(ext/rtr/ovr)="); Serial.println(d.firstBadFlags);
+    }
+  }
+}
+
+static void printHistory() {
+  // One-motor snapshot buffer ensures printing cannot corrupt the history being read.
+  static HistoryRow rows[HISTORY_SIZE];
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    uint16_t n, start;
+    bool frozen;
+    noInterrupts();
+    n = histories[i].count;
+    start = (histories[i].head + HISTORY_SIZE - n) % HISTORY_SIZE;
+    frozen = histories[i].frozen;
+    interrupts();
+    for (uint16_t k = 0; k < n; ++k) {
+      noInterrupts();
+      rows[k] = histories[i].data[(start + k) % HISTORY_SIZE];
+      interrupts();
+    }
+    Serial.print("HISTORY,M"); Serial.print(i+1);
+    Serial.print(",COUNT,"); Serial.print(n);
+    Serial.print(",FROZEN,"); Serial.println(frozen ? 1 : 0);
+    Serial.println("HIST,t_ms,motor,fault,tx,tx_fail,rx,rx_reject,rx_hw_overrun,rx_age_us,TEC,REC,TXQ,ESR1,isr_max_us,jitter_max_us,p_rad,v_rad_s,t_fb_Nm,t_cmd_Nm");
+    for (uint16_t k = 0; k < n; ++k) {
+      const HistoryRow &h = rows[k];
+      Serial.print("HIST,"); Serial.print((h.us-sessionStartUs)/1000.0f, 3);
+      Serial.print(','); Serial.print(i+1);
+      Serial.print(','); Serial.print(h.faultRow ? 1 : 0);
+      Serial.print(','); Serial.print(h.tx);
+      Serial.print(','); Serial.print(h.txFail);
+      Serial.print(','); Serial.print(h.rx);
+      Serial.print(','); Serial.print(h.reject);
+      Serial.print(','); Serial.print(h.rxHwOverrun);
+      Serial.print(','); Serial.print(h.rxAgeUs);
+      Serial.print(','); Serial.print(h.tec);
+      Serial.print(','); Serial.print(h.rec);
+      Serial.print(','); Serial.print(h.txQueue);
+      Serial.print(",0x"); Serial.print(h.esr1, HEX);
+      Serial.print(','); Serial.print(h.maxIsrUs);
+      Serial.print(','); Serial.print(h.maxJitterUs);
+      Serial.print(','); Serial.print(h.p, 6);
+      Serial.print(','); Serial.print(h.v, 6);
+      Serial.print(','); Serial.print(h.t, 6);
+      Serial.print(','); Serial.println(h.cmdNm, 6);
+    }
+  }
+}
+
+static void printTrace() {
+  if (state == RUNNING) {
+    Serial.println("TRACE only after X/fault (probe auto-freeze is internal)");
+    return;
+  }
+  const uint16_t n = traceCount;
+  const uint16_t first = (traceHead + TRACE_SIZE - n) % TRACE_SIZE;
+  Serial.print("TRACE_INFO,COUNT,"); Serial.print(n);
+  Serial.print(",FROZEN,"); Serial.print(traceFrozen ? 1 : 0);
+  Serial.print(",PROBE_FINISHED,"); Serial.print(probeFinished ? 1 : 0);
+  Serial.print(",AUTO_FINISH,"); Serial.print(static_cast<int>(autoFinish));
+  Serial.print(",AUTO_PULSE_COUNT,"); Serial.println(autoPulseCount);
+  if (autoTriggered) {
+    Serial.print("AUTO_TRIGGER_INFO,t_ms,"); Serial.print((autoTriggerUs-sessionStartUs)/1000.0f,3);
+    Serial.print(",BUS_MOTOR,"); Serial.print(autoTriggerMotor+1);
+    Serial.print(",TORQUE_MOTOR,"); Serial.print(autoTriggerTorqueMotor+1);
+    Serial.print(",SOURCE,"); Serial.print(autoTriggerSource == AUTO_SRC_ISR_ESR ? "ISR_ESR" : "IRQ_QUEUE_DRAIN");
+    Serial.print(",ESR1,0x"); Serial.print(autoTriggerEsr,HEX);
+    Serial.print(",TEC,"); Serial.print(autoTriggerEcr & 255U);
+    Serial.print(",REC,"); Serial.println((autoTriggerEcr >> 8) & 255U);
+  }
+  Serial.println("TRACE,t_ms,step,m1_cmd_Nm,m1_fb_Nm,m1_p_rad,m1_v_rad_s,m1_rx_age_us,m1_rx_count,m1_TEC,m1_REC,m1_TXQ,m1_irq_snapshots,m2_cmd_Nm,m2_fb_Nm,m2_p_rad,m2_v_rad_s,m2_rx_age_us,m2_rx_count,m2_TEC,m2_REC,m2_TXQ,m2_irq_snapshots");
+  for (uint16_t k = 0; k < n; ++k) {
+    const TraceRow &r = traceBuffer[(first + k) % TRACE_SIZE];
+    Serial.print("TRACE,"); Serial.print((r.us - sessionStartUs)/1000.0f, 3);
+    Serial.print(','); Serial.print(r.probeStep);
+    for (uint8_t i = 0; i < 2; ++i) {
+      Serial.print(','); Serial.print(r.cmd[i], 6);
+      Serial.print(','); Serial.print(r.torqueFb[i], 6);
+      Serial.print(','); Serial.print(r.pos[i], 6);
+      Serial.print(','); Serial.print(r.vel[i], 6);
+      Serial.print(','); Serial.print(r.rxAge[i]);
+      Serial.print(','); Serial.print(r.rxCount[i]);
+      Serial.print(','); Serial.print(r.tec[i]);
+      Serial.print(','); Serial.print(r.rec[i]);
+      Serial.print(','); Serial.print(r.txq[i]);
+      Serial.print(','); Serial.print(r.irqSnapshots[i]);
+    }
+    Serial.println();
+  }
+  Serial.println("TRACE_END");
+}
+
+// A does NOT change CAN pack/unpack, physical limits, or S startup behavior.
+static void requestAuto() {
+  if (state != RUNNING) { Serial.println("A_REJECT,NOT_RUNNING (send S first)"); return; }
+  if (probeRequested || probeActive || probeFinished ||
+      autoRequested || autoActive || autoFinish != AUTO_NOT_FINISHED) {
+    Serial.println("A_REJECT,ANOTHER_TEST_RUNNING_OR_FINISHED (start a fresh S)");
+    return;
+  }
+  const uint32_t now = micros();
+  MotorStats snap[2];
+  noInterrupts(); snap[0] = motors[0]; snap[1] = motors[1]; interrupts();
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    const MotorStats &d = snap[i];
+    if (!d.sawRx || d.rxValid < PROBE_MIN_RX_FRAMES ||
+        (now - d.lastRxUs) > PROBE_RX_STALE_US || d.motorError != 0 ||
+        txQueue(i) != 0 ||
+        FLEXCAN_ESR_get_fault_code(esrValue(i)) != CAN_ERROR_ACTIVE ||
+        fabsf(d.velocityRadS) > PROBE_MAX_V_RAD_S) {
+      Serial.print("A_REJECT,M"); Serial.print(i+1);
+      Serial.println(",NOT_READY (RX/age/queue/CAN state/speed)");
+      return;
+    }
+  }
+  // Clear queued snapshots BEFORE arming to avoid treating pre-test errors as
+  // qualifying errors. New hardware errors can still occur during this call.
+  discardOldCanErrors();
+  noInterrupts();
+  autoRequested = true;
+  // Preserve the pre-A zero-torque baseline already in the 2.048s ring.
+  traceFrozen = false;
+  interrupts();
+  Serial.println("A_ACCEPTED,REPEATED_4_PULSES,MAX_TORQUE_Nm,0.6,PULSE_MS,25,CYCLE_MS,800,MAX_DURATION_S,30,POST_TRIGGER_MS,350");
+  Serial.println("A_NOTE,QUALIFIED_ERROR_ONLY_DURING_NONZERO_PULSE; IRQ_QUEUE_TRIGGER_TIMESTAMP_IS_DRAIN_TIME");
+}
+
+static void requestProbe() {
+  if (state != RUNNING) {
+    Serial.println("P_REJECT,NOT_RUNNING (send S first)"); return;
+  }
+  if (probeActive || probeRequested || autoActive || autoRequested || autoFinish != AUTO_NOT_FINISHED) {
+    Serial.println("P_REJECT,ALREADY_ACTIVE"); return;
+  }
+  const uint32_t now = micros();
+  MotorStats snap[2];
+  noInterrupts(); snap[0] = motors[0]; snap[1] = motors[1]; interrupts();
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    const MotorStats &d = snap[i];
+    if (!d.sawRx || d.rxValid < PROBE_MIN_RX_FRAMES ||
+        (now-d.lastRxUs) > PROBE_RX_STALE_US || d.motorError != 0 ||
+        txQueue(i) != 0 ||
+        FLEXCAN_ESR_get_fault_code(esrValue(i)) != CAN_ERROR_ACTIVE) {
+      Serial.print("P_REJECT,M"); Serial.print(i+1);
+      Serial.println(",NOT_READY (RX/age/queue/CAN state)");
+      return;
+    }
+    if (fabsf(d.velocityRadS) > PROBE_MAX_V_RAD_S) {
+      Serial.print("P_REJECT,M"); Serial.print(i+1);
+      Serial.println(",MOVING_TOO_FAST"); return;
+    }
+  }
+  noInterrupts();
+  probeRequested = true; probeFinished = false; traceFrozen = false;
+  interrupts();
+  Serial.println("P_ACCEPTED,4_PULSES,+M1,-M1,+M2,-M2,MAX_TORQUE_Nm,0.6,PULSE_MS,25,SPACING_MS,150");
+}
+
+static void printEvents() {
+  uint32_t end;
+  noInterrupts(); end = eventWriteSeq; interrupts();
+  const uint32_t start = end > EVENT_SIZE ? end - EVENT_SIZE : 0;
+  Serial.print("EVENTS,count="); Serial.println(end - start);
+  for (uint32_t seq = start; seq < end; ++seq) {
+    Event ev{};
+    noInterrupts(); ev = events[seq % EVENT_SIZE]; interrupts();
+    printEvent(ev);
+  }
+}
+
+static void printFaultReport() {
+  if (!fault.valid) return;
+  FaultSnapshot f;
+  TxFailure tx;
+  noInterrupts(); f = fault; tx = firstTxFailure; interrupts();
+  eventPrefix(f.us, f.motor);
+  Serial.print("ERROR "); Serial.println(faultName(f.kind));
+  Serial.print("  CAN="); Serial.print(f.motor+1);
+  Serial.print(" MOTOR_ID="); Serial.println(MOTOR_ID[f.motor]);
+  Serial.print("  ESR1=0x"); Serial.print(f.esr, HEX);
+  Serial.print(" TEC/REC="); Serial.print(f.ecr & 255U);
+  Serial.print('/'); Serial.println((f.ecr>>8) & 255U);
+  Serial.print("  CAN_STATE="); Serial.print(canStateName(f.esr));
+  Serial.print(" ERR="); printErrorNames(f.esr); Serial.println();
+  Serial.print("  RX_AGE_US="); Serial.print(f.rxAge);
+  Serial.print(" RX_RAW/VALID="); Serial.print(f.rxRaw);
+  Serial.print('/'); Serial.println(f.rxValid);
+  Serial.print("  TX_ACCEPTED/FAIL="); Serial.print(f.tx);
+  Serial.print('/'); Serial.print(f.txFail);
+  Serial.print(" TX_QUEUE="); Serial.println(f.txQueue);
+  Serial.print("  MOTOR_ERROR="); Serial.println(f.motorError);
+  Serial.print("  ISR_MAX_US="); Serial.print(f.maxIsr);
+  Serial.print(" JITTER_MAX_US="); Serial.println(f.maxJitter);
+  if (tx.valid) {
+    Serial.print("  FIRST_TX_FAILURE: t_ms=");
+    Serial.print((tx.us-sessionStartUs)/1000.0f, 3);
+    Serial.print(" M"); Serial.print(tx.motor+1);
+    Serial.print(" KIND="); Serial.print(txKindName(tx.kind));
+    Serial.print(" RETURN="); Serial.print(tx.result);
+    Serial.print(" TXQ="); Serial.print(tx.queueBefore);
+    Serial.print("->"); Serial.print(tx.queueAfter);
+    Serial.print(" RX_AGE_US="); Serial.println(tx.rxAge);
+  }
+  Serial.println("  >>> SAFETY STOP: periodic command disabled; stop CAN frames best effort");
+}
+
+// Called from loop only after the periodic timer is stopped.
+static void sendStopRequests() {
+  bool zeroOK[2] = {false, false};
+  bool exitOK[2] = {false, false};
+  // Send to BOTH motors before printing: Serial must never delay the peer stop.
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i))
+    zeroOK[i] = sendZeroTorque(i, STOP_ZERO);
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i))
+    exitOK[i] = sendSpecial(i, 0xFD, STOP_DISABLE);
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    Serial.print("M"); Serial.print(i+1);
+    Serial.print(" STOP_ZERO_TX_ACCEPTED="); Serial.print(zeroOK[i] ? 1 : 0);
+    Serial.print(" STOP_DISABLE_TX_ACCEPTED="); Serial.println(exitOK[i] ? 1 : 0);
+  }
+}
+
+static void stopTimer() {
+  if (timerActive) { commandTimer.end(); timerActive = false; }
+}
+
+// The same timer is kept active in IDLE; it *only* drains RX there.
+// The caller must set state to IDLE or FAULT_STOPPED before invoking.
+static bool startIdleTimer() {
+  if (timerActive) return true;
+  commandTimer.priority(TIMER_ISR_PRIORITY);
+  timerActive = commandTimer.begin(commandISR, RX_POLL_PERIOD_US);
+  return timerActive;
+}
+
+// Reinitialize ONLY at the beginning of the first S after upload/reset,
+// while the timer is stopped. This reproduces the successful case in which
+// the motor's 48-V power was already on when Teensy firmware started.
+// Later S commands preserve the known-good Jia configuration.
+static void reinitSelectedCan() {
+  if (MOTOR1_ON) {
+    can1.begin();
+    can1.setBaudRate(CAN_BAUD);
+    NVIC_SET_PRIORITY(IRQ_CAN1, CAN_IRQ_PRIORITY);
+  }
+  if (MOTOR2_ON) {
+    can2.begin();
+    can2.setBaudRate(CAN_BAUD);
+    NVIC_SET_PRIORITY(IRQ_CAN2, CAN_IRQ_PRIORITY);
+  }
+  ++reinitCount;
+}
+
+static void serviceFault() {
+  if (!faultPending || faultOutputDone) return;
+  stopTimer();
+  faultPending = false;
+  // Attempt the stop frames BEFORE any potentially blocking Serial output.
+  sendStopRequests();
+  printFaultReport();
+  printNewEvents(32);
+  faultOutputDone = true;
+  // Resume RX-drain mode after the stop frames have been sent.
+  if (!startIdleTimer()) Serial.println("ERROR,IDLE_RX_TIMER_START_FAILED");
+}
+
+static void resetSession() {
+  stopTimer();
+  state = IDLE; faultPending = false; faultOutputDone = false;
+  motors[0] = MotorStats{}; motors[1] = MotorStats{};
+  histories[0] = HistoryBuffer{}; histories[1] = HistoryBuffer{};
+  fault = FaultSnapshot{}; firstTxFailure = TxFailure{};
+  eventWriteSeq = 0; eventPrintSeq = 0; eventLostForPrint = 0;
+  ticks = 0; maxIsrUs = 0; isrOverruns = 0;
+  rxPollTicks = 0; maxRxPollUs = 0; rxPollOverruns = 0;
+  maxRxPollGapUs = 0; txDivider = 0; lastRxPollUs = 0;
+  maxTickGapUs = 0; maxJitterUs = 0; lateTicks = 0;
+  lastTickUs = 0;
+  traceHead = traceCount = 0; traceFrozen = false;
+  probeRequested = probeActive = probeFinished = false;
+  autoRequested = autoActive = autoTriggered = autoStopPending = false;
+  autoPulseActive = false; autoPulseMotor = 255; autoFinish = AUTO_NOT_FINISHED;
+  autoStartUs = autoTick = autoLastElapsedUs = 0;
+  autoKeepPulseUntilUs = autoTriggerUs = 0;
+  autoTriggerMotor = autoTriggerTorqueMotor = 255;
+  autoTriggerEsr = autoTriggerEcr = 0; autoTriggerSource = AUTO_SRC_NONE;
+  autoPulseCount = 0; autoStartPos[0] = autoStartPos[1] = 0;
+  probeTick = probeStartUs = 0;
+  currentProbeStep = 255;
+  commandNm[0] = commandNm[1] = 0.0f;
+  prevTx[0] = prevTx[1] = prevRx[0] = prevRx[1] = 0;
+  sessionStartUs = micros();
+  for (uint8_t i = 0; i < 2; ++i) motors[i].historyStampUs = sessionStartUs;
+}
+
+static void stopManually() {
+  if (state == IDLE) return;
+  const RunState old = state;
+  state = IDLE;
+  probeActive = false; probeRequested = false;
+  autoRequested = false; autoActive = false; autoPulseActive = false; autoStopPending = false;
+  traceFrozen = true;
+  stopTimer();
+  for (uint8_t i = 0; i < 2; ++i) histories[i].frozen = true;
+  sendStopRequests();
+  pushEvent(EV_STOP, MOTOR1_ON ? 0 : 1, micros(), 0, 0);
+  Serial.println(old == RUNNING ? "TEST STOPPED" : "FAULT STOP REQUEST RETRIED");
+  if (!startIdleTimer()) Serial.println("ERROR,IDLE_RX_TIMER_START_FAILED");
+}
+
+static void beginSession() {
+  if (state == RUNNING) { Serial.println("ALREADY_RUNNING"); return; }
+  if (!faultOutputDone && state == FAULT_STOPPED) serviceFault();
+
+  // Stop the idle poller before touching the CAN controller or stats.
+  stopTimer();
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    const uint32_t ecr = ecrValue(i), esr = esrValue(i);
+    Serial.print("PRESTART_SNAPSHOT,M"); Serial.print(i+1);
+    Serial.print(",IDLE_RX_RAW,"); Serial.print(idleRxRaw[i]);
+    Serial.print(",IDLE_RX_HW_OVERRUN,"); Serial.print(idleRxHwOverrun[i]);
+    Serial.print(",TEC/REC,"); Serial.print(ecr & 255U);
+    Serial.print('/'); Serial.print((ecr >> 8) & 255U);
+    Serial.print(",ESR1,0x"); Serial.println(esr, HEX);
+  }
+  discardOldCanErrors();
+  resetSession();
+  if (firstStartSinceBoot && REINIT_CAN_ON_FIRST_S) {
+    reinitSelectedCan();
+    Serial.println("PRESTART,CAN_REINITIALIZED_ON_FIRST_S,1");
+  }
+  firstStartSinceBoot = false;
+  discardOldCanErrors();
+  // Drain any mailbox frames present after CAN initialization.
+  if (MOTOR1_ON) readIdleMotor(0);
+  if (MOTOR2_ON) readIdleMotor(1);
+  bool ok = true;
+  // Match the working Jia sketch: send ENABLE only now, not ZERO immediately.
+  // First zero is issued by the ISR 500 us after timer start.
+  for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+    if (!sendSpecial(i, 0xFC, START_ENABLE)) ok = false;
+  }
+  if (!ok) {
+    Serial.println("START_ERROR: TX API rejected enable or zero frame");
+    state = FAULT_STOPPED;
+    sendStopRequests();
+    faultOutputDone = true;
+    if (!startIdleTimer()) Serial.println("ERROR,IDLE_RX_TIMER_START_FAILED");
+    return;
+  }
+  // Startup event must be written before ISR starts using the same ring.
+  pushEvent(EV_START, MOTOR1_ON ? 0 : 1, micros(), 0, 0);
+  state = RUNNING;
+  lastPrintMs = millis();
+  commandTimer.priority(TIMER_ISR_PRIORITY);
+  if (!commandTimer.begin(commandISR, RX_POLL_PERIOD_US)) {
+    state = FAULT_STOPPED;
+    Serial.println("START_ERROR: IntervalTimer.begin() failed");
+    sendStopRequests();
+    faultOutputDone = true;
+    if (!startIdleTimer()) Serial.println("ERROR,IDLE_RX_TIMER_START_FAILED");
+    return;
+  }
+  timerActive = true;
+  Serial.print("TEST STARTED,PERIOD_US,"); Serial.print(COMMAND_PERIOD_US);
+  Serial.print(",RX_POLL_US,"); Serial.println(RX_POLL_PERIOD_US);
+}
+
+static void handleCommand(char *line) {
+  for (char *p = line; *p; ++p) *p = char(toupper((unsigned char)*p));
+  if (!strcmp(line, "S")) beginSession();
+  else if (!strcmp(line, "P")) requestProbe();
+  else if (!strcmp(line, "A")) requestAuto();
+  else if (!strcmp(line, "X")) { serviceFault(); stopManually(); }
+  else if (!strcmp(line, "STATUS")) printStatus();
+  else if (!strcmp(line, "TRACE")) printTrace();
+  else if (!strcmp(line, "HISTORY")) {
+    if (state == RUNNING) Serial.println("HISTORY available after X/fault only (avoid blocking stop commands)");
+    else printHistory();
+  }
+  else if (!strcmp(line, "EVENTS")) {
+    if (state == RUNNING) Serial.println("EVENTS dump available after X/fault only; live events print automatically");
+    else printEvents();
+  }
+  else if (!strcmp(line, "RESET")) {
+    if (state == RUNNING) Serial.println("RESET only allowed when stopped");
+    else {
+      resetSession();
+      Serial.println("STATISTICS RESET");
+      if (!startIdleTimer()) Serial.println("ERROR,IDLE_RX_TIMER_START_FAILED");
+    }
+  } else if (!strcmp(line, "HELP"))
+    Serial.println("COMMANDS: S=zero-torque, P=one 0.6Nm 4-pulse test, A=bounded repeated test + error-triggered capture, X=stop, TRACE=CSV after auto-stop/X, STATUS, HISTORY, EVENTS, RESET, HELP");
+  else Serial.println("Unknown command. Type HELP");
+}
+
+static void readSerial() {
+  static char line[32];
+  static uint8_t used = 0;
+  while (Serial.available()) {
+    const char c = char(Serial.read());
+    if (c == '\r' || c == '\n') {
+      if (used) { line[used] = 0; handleCommand(line); used = 0; }
+    } else if (used < sizeof(line)-1) line[used++] = c;
+  }
+}
+
+void setup() {
+  Serial.begin(SERIAL_BAUD);
+  resetSession();
+  if (MOTOR1_ON) {
+    can1.begin();
+    can1.setBaudRate(CAN_BAUD);
+    NVIC_SET_PRIORITY(IRQ_CAN1, CAN_IRQ_PRIORITY);
+  }
+  if (MOTOR2_ON) {
+    can2.begin();
+    can2.setBaudRate(CAN_BAUD);
+    NVIC_SET_PRIORITY(IRQ_CAN2, CAN_IRQ_PRIORITY);
+  }
+  // Keep the default FlexCAN_T4 polling-mailbox configuration.
+  // Do NOT install an RX callback or enable an RX mailbox interrupt.
+  Serial.println("READY,CAN_debug_AK80_Jia_TimerISR_v6_ERROR_TRIGGER_TORQUE");
+  Serial.print("M1=CAN1/ID1/"); Serial.print(MOTOR1_ON ? "ON" : "OFF");
+  Serial.print(",M2=CAN2/ID2/"); Serial.print(MOTOR2_ON ? "ON" : "OFF");
+  Serial.print(",CAN_BAUD,"); Serial.print(CAN_BAUD);
+  Serial.print(",TX_PERIOD_US,"); Serial.print(COMMAND_PERIOD_US);
+  Serial.print(",RX_POLL_PERIOD_US,"); Serial.println(RX_POLL_PERIOD_US);
+  Serial.println("Jia Mode1 dual CAN: 100us polling RX each, 500us torque command each, IntervalTimer ISR");
+  Serial.println("TORQUE_PROBE,S=zero only; P=one set of four pulses; A=repeat up to 30s, freeze on CAN error DURING nonzero pulse, then auto-stop; X=stop");
+  Serial.println("A captures error + 350ms post window; RAM TRACE remains until RESET/new S/power loss. Use TRACE after AUTO_STOPPED.");
+  Serial.println("DANGER,zero Nm does NOT brake motion. Secure/support arm, verify clear workspace; physical E-stop required.");
+  Serial.println("P range -12.5..12.5 rad; V range -37.5..37.5 rad/s; T range -32..32 Nm");
+  Serial.println("COMMANDS: S, P, A, X, STATUS, TRACE, HISTORY, EVENTS, RESET, HELP");
+  Serial.println("WARNING: RX HW overrun, active-pulse RX stale/motion/backlog fault stops TX and attempts MIT EXIT.");
+  Serial.println("WARNING: CAN errors may persist as latched ESR1 bits; RX gap window is separately measured.");
+  Serial.println("WARNING: CAN stop is best effort; physical emergency stop required.");
+  Serial.println("DUAL_TEST: any motor fault stops periodic TX for BOTH motors.");
+  Serial.print("PRESTART,IDLE_RX_DRAIN,"); Serial.print(IDLE_RX_DRAIN ? 1 : 0);
+  Serial.print(",REINIT_ON_FIRST_S,"); Serial.println(REINIT_CAN_ON_FIRST_S ? 1 : 0);
+  if (!startIdleTimer()) Serial.println("ERROR,IDLE_RX_TIMER_START_FAILED");
+}
+
+void loop() {
+  // All hardware CAN RX, periodic TX and periodic diagnosis live in commandISR().
+  // Only slow/non-real-time serial logging and stop/start operations live here.
+  serviceFault();
+  // The ISR has already frozen the trace and returned to zero torque. Stop
+  // the timer and request EXIT BEFORE potentially blocking serial output.
+  if (autoStopPending && state == RUNNING) {
+    const AutoFinish outcome = autoFinish;
+    stopManually();
+    Serial.print("AUTO_STOPPED,RESULT,");
+    Serial.print(outcome == AUTO_ERROR_CAPTURED ? "ERROR_CAPTURED" : "TIMEOUT_NO_QUALIFIED_ERROR");
+    Serial.print(",PULSES,"); Serial.println(autoPulseCount);
+    Serial.println("CAPTURE_READY,send TRACE (and EVENTS/STATUS if desired)");
+  }
+  readSerial();
+  drainCanErrorSnapshots();
+  // Do not spam Serial during the bounded auto test: queued error snapshots
+  // should be drained promptly so they overlap the correct pulse.
+  if (!autoActive && !autoRequested) printNewEvents(8);
+  if (state == RUNNING && !autoActive && !autoRequested && millis() - lastPrintMs >= PRINT_INTERVAL_MS) {
+    lastPrintMs = millis();
+    MotorStats d[2];
+    noInterrupts(); d[0] = motors[0]; d[1] = motors[1]; interrupts();
+    Serial.print("[ "); Serial.print((micros()-sessionStartUs)/1000000.0f, 1);
+    Serial.print("s] PERIOD SUMMARY ISR_MAX_US="); Serial.print(maxIsrUs);
+    Serial.print(" RX_POLL_OVERRUNS="); Serial.print(rxPollOverruns);
+    Serial.print(" JITTER_MAX_US="); Serial.print(maxJitterUs);
+    Serial.print(" PROBE_ACTIVE="); Serial.print(probeActive ? 1 : 0);
+    Serial.print(" PROBE_FINISHED="); Serial.println(probeFinished ? 1 : 0);
+    for (uint8_t i = 0; i < 2; ++i) if (motorOn(i)) {
+      const uint32_t tx = d[i].txAccepted[PERIODIC_COMMAND];
+      const uint32_t rx = d[i].rxValid;
+      Serial.print(" M"); Serial.print(i+1);
+      Serial.print(" TX="); Serial.print(tx-prevTx[i]);
+      Serial.print(" RX="); Serial.print(rx-prevRx[i]);
+      Serial.print(" TX_FAIL="); Serial.print(d[i].txFailures[PERIODIC_COMMAND]);
+      Serial.print(" RX_GAP_MAX_US="); Serial.print(d[i].maxRxGapUs);
+      Serial.print(" TXQ_MAX="); Serial.print(d[i].txQueueMax);
+      Serial.print(" CMD_Nm="); Serial.print(commandNm[i], 4);
+      Serial.print(" FB_T_Nm="); Serial.print(d[i].torqueNm, 4);
+      Serial.print(" V_rad_s="); Serial.print(d[i].velocityRadS, 4);
+      Serial.print(" TEC/REC="); Serial.print(d[i].ecr & 255U);
+      Serial.print('/'); Serial.println((d[i].ecr >> 8) & 255U);
+      prevTx[i] = tx; prevRx[i] = rx;
+    }
+  }
+  serviceFault();
+}

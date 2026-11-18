@@ -1,0 +1,6 @@
+# PORT=COM3
+# BAUD=115200
+# DURATION_SECONDS=10
+# Only serial commands S, X, STATUS are allowlisted.
+# CAPTURE_FAILED=No serial lines received before the capture command returned; v5 READY was absent
+# S_COMMAND_ATTEMPTED=0 (no READY_WAIT records and no HOST_COMMAND marker)

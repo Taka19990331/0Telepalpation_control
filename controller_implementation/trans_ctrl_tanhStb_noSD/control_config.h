@@ -55,7 +55,7 @@ static_assert(NOTCH_LOW_SIDE_HZ>0 && NOTCH_LOW_SIDE_HZ<NOTCH_CENTER_HZ && NOTCH_
 static_assert(ANGLE_BPF_LOW_HZ>0 && ANGLE_BPF_HIGH_HZ>ANGLE_BPF_LOW_HZ && ANGLE_BPF_HIGH_HZ<500000.0/CONTROL_PERIOD_US,"Invalid angle BPF frequencies");
 static_assert(ANGLE_NOTCH_FULL_DEG_RMS>ANGLE_NOTCH_START_DEG_RMS && SPEED_GATE_ZERO_RAD_S>SPEED_GATE_FULL_RAD_S,"Invalid adaptive notch thresholds");
 static_assert(NOTCH_ATTACK_S>0 && NOTCH_RELEASE_S>0 && ANGLE_RMS_TAU_S>0,"Invalid adaptive notch time constants");
-constexpr float OMEGA_0=0.1f; // 摩擦モデルのゼロ近傍平滑化速度 [rad/s]
+constexpr float OMEGA_0=0.3f; // 摩擦モデルのゼロ近傍平滑化速度 [rad/s]
 enum FrictionModel : uint8_t { FRICTION_STRIBECK=0, FRICTION_TANH=1 };
 // Select the observer and feed-forward models independently for both motors.
 constexpr FrictionModel RFOB_FRICTION_MODEL=FRICTION_STRIBECK;

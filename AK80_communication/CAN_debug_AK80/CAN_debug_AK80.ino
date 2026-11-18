@@ -1,0 +1,405 @@
+#include <Arduino.h>
+#include <FlexCAN_T4.h>
+#include <IntervalTimer.h>
+#include <ctype.h>
+#include "control_config.h"
+#include "can_diagnostics.h"
+
+using Can1 = FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16>;
+using Can2 = FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16>;
+static Can1 can1; static Can2 can2; static IntervalTimer commandTimer;
+static volatile uint32_t timerOverrun=0, timerMaxUs=0, isrEntryUs=0;
+static uint32_t sessionStartUs=0, printStampMs=0, rxCheckStampUs=0;
+static bool timerReady=false, faultOutputDone=false;
+static volatile uint32_t prevTx[2]={0,0}, prevRx[2]={0,0}, prevRxFrames[2]={0,0};
+static uint32_t seenHw[2]={0,0}, seenOverflow[2]={0,0}, seenRejected[2]={0,0};
+
+static uint32_t enc(float x,float lo,float hi,uint8_t bits) {
+  x=constrain(x,lo,hi); return uint32_t((x-lo)*float((1UL<<bits)-1)/(hi-lo));
+}
+static uint32_t busBase(uint8_t i) { return i==0?CAN1:CAN2; }
+static uint32_t txQueue(uint8_t i) { return i==0?can1.getTXQueueCount():can2.getTXQueueCount(); }
+static uint32_t ecrValue(uint8_t i) { return FLEXCANb_ECR(busBase(i)); }
+static uint32_t esrValue(uint8_t i) { return FLEXCANb_ESR1(busBase(i)); }
+static const char *txKindName(uint8_t k) {
+  switch(k) {
+    case Diag::PERIODIC_ZERO:return "PERIODIC_ZERO";
+    case Diag::START_ENABLE:return "START_ENABLE";
+    case Diag::START_ZERO:return "START_ZERO";
+    case Diag::STOP_ZERO:return "STOP_ZERO";
+    case Diag::STOP_DISABLE:return "STOP_DISABLE";
+    default:return "UNKNOWN";
+  }
+}
+static const char *faultName(uint8_t k) {
+  switch(k) {
+    case Diag::FAULT_TX_FAIL:return "TX_FAIL";
+    case Diag::FAULT_RX_TIMEOUT:return "RX_TIMEOUT";
+    case Diag::FAULT_BUS_OFF:return "BUS_OFF";
+    case Diag::FAULT_RX_OVERFLOW:return "RX_OVERFLOW";
+    case Diag::FAULT_ISR_OVERRUN:return "ISR_OVERRUN";
+    case Diag::FAULT_MOTOR_ERROR:return "MOTOR_ERROR";
+    default:return "UNKNOWN";
+  }
+}
+static const char *canStateName(uint32_t esr) {
+  switch(FLEXCAN_ESR_get_fault_code(esr)) {
+    case CAN_ERROR_ACTIVE:return "ERROR_ACTIVE";
+    case CAN_ERROR_PASSIVE:return "ERROR_PASSIVE";
+    case CAN_ERROR_BUS_OFF:return "BUS_OFF";
+    default:return "UNKNOWN";
+  }
+}
+static uint32_t canErrorMask(uint32_t esr) {
+  return esr & (FLEXCAN_ESR_ACK_ERR|FLEXCAN_ESR_BIT0_ERR|FLEXCAN_ESR_BIT1_ERR|
+                FLEXCAN_ESR_STF_ERR|FLEXCAN_ESR_FRM_ERR|FLEXCAN_ESR_CRC_ERR);
+}
+static uint32_t canUnknownSignal(uint32_t esr) {
+  return esr&(FLEXCAN_ESR_WAK_INT|FLEXCAN_ESR_ERR_INT|FLEXCAN_ESR_BOFF_INT|FLEXCAN_ESR_RX_WRN|FLEXCAN_ESR_TX_WRN);
+}
+static void appendName(char *dst,size_t cap,const char *name) {
+  if(dst[0]) strlcat(dst,", ",cap);
+  strlcat(dst,name,cap);
+}
+static void canErrorNames(uint32_t esr,char *dst,size_t cap) {
+  dst[0]=0;
+  if(esr&FLEXCAN_ESR_ACK_ERR) appendName(dst,cap,"ACK_ERROR");
+  if(esr&FLEXCAN_ESR_BIT0_ERR) appendName(dst,cap,"BIT0_ERROR");
+  if(esr&FLEXCAN_ESR_BIT1_ERR) appendName(dst,cap,"BIT1_ERROR");
+  if(esr&FLEXCAN_ESR_STF_ERR) appendName(dst,cap,"STUFF_ERROR");
+  if(esr&FLEXCAN_ESR_FRM_ERR) appendName(dst,cap,"FORM_ERROR");
+  if(esr&FLEXCAN_ESR_CRC_ERR) appendName(dst,cap,"CRC_ERROR");
+  const uint32_t stateCode=FLEXCAN_ESR_get_fault_code(esr);
+  if(stateCode==CAN_ERROR_PASSIVE) appendName(dst,cap,"ERROR_PASSIVE");
+  else if(stateCode==CAN_ERROR_BUS_OFF) appendName(dst,cap,"BUS_OFF");
+  if(!dst[0]) strlcpy(dst,"UNKNOWN",cap);
+}
+static uint32_t elapsedFromStart(uint32_t now=micros()) { return now-sessionStartUs; }
+static void eventPrefix(uint32_t us,uint8_t i) {
+  Serial.print('[');Serial.print(us/1000000.0f,2);Serial.print("s] M");Serial.print(i+1);Serial.print(' ');
+}
+static int sendRaw(uint8_t i,const CAN_message_t &m) { return i==0?can1.write(m):can2.write(m); }
+
+static void latchFault(Diag::FaultKind kind,uint8_t i,uint32_t when,uint32_t esr,uint32_t ecr,uint32_t queueValue) {
+  if(Diag::state!=Diag::RUNNING) return;
+  Diag::fault.valid=true; Diag::fault.us=when; Diag::fault.motor=i; Diag::fault.kind=kind;
+  Diag::fault.esr1=esr; Diag::fault.ecr=ecr;
+  auto &d=Diag::motor[i];
+  Diag::fault.motorErrorCode=d.motorErrorCode;
+  Diag::fault.rxAgeUs=d.sawRx?when-d.lastRxUs:UINT32_MAX;
+  Diag::fault.rxFrames=d.rxFrames; Diag::fault.rxProcessed=d.rxProcessed;
+  Diag::fault.periodicAccepted=d.txAccepted[Diag::PERIODIC_ZERO];
+  Diag::fault.periodicFailures=d.txFailures[Diag::PERIODIC_ZERO];
+  Diag::fault.txQueue=queueValue; Diag::fault.rxQueue=d.head-d.tail;
+  uint32_t currentIsr=timerMaxUs;
+  if(isrEntryUs) { const uint32_t partial=when-isrEntryUs; if(partial>currentIsr) currentIsr=partial; }
+  Diag::fault.isrMaxUs=max(currentIsr,uint32_t(d.isrMaxUs));
+  Diag::state=Diag::FAULT_STOPPED; Diag::faultPending=true;
+  for(uint8_t n=0;n<2;++n) if(motorOn(n)) Diag::motor[n].historyFrozen=true;
+}
+
+static bool sendFrame(uint8_t i,const CAN_message_t &m,Diag::TxKind kind) {
+  auto &d=Diag::motor[i]; const uint32_t before=txQueue(i); const uint32_t now=micros();
+  const int result=sendRaw(i,m); const uint32_t after=txQueue(i);
+  if(result) ++d.txAccepted[kind];
+  else {
+    ++d.txFailures[kind];
+    if(kind!=Diag::STOP_ZERO&&kind!=Diag::STOP_DISABLE&&!Diag::firstTxFailure.valid) {
+      auto &f=Diag::firstTxFailure; f.valid=true; f.us=now; f.bus=i+1; f.motorId=MOTOR_ID[i]; f.type=kind;
+      f.apiResult=result; f.txQueueBefore=before; f.txQueueAfter=after;
+      const uint32_t ecr=ecrValue(i),esr=esrValue(i);
+      f.tec=ecr&255U; f.rec=(ecr>>8)&255U; f.esr1=esr;
+      f.rxAgeUs=d.sawRx?now-d.lastRxUs:UINT32_MAX; f.rxQueue=d.head-d.tail;
+      f.rxFrames=d.rxFrames-prevRxFrames[i]; f.rxProcessed=d.rxProcessed-prevRx[i];
+      f.periodicAccepted=d.txAccepted[Diag::PERIODIC_ZERO]-prevTx[i]; f.periodicFailures=d.txFailures[Diag::PERIODIC_ZERO];
+      uint32_t partial=timerMaxUs; if(isrEntryUs) { const uint32_t du=micros()-isrEntryUs; if(du>partial) partial=du; }
+      f.isrMaxUs=max(partial,uint32_t(d.isrMaxUs));
+    }
+    if(kind==Diag::PERIODIC_ZERO) latchFault(Diag::FAULT_TX_FAIL,i,now,esrValue(i),ecrValue(i),after);
+  }
+  return result!=0;
+}
+static bool sendSpecial(uint8_t i,uint8_t code,Diag::TxKind kind) {
+  CAN_message_t m={};m.id=MOTOR_ID[i];m.len=8;
+  for(uint8_t k=0;k<7;++k)m.buf[k]=0xff;
+  m.buf[7]=code;return sendFrame(i,m,kind);
+}
+static bool sendZero(uint8_t i,Diag::TxKind kind) {
+  const uint32_t p=enc(0,POSITION_MIN,POSITION_MAX,16),v=enc(0,VELOCITY_MIN,VELOCITY_MAX,12);
+  const uint32_t kp=enc(0,0,MIT_KP_MAX,12),kd=enc(0,0,MIT_KD_MAX,12),t=enc(0,TORQUE_MIN,TORQUE_MAX,12);
+  CAN_message_t m={};m.id=MOTOR_ID[i];m.len=8;
+  m.buf[0]=p>>8;m.buf[1]=p;m.buf[2]=v>>4;m.buf[3]=((v&15)<<4)|(kp>>8);m.buf[4]=kp;
+  m.buf[5]=kd>>4;m.buf[6]=((kd&15)<<4)|(t>>8);m.buf[7]=t;
+  return sendFrame(i,m,kind);
+}
+static void rx1(const CAN_message_t &m) { Diag::recordRx(0,m); }
+static void rx2(const CAN_message_t &m) { Diag::recordRx(1,m); }
+
+static void commandISR() {
+  const uint32_t begin=micros(); isrEntryUs=begin;
+  if(Diag::state==Diag::RUNNING) {
+    if(MOTOR1_ON) sendZero(0,Diag::PERIODIC_ZERO);
+    if(Diag::state==Diag::RUNNING && MOTOR2_ON) sendZero(1,Diag::PERIODIC_ZERO);
+  }
+  const uint32_t elapsed=micros()-begin;
+  if(elapsed>timerMaxUs) timerMaxUs=elapsed;
+  if(MOTOR1_ON && elapsed>Diag::motor[0].isrMaxUs) Diag::motor[0].isrMaxUs=elapsed;
+  if(MOTOR2_ON && elapsed>Diag::motor[1].isrMaxUs) Diag::motor[1].isrMaxUs=elapsed;
+  if(Diag::state==Diag::RUNNING && elapsed>COMMAND_PERIOD_US) {
+    ++timerOverrun;const uint8_t i=MOTOR1_ON?0:1;
+    latchFault(Diag::FAULT_ISR_OVERRUN,i,micros(),esrValue(i),ecrValue(i),txQueue(i));
+  }
+  isrEntryUs=0;
+}
+
+static void latchLoopFault(Diag::FaultKind kind,uint8_t i) {
+  noInterrupts();
+  if(Diag::state==Diag::RUNNING) {
+    const uint32_t now=micros(); latchFault(kind,i,now,esrValue(i),ecrValue(i),txQueue(i));
+  }
+  interrupts();
+}
+static void printCanError(uint8_t i,uint32_t esr,uint32_t ecr,bool recovered=false) {
+  eventPrefix(elapsedFromStart(),i);
+  if(recovered) { Serial.println("RECOVERED CAN_ERROR"); return; }
+  char names[96];canErrorNames(esr,names,sizeof(names));
+  Serial.print("WARN CAN_ERROR: ");Serial.print(names);
+  Serial.print(" | TEC=");Serial.print(ecr&255U);Serial.print(" REC=");Serial.print((ecr>>8)&255U);
+  Serial.print(" ESR1=0x");Serial.println(esr,HEX);
+}
+static void observeCanSnapshot(uint8_t i,uint32_t esr,uint32_t ecr) {
+  auto &d=Diag::motor[i]; const uint32_t mask=canErrorMask(esr), stateCode=FLEXCAN_ESR_get_fault_code(esr);
+  const uint32_t unknown=canUnknownSignal(esr);
+  const uint32_t signature=mask|(stateCode<<24)|(unknown<<8);
+  const bool meaningful=mask || stateCode!=CAN_ERROR_ACTIVE || unknown;
+  if(meaningful && signature!=d.lastCanSignature) { d.lastCanSignature=signature;++d.canErrorEvents;d.esrSeen|=esr;printCanError(i,esr,ecr); }
+  else if(!meaningful && d.lastCanSignature) { d.lastCanSignature=0;printCanError(i,esr,ecr,true); }
+  if(ecr>d.ecrMax)d.ecrMax=ecr;
+}
+static void checkBus(uint8_t i) {
+  if(!motorOn(i)||Diag::state!=Diag::RUNNING)return;
+  auto &d=Diag::motor[i];const uint32_t now=micros(),esr=esrValue(i);
+  if(FLEXCAN_ESR_get_fault_code(esr)==CAN_ERROR_BUS_OFF) {
+    d.busOff=1;latchLoopFault(Diag::FAULT_BUS_OFF,i);return;
+  }
+  if(timerOverrun) { latchLoopFault(Diag::FAULT_ISR_OVERRUN,i);return; }
+  if(d.rxHwOverrun&&!seenHw[i]) { seenHw[i]=1;eventPrefix(elapsedFromStart(now),i);Serial.print("WARN RX_HW_OVERRUN: count=");Serial.println(d.rxHwOverrun); }
+  if(d.rxOverflow!=seenOverflow[i]) { seenOverflow[i]=d.rxOverflow;if(d.rxOverflow){latchLoopFault(Diag::FAULT_RX_OVERFLOW,i);return;} }
+  if(d.rxRejected&&!seenRejected[i]) { seenRejected[i]=1;eventPrefix(elapsedFromStart(now),i);Serial.print("WARN RX_REJECTED id=");Serial.print(d.rejectId);Serial.print(" payload_id=");Serial.print(d.rejectPayloadId);Serial.print(" DLC=");Serial.print(d.rejectDlc);Serial.print(" format=");Serial.println(d.rejectFormat); }
+  // FlexCAN_T4::error() pops a queued ESR/ECR snapshot and briefly masks this
+  // controller's NVIC IRQ. It does not write/clear ESR1; cap work per loop pass.
+  CAN_error_t err;uint8_t drained=0;
+  while(drained<4) {
+    const bool available=i==0?can1.error(err,false):can2.error(err,false);
+    if(!available)break;
+    ++drained;observeCanSnapshot(i,err.ESR1,err.ECR);
+    if(FLEXCAN_ESR_get_fault_code(err.ESR1)==CAN_ERROR_BUS_OFF) {d.busOff=1;latchLoopFault(Diag::FAULT_BUS_OFF,i);return;}
+  }
+  const uint32_t age=d.sawRx?now-d.lastRxUs:now-sessionStartUs;
+  if(age>RX_TIMEOUT_US) { latchLoopFault(Diag::FAULT_RX_TIMEOUT,i);return; }
+  if(age>RX_WARNING_US&&!d.gapReported) { d.gapReported=true;eventPrefix(elapsedFromStart(now),i);Serial.print("WARN RX_GAP: ");Serial.print(age/1000.0f,1);Serial.println("ms"); }
+  else if(age<=RX_WARNING_US&&d.gapReported) { d.gapReported=false;eventPrefix(elapsedFromStart(now),i);Serial.println("RECOVERED RX_GAP"); }
+}
+static void processRx(uint8_t i) {
+  if(Diag::state!=Diag::RUNNING)return;
+  auto &d=Diag::motor[i];uint8_t budget=8;
+  while(budget--&&d.tail!=d.head&&Diag::state==Diag::RUNNING) {
+    const Diag::RxFrame r=d.queue[d.tail%RX_QUEUE_SIZE];asm volatile("" ::: "memory");++d.tail;++d.rxProcessed;
+    const uint8_t code=r.msg.buf[7];
+    if(code&&code!=d.motorErrorCode) { d.motorErrorCode=code;++d.motorError;latchLoopFault(Diag::FAULT_MOTOR_ERROR,i); }
+    else if(!code)d.motorErrorCode=0;
+  }
+}
+
+static void printTxFailure(const Diag::TxFailure &f) {
+  eventPrefix(f.us-sessionStartUs,f.bus-1);Serial.println("ERROR TX_FAIL");
+  Serial.print("  Type: ");Serial.println(txKindName(f.type));
+  Serial.print("  API return: ");Serial.println(f.apiResult);
+  Serial.print("  TX queue: ");Serial.print(f.txQueueBefore);Serial.print(" -> ");Serial.println(f.txQueueAfter);
+  Serial.print("  TEC/REC: ");Serial.print(f.tec);Serial.print('/');Serial.println(f.rec);
+  Serial.print("  CAN state: ");Serial.println(canStateName(f.esr1));
+  char names[96];canErrorNames(f.esr1,names,sizeof(names));Serial.print("  CAN error: ");Serial.println(names);
+  Serial.print("  ESR1: 0x");Serial.println(f.esr1,HEX);
+  Serial.print("  RX age: ");if(f.rxAgeUs==UINT32_MAX)Serial.println("NEVER");else {Serial.print(f.rxAgeUs/1000.0f,1);Serial.println(" ms");}
+  Serial.print("  Bus: CAN");Serial.print(f.bus);Serial.print(" | Motor ID: ");Serial.println(f.motorId);
+  Serial.print("  Recent RX frames/processed: ");Serial.print(f.rxFrames);Serial.print('/');Serial.println(f.rxProcessed);
+  Serial.print("  Recent periodic TX accepted/fail: ");Serial.print(f.periodicAccepted);Serial.print('/');Serial.println(f.periodicFailures);
+  Serial.print("  RX queue: ");Serial.println(f.rxQueue);
+  Serial.print("  ISR max: ");Serial.print(f.isrMaxUs);Serial.println(" us");
+  Serial.print("  Periodic TX failures: ");Serial.println(f.periodicFailures);
+  Serial.println("  >>> SAFETY STOP");
+}
+static void printFaultReport(const Diag::FaultSnapshot &f) {
+  eventPrefix(f.us-sessionStartUs,f.motor);Serial.print("ERROR ");Serial.println(faultName(f.kind));
+  Serial.print("  Bus: CAN");Serial.print(f.motor+1);Serial.print(" | Motor ID: ");Serial.println(MOTOR_ID[f.motor]);
+  if(f.kind==Diag::FAULT_MOTOR_ERROR) {Serial.print("  Motor error code: ");Serial.println(f.motorErrorCode);}
+  if(f.kind==Diag::FAULT_RX_OVERFLOW) {Serial.print("  Software RX overflow count: ");Serial.println(Diag::motor[f.motor].rxOverflow);}
+  if(f.kind==Diag::FAULT_ISR_OVERRUN) {Serial.print("  ISR overrun count: ");Serial.println(timerOverrun);}
+  Serial.print("  RX age: ");if(f.rxAgeUs==UINT32_MAX)Serial.println("NEVER");else {Serial.print(f.rxAgeUs/1000.0f,1);Serial.println(" ms");}
+  if(f.kind==Diag::FAULT_RX_TIMEOUT&&f.rxAgeUs==UINT32_MAX) {Serial.print("  No feedback since start: ");Serial.print((f.us-sessionStartUs)/1000.0f,1);Serial.println(" ms");}
+  Serial.print("  TEC/REC: ");Serial.print(f.ecr&255U);Serial.print('/');Serial.println((f.ecr>>8)&255U);
+  Serial.print("  CAN state: ");Serial.println(canStateName(f.esr1));
+  char names[96];canErrorNames(f.esr1,names,sizeof(names));Serial.print("  CAN error: ");Serial.println(names);
+  Serial.print("  ESR1: 0x");Serial.println(f.esr1,HEX);
+  Serial.print("  TX queue: ");Serial.println(f.txQueue);Serial.print("  RX queue: ");Serial.println(f.rxQueue);
+  Serial.print("  ISR max: ");Serial.print(f.isrMaxUs);Serial.println(" us");
+  Serial.print("  >>> SAFETY STOP");if(f.kind==Diag::FAULT_TX_FAIL)Serial.print(" | Periodic TX failures: ");
+  if(f.kind==Diag::FAULT_TX_FAIL)Serial.print(f.periodicFailures);
+  Serial.println();
+}
+static Diag::TxFailure copyFirstTxFailure() {
+  Diag::TxFailure f{};noInterrupts();
+  const volatile Diag::TxFailure &v=Diag::firstTxFailure;
+  f.valid=v.valid;f.us=v.us;f.bus=v.bus;f.motorId=v.motorId;f.type=v.type;f.apiResult=v.apiResult;
+  f.txQueueBefore=v.txQueueBefore;f.txQueueAfter=v.txQueueAfter;f.rxQueue=v.rxQueue;
+  f.tec=v.tec;f.rec=v.rec;f.esr1=v.esr1;f.rxAgeUs=v.rxAgeUs;f.rxFrames=v.rxFrames;
+  f.rxProcessed=v.rxProcessed;f.periodicAccepted=v.periodicAccepted;f.periodicFailures=v.periodicFailures;f.isrMaxUs=v.isrMaxUs;
+  interrupts();return f;
+}
+static Diag::FaultSnapshot copyFault() {
+  Diag::FaultSnapshot f{};noInterrupts();const volatile Diag::FaultSnapshot &v=Diag::fault;
+  f.valid=v.valid;f.us=v.us;f.esr1=v.esr1;f.ecr=v.ecr;f.rxAgeUs=v.rxAgeUs;f.motor=v.motor;f.kind=v.kind;
+  f.rxFrames=v.rxFrames;f.rxProcessed=v.rxProcessed;f.periodicAccepted=v.periodicAccepted;f.periodicFailures=v.periodicFailures;f.motorErrorCode=v.motorErrorCode;
+  f.txQueue=v.txQueue;f.rxQueue=v.rxQueue;f.isrMaxUs=v.isrMaxUs;interrupts();return f;
+}
+static void sendStopRequests(bool includeZero=true) {
+  for(uint8_t i=0;i<2;++i)if(motorOn(i)) {
+    if(includeZero) { const bool ok=sendZero(i,Diag::STOP_ZERO);Serial.print("M");Serial.print(i+1);Serial.print(" STOP_ZERO: TX accepted ");Serial.println(ok?"YES":"NO"); }
+    const bool ok=sendSpecial(i,0xfd,Diag::STOP_DISABLE);Serial.print("M");Serial.print(i+1);Serial.print(" STOP_DISABLE: TX accepted ");Serial.println(ok?"YES":"NO");
+  }
+}
+static void serviceFault() {
+  if(!Diag::faultPending||faultOutputDone)return;
+  noInterrupts();Diag::faultPending=false;interrupts();
+  const Diag::FaultSnapshot f=copyFault();const Diag::TxFailure tf=copyFirstTxFailure();
+  for(uint8_t i=0;i<2;++i)if(motorOn(i)) {
+    const bool txIncident=tf.valid&&f.kind==Diag::FAULT_TX_FAIL&&tf.bus==i+1;
+    const uint32_t snapEcr=txIncident?(uint32_t(tf.rec)<<8)|tf.tec:ecrValue(i);
+    Diag::pushFaultHistory(i,f.us,txIncident?tf.esr1:esrValue(i),snapEcr,txIncident?tf.txQueueAfter:txQueue(i));
+  }
+  if(tf.valid&&f.kind==Diag::FAULT_TX_FAIL)printTxFailure(tf);else printFaultReport(f);
+  sendStopRequests(true);
+  for(uint8_t i=0;i<2;++i)if(motorOn(i)&&i!=f.motor) {Serial.print("M");Serial.print(i+1);Serial.print(" STOPPED (peer M");Serial.print(f.motor+1);Serial.print(' ');Serial.print(faultName(f.kind));Serial.println(')');}
+  faultOutputDone=true;
+}
+
+static void stopManually(bool retryFault) {
+  const Diag::State old=Diag::state;
+  if(old==Diag::IDLE)return;
+  noInterrupts();Diag::state=Diag::IDLE;for(uint8_t i=0;i<2;++i)if(motorOn(i))Diag::motor[i].historyFrozen=true;interrupts();
+  sendStopRequests(true);
+  if(old==Diag::RUNNING) {Serial.print('[');Serial.print(elapsedFromStart()/1000000.0f,1);Serial.println("s] TEST STOPPED");}
+  else if(retryFault) Serial.println("FAULT STOP REQUEST RETRIED");
+}
+static void discardOldCanErrors();
+static void beginSession() {
+  if(Diag::state==Diag::RUNNING)return;
+  if(!timerReady) { Serial.println("START ERROR: command timer unavailable");return; }
+  discardOldCanErrors();
+  Diag::reset(micros());faultOutputDone=false;timerOverrun=timerMaxUs=0;
+  seenHw[0]=seenHw[1]=seenOverflow[0]=seenOverflow[1]=seenRejected[0]=seenRejected[1]=0;
+  prevTx[0]=prevTx[1]=prevRx[0]=prevRx[1]=prevRxFrames[0]=prevRxFrames[1]=0;
+  sessionStartUs=micros();Diag::startUs=sessionStartUs;rxCheckStampUs=sessionStartUs;
+  bool ok=true;
+  for(uint8_t i=0;i<2;++i)if(motorOn(i)) {if(!sendSpecial(i,0xfc,Diag::START_ENABLE)){ok=false;break;}}
+  if(ok)for(uint8_t i=0;i<2;++i)if(motorOn(i)) {if(!sendZero(i,Diag::START_ZERO)){ok=false;break;}}
+  if(!ok) {
+    const uint8_t i=Diag::firstTxFailure.valid?Diag::firstTxFailure.bus-1:0;
+    noInterrupts();Diag::state=Diag::RUNNING;latchFault(Diag::FAULT_TX_FAIL,i,micros(),esrValue(i),ecrValue(i),txQueue(i));interrupts();
+    serviceFault();return;
+  }
+  noInterrupts();Diag::state=Diag::RUNNING;interrupts();printStampMs=millis();
+  Serial.print("[ 0.0s] TEST STARTED\n");
+}
+
+static void configureBus(Can1 &bus) {bus.begin();bus.setBaudRate(CAN_BAUD);bus.setMaxMB(16);bus.setMB(MB0,RX,STD);bus.setMBFilter(REJECT_ALL);bus.setMBFilter(MB0,ACCEPT_ALL);bus.onReceive(MB0,rx1);bus.enableMBInterrupt(MB0);}
+static void configureBus(Can2 &bus) {bus.begin();bus.setBaudRate(CAN_BAUD);bus.setMaxMB(16);bus.setMB(MB0,RX,STD);bus.setMBFilter(REJECT_ALL);bus.setMBFilter(MB0,ACCEPT_ALL);bus.onReceive(MB0,rx2);bus.enableMBInterrupt(MB0);}
+static void discardOldCanErrors() {
+  CAN_error_t stale;
+  if(MOTOR1_ON)for(uint8_t n=0;n<32&&can1.error(stale,false);++n){}
+  if(MOTOR2_ON)for(uint8_t n=0;n<32&&can2.error(stale,false);++n){}
+}
+
+static void printStatus() {
+  Serial.print("STATE: ");Serial.println(Diag::state==Diag::IDLE?"IDLE":Diag::state==Diag::RUNNING?"RUNNING":"FAULT_STOPPED");
+  for(uint8_t i=0;i<2;++i)if(motorOn(i)) {
+    auto &d=Diag::motor[i];const uint32_t now=micros(),ecr=ecrValue(i),esr=esrValue(i);const uint32_t age=d.sawRx?now-d.lastRxUs:UINT32_MAX;
+    Serial.print("M");Serial.print(i+1);Serial.print(" RX frames/accepted/queued/processed=");Serial.print(d.rxFrames);Serial.print('/');Serial.print(d.rxAccepted);Serial.print('/');Serial.print(d.rxQueued);Serial.print('/');Serial.print(d.rxProcessed);
+    Serial.print(" reject(id/payload/DLC/format)=");Serial.print(d.rejectId);Serial.print('/');Serial.print(d.rejectPayloadId);Serial.print('/');Serial.print(d.rejectDlc);Serial.print('/');Serial.print(d.rejectFormat);
+    Serial.print(" RX overflow/hw=");Serial.print(d.rxOverflow);Serial.print('/');Serial.print(d.rxHwOverrun);Serial.print(" RXQ=");Serial.print(d.head-d.tail);
+    Serial.print(" TX periodic accepted/fail=");Serial.print(d.txAccepted[Diag::PERIODIC_ZERO]);Serial.print('/');Serial.print(d.txFailures[Diag::PERIODIC_ZERO]);
+    Serial.print(" start enable/zero fail=");Serial.print(d.txFailures[Diag::START_ENABLE]);Serial.print('/');Serial.print(d.txFailures[Diag::START_ZERO]);
+    Serial.print(" stop zero/disable fail=");Serial.print(d.txFailures[Diag::STOP_ZERO]);Serial.print('/');Serial.print(d.txFailures[Diag::STOP_DISABLE]);
+    Serial.print(" TXQ=");Serial.print(txQueue(i));Serial.print(" RX age ms=");if(age==UINT32_MAX)Serial.print("NEVER");else Serial.print(age/1000.0f,2);
+    Serial.print(" TEC/REC=");Serial.print(ecr&255U);Serial.print('/');Serial.print((ecr>>8)&255U);Serial.print(" CAN state=");Serial.print(canStateName(esr));Serial.print(" ESR1=0x");Serial.println(esr,HEX);
+  }
+}
+static void printHistory() {
+  for(uint8_t i=0;i<2;++i)if(motorOn(i)) {
+    auto &d=Diag::motor[i];Serial.print("HISTORY M");Serial.print(i+1);Serial.print(" count=");Serial.print(d.histCount);Serial.print(" frozen=");Serial.println(d.historyFrozen?"YES":"NO");
+    const uint16_t n=d.histCount,start=(d.histHead+HISTORY_SIZE-n)%HISTORY_SIZE;
+    for(uint16_t k=0;k<n;++k) {
+      Diag::HistoryRow r{};noInterrupts();r=d.history[(start+k)%HISTORY_SIZE];interrupts();
+      Serial.print((r.us-sessionStartUs)/1000);Serial.print("ms ");if(r.kind==Diag::HISTORY_FAULT)Serial.print("FAULT ");
+      Serial.print("rx=");Serial.print(r.rxFrames);Serial.print('/');Serial.print(r.rxAccepted);Serial.print('/');Serial.print(r.rxQueued);Serial.print('/');Serial.print(r.rxProcessed);
+      Serial.print(" periodic_tx=");Serial.print(r.periodicAccepted);Serial.print('/');Serial.print(r.periodicFailures);
+      Serial.print(" stop_fail=");Serial.print(r.stopZeroFailures);Serial.print('/');Serial.print(r.stopDisableFailures);
+      Serial.print(" RXage_us=");Serial.print(r.lastRxUs?uint32_t(r.us-r.lastRxUs):UINT32_MAX);
+      Serial.print(" TEC/REC=");Serial.print(r.tec);Serial.print('/');Serial.print(r.rec);Serial.print(" TXQ/RXQ=");Serial.print(r.txQueue);Serial.print('/');Serial.print(r.rxQueue);
+      Serial.print(" ESR1=0x");Serial.print(r.esr1,HEX);Serial.print(" ISRmax_us=");Serial.println(r.isrMaxUs);
+    }
+  }
+}
+static void handleCommand(char *line) {
+  for(char *p=line;*p;++p)*p=char(toupper((unsigned char)*p));
+  if(!strcmp(line,"S"))beginSession();
+  else if(!strcmp(line,"X")) {serviceFault();stopManually(true);}
+  else if(!strcmp(line,"STATUS"))printStatus();
+  else if(!strcmp(line,"HISTORY"))printHistory();
+  else if(!strcmp(line,"RESET")) {
+    if(Diag::state!=Diag::RUNNING) {Diag::reset(micros());timerOverrun=timerMaxUs=0;faultOutputDone=false;Serial.println("STATISTICS RESET");}
+    else Serial.println("RESET requires IDLE or FAULT_STOPPED");
+  } else Serial.println("Commands: S, X, STATUS, HISTORY, RESET");
+}
+
+void setup() {
+  Serial.begin(SERIAL_BAUD);
+  Diag::reset(micros());
+  if(MOTOR1_ON)configureBus(can1);
+  if(MOTOR2_ON)configureBus(can2);
+  if(MOTOR1_ON)NVIC_SET_PRIORITY(IRQ_CAN1,ISR_PRIORITY);
+  if(MOTOR2_ON)NVIC_SET_PRIORITY(IRQ_CAN2,ISR_PRIORITY);
+  commandTimer.priority(ISR_PRIORITY);timerReady=commandTimer.begin(commandISR,COMMAND_PERIOD_US);
+}
+void loop() {
+  serviceFault();
+  static char line[32];static uint8_t used=0;
+  while(Serial.available()) {
+    const char c=Serial.read();
+    if(c=='\r'||c=='\n') {if(used){line[used]=0;handleCommand(line);used=0;}}
+    else if(used<sizeof(line)-1)line[used++]=c;
+  }
+  if(Diag::state==Diag::RUNNING) {
+    const uint32_t now=micros();
+    if(MOTOR1_ON)processRx(0);
+    if(Diag::state==Diag::RUNNING&&MOTOR2_ON)processRx(1);
+    if(uint32_t(now-rxCheckStampUs)>=1000) {
+      rxCheckStampUs=now;
+      if(MOTOR1_ON)checkBus(0);
+      if(Diag::state==Diag::RUNNING&&MOTOR2_ON)checkBus(1);
+    }
+    if(Diag::state==Diag::RUNNING)for(uint8_t i=0;i<2;++i)if(motorOn(i)&&uint32_t(now-Diag::motor[i].historyStampUs)>=10000) {
+      Diag::motor[i].historyStampUs=now;Diag::pushHistory(i,now,esrValue(i),ecrValue(i),txQueue(i));
+    }
+    if(Diag::state==Diag::RUNNING&&uint32_t(millis()-printStampMs)>=PRINT_INTERVAL_MS) {
+      printStampMs=millis();const float seconds=elapsedFromStart()/1000000.0f;
+      for(uint8_t i=0;i<2;++i)if(motorOn(i)) {
+        auto &d=Diag::motor[i];const uint32_t tx=d.txAccepted[Diag::PERIODIC_ZERO],rx=d.rxProcessed;
+        if(i==0){Serial.print("[ ");Serial.print(seconds,1);Serial.print("s] ");}else Serial.print("         ");
+        Serial.print("M");Serial.print(i+1);Serial.print(" OK | TX:");Serial.print(tx-prevTx[i]);Serial.print(" RX:");Serial.println(rx-prevRx[i]);
+        prevTx[i]=tx;prevRx[i]=rx;prevRxFrames[i]=d.rxFrames;
+      }
+    }
+  }
+  serviceFault();
+}

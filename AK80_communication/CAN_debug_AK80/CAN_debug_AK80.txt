@@ -1,0 +1,308 @@
+===== CAN_debug_AK80.ino =====
+#include <Arduino.h>
+#include <FlexCAN_T4.h>
+#include <IntervalTimer.h>
+#include "control_config.h"
+#include "can_diagnostics.h"
+
+using Can1 = FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16>;
+using Can2 = FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16>;
+static Can1 can1; static Can2 can2; static IntervalTimer commandTimer;
+static volatile uint32_t timerOverrun=0, timerMaxUs=0;
+static uint32_t bootUs=0, printStampMs=0, rxCheckStampUs=0;
+static bool sessionStoppedByFault=false;
+static bool timerReady=false;
+static uint32_t prevTx[2]={0,0}, prevRx[2]={0,0};
+static const char *sessionStopReason="";
+static uint32_t seenHw[2]={0,0}, seenOv[2]={0,0}, seenRej[2]={0,0}, seenTxFail[2]={0,0};
+static bool seenCanError[2]={false,false}, saidIsrOverrun=false;
+
+static uint32_t enc(float x,float lo,float hi,uint8_t bits) {
+  x=constrain(x,lo,hi); return uint32_t((x-lo)*float((1UL<<bits)-1)/(hi-lo));
+}
+static bool sendRaw(uint8_t i, const CAN_message_t &m) { return i==0?can1.write(m):can2.write(m); }
+static bool sendSpecial(uint8_t i, uint8_t code) {
+  CAN_message_t m={}; m.id=MOTOR_ID[i]; m.len=8;
+  for(uint8_t k=0;k<7;++k) m.buf[k]=0xff;
+  m.buf[7]=code;
+  const bool ok=sendRaw(i,m); if(ok) ++Diag::motor[i].txSuccess; else ++Diag::motor[i].txFail; return ok;
+}
+static bool sendZero(uint8_t i) {
+  const uint32_t p=enc(0,POSITION_MIN,POSITION_MAX,16), v=enc(0,VELOCITY_MIN,VELOCITY_MAX,12);
+  const uint32_t kp=enc(0,0,MIT_KP_MAX,12), kd=enc(0,0,MIT_KD_MAX,12), t=enc(0,TORQUE_MIN,TORQUE_MAX,12);
+  CAN_message_t m={}; m.id=MOTOR_ID[i]; m.len=8;
+  m.buf[0]=p>>8; m.buf[1]=p; m.buf[2]=v>>4; m.buf[3]=((v&15)<<4)|(kp>>8); m.buf[4]=kp;
+  m.buf[5]=kd>>4; m.buf[6]=((kd&15)<<4)|(t>>8); m.buf[7]=t;
+  const bool ok=sendRaw(i,m); if(ok) ++Diag::motor[i].txSuccess; else ++Diag::motor[i].txFail; return ok;
+}
+static void rx1(const CAN_message_t &m) { Diag::recordRx(0,m); }
+static void rx2(const CAN_message_t &m) { Diag::recordRx(1,m); }
+
+static void commandISR() {
+  const uint32_t begin=micros();
+  if(Diag::active) {
+    if(MOTOR1_ON) sendZero(0);
+    if(MOTOR2_ON) sendZero(1);
+  }
+  const uint32_t elapsed=micros()-begin;
+  if(elapsed>timerMaxUs) timerMaxUs=elapsed;
+  if(MOTOR1_ON && elapsed>Diag::motor[0].isrMaxUs) Diag::motor[0].isrMaxUs=elapsed;
+  if(MOTOR2_ON && elapsed>Diag::motor[1].isrMaxUs) Diag::motor[1].isrMaxUs=elapsed;
+  if(elapsed>COMMAND_PERIOD_US) ++timerOverrun;
+}
+static uint32_t busBase(uint8_t i) { return i==0?CAN1:CAN2; }
+static uint32_t txQueue(uint8_t i) { return i==0?can1.getTXQueueCount():can2.getTXQueueCount(); }
+static void errorEvent(uint8_t i, const char *name, const char *detail="") {
+  Serial.print('['); Serial.print((micros()-bootUs)/1000000.0f,2); Serial.print("s] M"); Serial.print(i+1);
+  Serial.print(" WARN "); Serial.print(name); if(*detail){Serial.print(": ");Serial.print(detail);} Serial.println();
+}
+static void stopSession(const char *reason, int faultMotor) {
+  if(!Diag::active) return;
+  Diag::active=false; sessionStoppedByFault=(faultMotor>=0); Diag::stoppedByFault=sessionStoppedByFault;
+  sessionStopReason=reason;
+  Diag::stopFaultMotor=faultMotor<0?255:uint8_t(faultMotor);
+  for(uint8_t i=0;i<2;++i) if(motorOn(i)) {
+    const bool zero=sendZero(i); const bool disabled=sendSpecial(i,0xfd);
+    Serial.print("M");Serial.print(i+1);Serial.print(" STOP: Disable requested");
+    if(strcmp(reason,"Disable requested")) { Serial.print(" (");Serial.print(reason);Serial.print(')'); }
+    Serial.print(" | TX accepted: ");Serial.println(disabled?"YES":"NO");
+    if(!zero) Serial.print("  zero command TX accepted: NO\n");
+  }
+  if(sessionStoppedByFault) for(uint8_t i=0;i<2;++i) if(motorOn(i)&&int(i)!=faultMotor){Serial.print("M");Serial.print(i+1);Serial.println(" STOPPED (peer fault)");}
+}
+static void beginSession() {
+  if(Diag::active) return;
+  if(!timerReady) { Serial.println("START ERROR: command timer unavailable"); return; }
+  Diag::reset(micros()); sessionStoppedByFault=false; Diag::stopFaultMotor=255;
+  prevTx[0]=prevTx[1]=prevRx[0]=prevRx[1]=0;
+  timerOverrun=timerMaxUs=0; seenHw[0]=seenHw[1]=seenOv[0]=seenOv[1]=seenRej[0]=seenRej[1]=seenTxFail[0]=seenTxFail[1]=0; seenCanError[0]=seenCanError[1]=false; saidIsrOverrun=false;
+  bool ok=true;
+  for(uint8_t i=0;i<2;++i) if(motorOn(i)) ok=sendSpecial(i,0xfc)&&ok;
+  for(uint8_t i=0;i<2;++i) if(motorOn(i)) ok=sendZero(i)&&ok;
+  if(!ok){
+    Serial.println("START ERROR: Enable/zero TX API failed");
+    for(uint8_t i=0;i<2;++i) if(motorOn(i)) { const bool accepted=sendSpecial(i,0xfd); Serial.print("M");Serial.print(i+1);Serial.print(" STOP: Disable requested | TX accepted: ");Serial.println(accepted?"YES":"NO"); }
+    return;
+  }
+  for(uint8_t i=0;i<2;++i) if(motorOn(i)) Diag::motor[i].txSuccess=Diag::motor[i].txFail=0;
+  Diag::startUs=micros(); rxCheckStampUs=Diag::startUs; Diag::active=true;
+  printStampMs=millis();
+  Serial.println("TEST STARTED");
+}
+static void configureBus(Can1 &bus) { bus.begin(); bus.setBaudRate(CAN_BAUD); bus.setMaxMB(16); bus.setMB(MB0,RX,STD); bus.setMBFilter(REJECT_ALL); bus.setMBFilter(MB0,ACCEPT_ALL); bus.onReceive(MB0,rx1); bus.enableMBInterrupt(MB0); }
+static void configureBus(Can2 &bus) { bus.begin(); bus.setBaudRate(CAN_BAUD); bus.setMaxMB(16); bus.setMB(MB0,RX,STD); bus.setMBFilter(REJECT_ALL); bus.setMBFilter(MB0,ACCEPT_ALL); bus.onReceive(MB0,rx2); bus.enableMBInterrupt(MB0); }
+
+static void processRx(uint8_t i) {
+  auto &d=Diag::motor[i]; uint8_t budget=8;
+  while(budget-- && d.tail!=d.head) {
+    const auto r=d.queue[d.tail%RX_QUEUE_SIZE]; asm volatile("" ::: "memory"); ++d.tail;
+    ++d.rxProcessed;
+    const uint8_t error=r.msg.buf[7];
+    if(error && error!=d.motorErrorCode) { d.motorErrorCode=error; ++d.motorError; char b[24]; snprintf(b,sizeof(b),"code=%u",error); errorEvent(i,"MOTOR_ERROR",b); stopSession("MOTOR_ERROR",i); }
+    else if(!error) d.motorErrorCode=0;
+  }
+}
+static void printStatus() {
+  Serial.println("STATUS BEGIN");
+  for(uint8_t i=0;i<2;++i) if(motorOn(i)) {
+    auto &d=Diag::motor[i]; const uint32_t now=micros(), ecr=FLEXCANb_ECR(busBase(i)), esr=FLEXCANb_ESR1(busBase(i));
+    const uint32_t age=d.sawRx?now-d.lastRxUs:UINT32_MAX;
+    Serial.print("M");Serial.print(i+1);Serial.print(" CAN");Serial.print(i+1);Serial.print(" active=");Serial.print(Diag::active?"YES":"NO");
+    Serial.print(" RX frames/accepted/queued/processed=");Serial.print(d.rxFrames);Serial.print('/');Serial.print(d.rxAccepted);Serial.print('/');Serial.print(d.rxQueued);Serial.print('/');Serial.print(d.rxProcessed);
+    Serial.print(" rejected(id/payload/DLC/format)=");Serial.print(d.rejectId);Serial.print('/');Serial.print(d.rejectPayloadId);Serial.print('/');Serial.print(d.rejectDlc);Serial.print('/');Serial.print(d.rejectFormat);
+    Serial.print(" overflow/hw_overrun=");Serial.print(d.rxOverflow);Serial.print('/');Serial.print(d.rxHwOverrun);
+    Serial.print(" TX success/fail=");Serial.print(d.txSuccess);Serial.print('/');Serial.print(d.txFail);Serial.print(" TXQ/RXQ=");Serial.print(txQueue(i));Serial.print('/');Serial.print(d.head-d.tail);
+    Serial.print(" RX_age_ms=");if(age==UINT32_MAX)Serial.print("NEVER");else Serial.print(age/1000.0f,2);
+    Serial.print(" TEC/REC=");Serial.print(ecr&255);Serial.print('/');Serial.print((ecr>>8)&255);Serial.print(" ESR=0x");Serial.print(esr,HEX);Serial.print(" CAN_error_events=");Serial.print(d.canErrorEvents);
+    Serial.print(" ISR_max_us=");Serial.print(timerMaxUs);Serial.print(" overrun=");Serial.println(timerOverrun);
+  }
+  Serial.println("STATUS END");
+}
+static void printHistory() {
+  for(uint8_t i=0;i<2;++i) if(motorOn(i)) {
+    auto &d=Diag::motor[i]; Serial.print("HISTORY M");Serial.println(i+1);
+    const uint16_t n=d.histCount, start=(d.histHead+HISTORY_SIZE-n)%HISTORY_SIZE;
+    for(uint16_t k=0;k<n;++k) {
+      const auto &r=d.history[(start+k)%HISTORY_SIZE];
+      Serial.print((r.us-bootUs)/1000);Serial.print("ms rx=");Serial.print(r.rxFrames);Serial.print('/');Serial.print(r.rxAccepted);Serial.print('/');Serial.print(r.rxQueued);Serial.print('/');Serial.print(r.rxProcessed);
+      Serial.print(" tx=");Serial.print(r.txSuccess);Serial.print('/');Serial.print(r.txFail);Serial.print(" age_us=");Serial.print(r.lastRxUs?uint32_t(r.us-r.lastRxUs):UINT32_MAX);
+      Serial.print(" TEC/REC=");Serial.print(r.tec);Serial.print('/');Serial.print(r.rec);Serial.print(" TXQ/RXQ=");Serial.print(r.txQueue);Serial.print('/');Serial.print(r.rxQueue);Serial.print(" ISRmax=");Serial.println(r.isrMaxUs);
+    }
+  }
+}
+static void checkBus(uint8_t i) {
+  if(!motorOn(i)) return;
+  auto &d=Diag::motor[i]; const uint32_t base=busBase(i), now=micros();
+  const uint32_t esr=FLEXCANb_ESR1(base), ecr=FLEXCANb_ECR(base);
+  const uint32_t tec=ecr&255U, rec=(ecr>>8)&255U;
+  if ((ecr!=d.previousEcr || esr!=d.previousEsr) && (tec || rec || (esr & 0x3fU))) {
+    d.previousEcr=ecr; d.previousEsr=esr; ++d.canErrorEvents; d.esrSeen|=esr;
+    if(!seenCanError[i]) { seenCanError[i]=true; char b[48]; snprintf(b,sizeof(b),"TEC=%lu REC=%lu ESR=0x%lX",(unsigned long)tec,(unsigned long)rec,(unsigned long)esr); errorEvent(i,"CAN_ERROR",b); }
+  } else { d.previousEcr=ecr; d.previousEsr=esr; }
+  if(ecr>d.ecrMax) d.ecrMax=ecr;
+  const bool busOff=FLEXCAN_ESR_get_fault_code(esr)==2U;
+  if(busOff && !d.busOff) { d.busOff=1; char b[40]; snprintf(b,sizeof(b),"TEC=%lu REC=%lu",(unsigned long)tec,(unsigned long)rec); errorEvent(i,"BUS_OFF",b); stopSession("BUS_OFF",i); }
+  CAN_error_t err; bool gotCanError=false;
+  auto drain=[&](auto &bus) { for(uint8_t n=0;n<4 && bus.error(err,false);++n) { ++d.canErrorEvents; d.esrSeen|=err.ESR1; d.ecrMax=max(d.ecrMax,err.ECR); gotCanError=true; } };
+  if(i==0) drain(can1); else drain(can2);
+  if(gotCanError && !seenCanError[i]) { seenCanError[i]=true; char b[48]; snprintf(b,sizeof(b),"TEC=%lu REC=%lu ESR=0x%lX",(unsigned long)tec,(unsigned long)rec,(unsigned long)esr); errorEvent(i,"CAN_ERROR",b); }
+  if(d.rxHwOverrun && !seenHw[i]) { seenHw[i]=1;char b[32];snprintf(b,sizeof(b),"count=%lu",(unsigned long)d.rxHwOverrun);errorEvent(i,"RX_HW_OVERRUN",b); }
+  if(d.rxOverflow && d.rxOverflow!=seenOv[i]) { seenOv[i]=d.rxOverflow;char b[32];snprintf(b,sizeof(b),"count=%lu",(unsigned long)d.rxOverflow);errorEvent(i,"RX_OVERFLOW",b);stopSession("RX_OVERFLOW",i); }
+  if(d.rxRejected && !seenRej[i]) { seenRej[i]=1;char b[72];snprintf(b,sizeof(b),"id=%lu payload_id=%lu DLC=%lu format=%lu",(unsigned long)d.rejectId,(unsigned long)d.rejectPayloadId,(unsigned long)d.rejectDlc,(unsigned long)d.rejectFormat);errorEvent(i,"RX_REJECTED",b); }
+  if(d.txFail && d.txFail!=seenTxFail[i]) { seenTxFail[i]=d.txFail;char b[72];snprintf(b,sizeof(b),"count=%lu TXQ=%lu TEC=%lu REC=%lu",(unsigned long)d.txFail,(unsigned long)txQueue(i),(unsigned long)tec,(unsigned long)rec);errorEvent(i,"TX_FAIL",b);stopSession("TX_FAIL",i); }
+  if(timerOverrun && !saidIsrOverrun) { saidIsrOverrun=true;char b[48];snprintf(b,sizeof(b),"max=%luus count=%lu",(unsigned long)timerMaxUs,(unsigned long)timerOverrun);errorEvent(i,"ISR_OVERRUN",b);stopSession("ISR_OVERRUN",i); }
+  if(Diag::active) {
+    const uint32_t age=d.sawRx?now-d.lastRxUs:now-Diag::startUs;
+    if(age>RX_TIMEOUT_US && !d.timeoutReported) { d.timeoutReported=true;char b[32];snprintf(b,sizeof(b),"%lu ms",(unsigned long)(age/1000));errorEvent(i,"RX_TIMEOUT",b);stopSession("RX_TIMEOUT",i); }
+    else if(age>RX_WARNING_US && !d.gapReported) {d.gapReported=true;char b[32];snprintf(b,sizeof(b),"%.1fms",age/1000.0f);errorEvent(i,"RX_GAP",b);}
+    else if(age<=RX_WARNING_US && d.gapReported){d.gapReported=false;d.timeoutReported=false;Serial.print('[');Serial.print((now-bootUs)/1000000.0f,2);Serial.print("s] M");Serial.print(i+1);Serial.println(" RECOVERED RX_GAP");}
+  }
+}
+static void handleCommand(char *line) {
+  if(!strcmp(line,"S")) beginSession();
+  else if(!strcmp(line,"X")) stopSession("Disable requested",-1);
+  else if(!strcmp(line,"STATUS")) printStatus();
+  else if(!strcmp(line,"HISTORY")) printHistory();
+  else if(!strcmp(line,"RESET")) { if(!Diag::active){Diag::reset(micros());timerOverrun=timerMaxUs=0;Serial.println("STATISTICS RESET");}else Serial.println("RESET requires stopped test"); }
+  else Serial.println("Commands: S, X, STATUS, HISTORY, RESET");
+}
+
+void setup() {
+  Serial.begin(SERIAL_BAUD); bootUs=micros(); Diag::reset(bootUs);
+  if(MOTOR1_ON) configureBus(can1);
+  if(MOTOR2_ON) configureBus(can2);
+  if(MOTOR1_ON) NVIC_SET_PRIORITY(IRQ_CAN1,ISR_PRIORITY);
+  if(MOTOR2_ON) NVIC_SET_PRIORITY(IRQ_CAN2,ISR_PRIORITY);
+  commandTimer.priority(ISR_PRIORITY);
+  timerReady=commandTimer.begin(commandISR,COMMAND_PERIOD_US);
+  Serial.print("READY "); if(MOTOR1_ON)Serial.print("M1=CAN1 "); if(MOTOR2_ON)Serial.print("M2=CAN2 ");
+  Serial.print("CAN=1Mbps period=");Serial.print(COMMAND_PERIOD_US);Serial.print("us TIMER=");Serial.println(timerReady?"OK":"ERROR");
+  Serial.println("Commands: S, X, STATUS, HISTORY, RESET");
+}
+void loop() {
+  static char line[32]; static uint8_t used=0;
+  while(Serial.available()) { char c=Serial.read(); if(c=='\r'||c=='\n'){if(used){line[used]=0;handleCommand(line);used=0;}}else if(used<sizeof(line)-1)line[used++]=c; }
+  const uint32_t now=micros();
+  if(MOTOR1_ON) processRx(0);
+  if(MOTOR2_ON) processRx(1);
+  if(uint32_t(now-rxCheckStampUs)>=1000) { rxCheckStampUs=now; if(MOTOR1_ON)checkBus(0); if(MOTOR2_ON)checkBus(1); }
+  for(uint8_t i=0;i<2;++i) if(motorOn(i) && uint32_t(now-Diag::motor[i].historyStampUs)>=10000) { Diag::motor[i].historyStampUs=now; Diag::pushHistory(i,now,FLEXCANb_ECR(busBase(i)),txQueue(i)); }
+  if(uint32_t(millis()-printStampMs)>=PRINT_INTERVAL_MS) {
+    printStampMs=millis(); const float sec=(micros()-bootUs)/1000000.0f;
+    for(uint8_t i=0;i<2;++i) if(motorOn(i)) {
+      auto &d=Diag::motor[i]; const uint32_t tx=d.txSuccess, rx=d.rxProcessed;
+      Serial.print(i==0?"[ ":"         "); if(i==0){Serial.print(sec,1);Serial.print("s] ");}
+      Serial.print("M");Serial.print(i+1);Serial.print(' ');
+      if(Diag::active && d.sawRx && uint32_t(micros()-d.lastRxUs)<=RX_WARNING_US) {Serial.print("OK | TX:");Serial.print(tx-prevTx[i]);Serial.print(" RX:");Serial.println(rx-prevRx[i]);}
+      else if(Diag::active) {Serial.print(d.timeoutReported?"RX_TIMEOUT | age:":"RX_GAP | age:");const uint32_t age=d.sawRx?micros()-d.lastRxUs:micros()-Diag::startUs;Serial.print(age/1000);Serial.println("ms");}
+      else if(sessionStoppedByFault && int(i)!=Diag::stopFaultMotor) Serial.println("STOPPED (peer fault)");
+      else if(sessionStoppedByFault && sessionStopReason && !strcmp(sessionStopReason,"RX_TIMEOUT")) { Serial.print("RX_TIMEOUT | age:"); const uint32_t age=d.sawRx?micros()-d.lastRxUs:micros()-Diag::startUs; Serial.print(age/1000); Serial.println("ms"); }
+      else if(sessionStoppedByFault && sessionStopReason && *sessionStopReason) { Serial.print(sessionStopReason); Serial.print(" | TX_FAIL:"); Serial.println(d.txFail); }
+      else Serial.println("STOPPED");
+      prevTx[i]=tx;prevRx[i]=rx;
+    }
+  }
+}
+
+
+===== can_diagnostics.h =====
+#pragma once
+#include <Arduino.h>
+#include "control_config.h"
+
+namespace Diag {
+struct RxFrame { CAN_message_t msg; uint32_t us; };
+struct HistoryRow {
+  uint32_t us, rxFrames, rxAccepted, rxQueued, rxProcessed, txSuccess, txFail, lastRxUs;
+  uint16_t tec, rec, txQueue, rxQueue;
+  uint32_t isrMaxUs;
+};
+struct Motor {
+  volatile uint32_t rxFrames=0, rxAccepted=0, rxQueued=0, rxProcessed=0, rxRejected=0;
+  volatile uint32_t rejectId=0, rejectPayloadId=0, rejectDlc=0, rejectFormat=0;
+  volatile uint32_t rxOverflow=0, rxHwOverrun=0, txSuccess=0, txFail=0;
+  volatile uint32_t lastRxUs=0, isrMaxUs=0, canErrorEvents=0, motorError=0;
+  volatile uint32_t ecrMax=0, esrSeen=0, busOff=0;
+  volatile uint32_t previousEcr=0, previousEsr=0;
+  volatile uint32_t head=0, tail=0;
+  RxFrame queue[RX_QUEUE_SIZE];
+  HistoryRow history[HISTORY_SIZE];
+  volatile uint16_t histHead=0, histCount=0;
+  uint32_t historyStampUs=0;
+  bool sawRx=false;
+  bool gapReported=false, timeoutReported=false;
+  uint8_t motorErrorCode=0;
+};
+static Motor motor[2];
+static volatile bool active=false, stoppedByFault=false;
+static volatile uint8_t stopFaultMotor=255;
+static volatile uint32_t startUs=0;
+
+inline void recordRx(uint8_t i, const CAN_message_t &m) {
+  Motor &d=motor[i]; const uint32_t now=micros();
+  ++d.rxFrames;
+  if (m.flags.overrun) ++d.rxHwOverrun;
+  if (m.id != MOTOR_ID[i]) { ++d.rejectId; ++d.rxRejected; return; }
+  if (m.flags.remote || m.flags.extended) { ++d.rejectFormat; ++d.rxRejected; return; }
+  if (m.len != 8) { ++d.rejectDlc; ++d.rxRejected; return; }
+  if (m.buf[0] != MOTOR_ID[i]) { ++d.rejectPayloadId; ++d.rxRejected; return; }
+  ++d.rxAccepted;
+  d.sawRx=true; d.lastRxUs=now;
+  const uint32_t h=d.head, t=d.tail;
+  if (h-t >= RX_QUEUE_SIZE) { ++d.rxOverflow; return; }
+  d.queue[h % RX_QUEUE_SIZE].msg=m; d.queue[h % RX_QUEUE_SIZE].us=now;
+  asm volatile("" ::: "memory"); d.head=h+1; ++d.rxQueued;
+}
+inline void pushHistory(uint8_t i, uint32_t now, uint32_t ecr, uint32_t txQ) {
+  Motor &d=motor[i]; const uint16_t p=d.histHead;
+  HistoryRow &r=d.history[p];
+  r.us=now; r.rxFrames=d.rxFrames; r.rxAccepted=d.rxAccepted; r.rxQueued=d.rxQueued; r.rxProcessed=d.rxProcessed;
+  r.txSuccess=d.txSuccess; r.txFail=d.txFail; r.lastRxUs=d.sawRx?d.lastRxUs:0;
+  r.tec=ecr&255U; r.rec=(ecr>>8)&255U; r.txQueue=txQ; r.rxQueue=d.head-d.tail; r.isrMaxUs=d.isrMaxUs;
+  d.histHead=(p+1)%HISTORY_SIZE; if(d.histCount<HISTORY_SIZE) ++d.histCount;
+}
+inline void reset(uint32_t now) {
+  for(uint8_t i=0;i<2;++i) if(motorOn(i)) {
+    Motor &d=motor[i];
+    d.rxFrames=d.rxAccepted=d.rxQueued=d.rxProcessed=d.rxRejected=0;
+    d.rejectId=d.rejectPayloadId=d.rejectDlc=d.rejectFormat=0;
+    d.rxOverflow=d.rxHwOverrun=d.txSuccess=d.txFail=0;
+    d.lastRxUs=d.isrMaxUs=d.canErrorEvents=d.motorError=0;
+    d.ecrMax=d.esrSeen=d.busOff=0; d.head=d.tail=0; d.histHead=d.histCount=0;
+    d.previousEcr=d.previousEsr=0;
+    d.historyStampUs=now; d.sawRx=false; d.gapReported=d.timeoutReported=false; d.motorErrorCode=0;
+  }
+}
+}
+
+
+===== control_config.h =====
+#pragma once
+#include <stdint.h>
+
+// ========== MOTOR SELECTION ==========
+constexpr bool MOTOR1_ON = true;   // CAN1 / Motor ID1
+constexpr bool MOTOR2_ON = true;  // CAN2 / Motor ID2
+
+// ========== TEST SETTINGS ==========
+constexpr uint32_t COMMAND_PERIOD_US = 500;
+constexpr uint32_t PRINT_INTERVAL_MS = 1000;
+constexpr uint32_t RX_WARNING_US = 5000;
+constexpr uint32_t RX_TIMEOUT_US = 500000;
+
+static_assert(MOTOR1_ON || MOTOR2_ON, "Enable at least one motor");
+constexpr uint32_t CAN_BAUD = 1000000;
+constexpr uint8_t MOTOR_ID[2] = {1, 2};
+constexpr uint32_t RX_QUEUE_SIZE = 64;
+constexpr uint16_t HISTORY_SIZE = 200; // 2 seconds at 10 ms/sample
+constexpr uint32_t SERIAL_BAUD = 115200;
+constexpr uint8_t ISR_PRIORITY = 192;
+
+constexpr float POSITION_MIN = -12.5f, POSITION_MAX = 12.5f;
+constexpr float VELOCITY_MIN = -37.5f, VELOCITY_MAX = 37.5f;
+constexpr float TORQUE_MIN = -32.0f, TORQUE_MAX = 32.0f;
+constexpr float MIT_KP_MAX = 500.0f, MIT_KD_MAX = 5.0f;
+
+inline constexpr bool motorOn(uint8_t i) { return i == 0 ? MOTOR1_ON : (i == 1 ? MOTOR2_ON : false); }
+
+
