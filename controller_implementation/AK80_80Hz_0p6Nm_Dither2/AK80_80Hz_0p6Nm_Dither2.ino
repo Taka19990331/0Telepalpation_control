@@ -24,8 +24,8 @@
 
 // ==================== USER SETTINGS ====================
 constexpr bool MOTOR1_ON = true;  // CAN1 / MotorID 1
-constexpr bool MOTOR2_ON = false;  // CAN2 / MotorID 2
-constexpr float DITHER_FREQUENCY_HZ = 3.0f; // arbitrary Hz, e.g. 40.0f, 77.5f, 80.0f
+constexpr bool MOTOR2_ON = true;  // CAN2 / MotorID 2
+constexpr float DITHER_FREQUENCY_HZ = 50.0f; // arbitrary Hz, e.g. 40.0f, 77.5f, 80.0f
 constexpr float DITHER_AMPLITUDE_NM = 0.4f; // peak torque [Nm], NOT peak-to-peak
 constexpr float MOTOR1_DITHER_SIGN = 1.0f;
 constexpr float MOTOR2_DITHER_SIGN = 1.0f; // both motors IN PHASE by default

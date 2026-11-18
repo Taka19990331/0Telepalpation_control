@@ -1,0 +1,682 @@
+#include <Arduino.h>
+#include <FlexCAN_T4.h>
+#include <IntervalTimer.h>
+#include <SdFat.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#include "C:/0Telepalpation_control/SDlog/LogProtocol.h"
+#include "GravityDiagTypes.h"
+
+// Two-motor external PD position hold for gravity/load torque measurement.
+// The target for each motor is its first valid feedback angle after `S`.
+// No encoder zero command or feedback-angle offset is applied.
+
+namespace Config {
+constexpr uint8_t MOTOR_ID[2] = {1, 2};
+constexpr uint32_t CAN_BAUD = 1000000;
+constexpr uint32_t CONTROL_PERIOD_US = 500; // 2 kHz PD + torque command
+// Imported from CAN_debug_AK80_Jia_TimerISR_v4_dual_motor:
+constexpr uint32_t RX_POLL_PERIOD_US = 100; // 10 kHz polling, 5 polls per PD update
+constexpr uint8_t RX_BUDGET_PER_TICK = 4;   // bounded reads per motor per poll
+constexpr uint8_t TIMER_ISR_PRIORITY = 96;
+constexpr uint8_t CAN_IRQ_PRIORITY = 128; // CAN TX-completion IRQ remains enabled
+constexpr uint32_t FEEDBACK_TIMEOUT_US = 100000;
+constexpr uint32_t STARTUP_TIMEOUT_US = 1000000;
+constexpr uint32_t LOG_RING_ROWS = 2048;
+constexpr uint8_t LOG_BATCH_ROWS = 32;
+constexpr unsigned LOG_FILE_COUNT = 10000;
+constexpr uint32_t SERIAL_BAUD = 115200;
+
+// AK80 standard MIT encoding ranges.
+constexpr float POSITION_MIN = -12.5f, POSITION_MAX = 12.5f;
+constexpr float VELOCITY_MIN = -37.5f, VELOCITY_MAX = 37.5f;
+constexpr float TORQUE_MIN = -32.0f, TORQUE_MAX = 32.0f;
+constexpr float MIT_KP_MIN = 0.0f, MIT_KP_MAX = 500.0f;
+constexpr float MIT_KD_MIN = 0.0f, MIT_KD_MAX = 5.0f;
+
+// External PD gains. Angle error is in degrees; velocity is rad/s.
+constexpr float KP_NM_PER_DEG = 1.0f; //0.00278
+constexpr float KD_NM_PER_RAD_S = 0.1f;
+constexpr float TORQUE_LIMIT_NM = 5.0f;
+}
+static_assert(Config::CONTROL_PERIOD_US % Config::RX_POLL_PERIOD_US == 0,
+              "CONTROL_PERIOD_US must be a multiple of RX_POLL_PERIOD_US");
+
+using Can1Type = FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16>;
+using Can2Type = FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16>;
+static Can1Type can1;
+static Can2Type can2;
+static IntervalTimer controlTimer;
+static SdFs sd;
+static FsFile logFile;
+
+static volatile Feedback feedback[2];
+static volatile bool captureFeedback = false;
+// CAN_debug v4 scheduling: RX always polled, zero-TX only during startup,
+// PD-TX during active control. No CAN callbacks or RX mailbox interrupts.
+static volatile bool startupZeroTx = false;
+static volatile bool startupTxError = false;
+static volatile bool stopCanPending = false;
+static uint8_t txDivider = 0; // used only by the 100-us timer ISR
+static volatile uint32_t rxRaw[2] = {0, 0};
+static volatile uint32_t rxAccepted[2] = {0, 0};
+static volatile uint32_t rxRejected[2] = {0, 0};
+static volatile uint32_t rxHwOverrun[2] = {0, 0};
+static volatile uint32_t txAccepted[2] = {0, 0};
+static volatile uint32_t txFailed[2] = {0, 0};
+static volatile int16_t lastTxResult[2] = {0, 0};
+static volatile uint32_t lastRejectedId[2] = {0, 0};
+static volatile uint8_t lastRejectedPayloadId[2] = {0, 0};
+static volatile uint8_t lastRejectedDlc[2] = {0, 0};
+
+// Only startup diagnostics change. The original GRAVPD1 data columns and
+// external PD controller remain untouched.
+static volatile StartupCause startupCause = START_OK;
+
+static const char *startupCauseName(StartupCause cause) {
+  switch (cause) {
+    case START_OK: return "OK";
+    case START_ENABLE_TX_FAIL: return "ENABLE_TX_FAIL";
+    case START_ZERO_TX_FAIL: return "ZERO_TX_FAIL";
+    case START_RX_TIMEOUT: return "RX_TIMEOUT";
+    case START_MOTOR_ERROR: return "MOTOR_ERROR";
+    case START_INVALID_ANGLE: return "INVALID_ANGLE";
+    case START_SD_HEADER_FAIL: return "SD_HEADER_FAIL";
+    case START_INTERRUPTED: return "USER_ABORT";
+    case START_TIMER_FAIL: return "TIMER_START_FAIL";
+    default: return "UNKNOWN";
+  }
+}
+
+DMAMEM static Sample logRing[Config::LOG_RING_ROWS];
+static volatile uint32_t logHead = 0, logTail = 0;
+static volatile bool recording = false, finalizeRequested = false;
+static volatile uint32_t logDropped = 0;
+
+static volatile bool active = false;
+static volatile uint32_t runStartUs = 0;
+static volatile uint32_t faultCode = 0;
+static volatile float targetAngleRad[2] = {0.0f, 0.0f};
+static volatile float commandTorqueNm[2] = {0.0f, 0.0f};
+static volatile bool stopRequested = false;
+static char latestFile[16] = {};
+static bool cardReady = false;
+static bool timerReady = false;
+
+static uint32_t encode(float value, float low, float high, uint8_t bits) {
+  value = constrain(value, low, high);
+  return uint32_t((value - low) * float((1UL << bits) - 1) / (high - low));
+}
+
+static float decode(uint32_t value, float low, float high, uint8_t bits) {
+  return float(value) * (high - low) / float((1UL << bits) - 1) + low;
+}
+
+// CAN_debug v4: use the Jia polling sketch's default FlexCAN mailboxes.
+// write() may return 1 (mailbox) or -1 (software queue in library variants).
+static bool sendFrame(uint8_t index, const CAN_message_t &message) {
+  const int result = index == 0 ? can1.write(message) : can2.write(message);
+  const bool ok = result == 1 || result == -1; // same rule as CAN_debug v4
+  lastTxResult[index] = result;
+  if (ok) ++txAccepted[index];
+  else ++txFailed[index];
+  return ok;
+}
+
+static bool sendSpecial(uint8_t index, uint8_t code) {
+  CAN_message_t message = {};
+  message.id = Config::MOTOR_ID[index];
+  message.len = 8;
+  message.flags.extended = 0;
+  message.flags.remote = 0;
+  for (uint8_t i = 0; i < 7; ++i) message.buf[i] = 0xff;
+  message.buf[7] = code;
+  return sendFrame(index, message);
+}
+
+static bool sendCommand(uint8_t index, float torqueNm) {
+  if (!isfinite(torqueNm)) torqueNm = 0.0f;
+  torqueNm = constrain(torqueNm, -Config::TORQUE_LIMIT_NM, Config::TORQUE_LIMIT_NM);
+  // Jia Mode1 MIT packing from CAN_debug v4, with the original PD torque.
+  const uint32_t p = encode(0.0f, Config::POSITION_MIN, Config::POSITION_MAX, 16);
+  const uint32_t v = encode(0.0f, Config::VELOCITY_MIN, Config::VELOCITY_MAX, 12);
+  const uint32_t kp = encode(0.0f, Config::MIT_KP_MIN, Config::MIT_KP_MAX, 12);
+  const uint32_t kd = encode(0.0f, Config::MIT_KD_MIN, Config::MIT_KD_MAX, 12);
+  const uint32_t t = encode(torqueNm, Config::TORQUE_MIN, Config::TORQUE_MAX, 12);
+  CAN_message_t message = {};
+  message.id = Config::MOTOR_ID[index];
+  message.len = 8;
+  message.flags.extended = 0;
+  message.flags.remote = 0;
+  message.buf[0] = p >> 8;
+  message.buf[1] = p;
+  message.buf[2] = v >> 4;
+  message.buf[3] = ((v & 0x0f) << 4) | (kp >> 8);
+  message.buf[4] = kp;
+  message.buf[5] = kd >> 4;
+  message.buf[6] = ((kd & 0x0f) << 4) | (t >> 8);
+  message.buf[7] = t;
+  return sendFrame(index, message);
+}
+
+static void receiveForMotor(uint8_t index, const CAN_message_t &message, uint32_t now) {
+  // As in CAN_debug v4, either matching CAN ID or matching payload ID is
+  // accepted on these dedicated motor buses (DLC 6..8, standard data frame).
+  if (message.flags.extended || message.flags.remote ||
+      message.len < 6 || message.len > 8 ||
+      (message.id != Config::MOTOR_ID[index] &&
+       message.buf[0] != Config::MOTOR_ID[index])) {
+    ++rxRejected[index];
+    lastRejectedId[index] = message.id;
+    lastRejectedPayloadId[index] = message.buf[0];
+    lastRejectedDlc[index] = message.len;
+    return;
+  }
+  ++rxAccepted[index];
+  volatile Feedback &f = feedback[index];
+  f.angleRad = decode((uint32_t(message.buf[1]) << 8) | message.buf[2],
+                      Config::POSITION_MIN, Config::POSITION_MAX, 16);
+  f.velocityRadS = decode((uint32_t(message.buf[3]) << 4) | (message.buf[4] >> 4),
+                          Config::VELOCITY_MIN, Config::VELOCITY_MAX, 12);
+  f.torqueNm = decode(((uint32_t(message.buf[4]) & 0x0f) << 8) | message.buf[5],
+                      Config::TORQUE_MIN, Config::TORQUE_MAX, 12);
+  f.error = message.len >= 8 ? message.buf[7] : 0;
+  f.rxUs = now;
+  f.valid = true;
+}
+
+// Poll both CAN buses in the 100-us timer ISR, including in IDLE to drain
+// stale mailboxes. Each motor is budgeted at most 4 frames per poll (v4).
+static void pollCanMotor(uint8_t index) {
+  for (uint8_t n = 0; n < Config::RX_BUDGET_PER_TICK; ++n) {
+    CAN_message_t message = {};
+    const int got = index == 0 ? can1.read(message) : can2.read(message);
+    if (!got) break;
+    ++rxRaw[index];
+    if (message.flags.overrun) ++rxHwOverrun[index];
+    if (captureFeedback) receiveForMotor(index, message, micros());
+  }
+}
+
+static void configureCan(Can1Type &can) {
+  can.begin();
+  can.setBaudRate(Config::CAN_BAUD);
+  // No setMaxMB / setMBFilter / onReceive / RX interrupt, matching v4.
+}
+static void configureCan(Can2Type &can) {
+  can.begin();
+  can.setBaudRate(Config::CAN_BAUD);
+}
+
+static bool openNewLog() {
+  if (!cardReady || recording || finalizeRequested) return false;
+  char name[16];
+  for (unsigned n = 0; n < Config::LOG_FILE_COUNT; ++n) {
+    snprintf(name, sizeof(name), "GPD%04u.CSV", n);
+    if (!sd.exists(name) && logFile.open(name, O_WRONLY | O_CREAT | O_EXCL)) {
+      strcpy(latestFile, name);
+      logFile.println("#firmware,gravity_estimate_PD");
+      logFile.println("#schema,GRAVPD1");
+      logFile.print("#control_period_us,"); logFile.println(Config::CONTROL_PERIOD_US);
+      logFile.print("#motor1_id,"); logFile.println(Config::MOTOR_ID[0]);
+      logFile.println("#motor1_can_bus,1");
+      logFile.print("#motor2_id,"); logFile.println(Config::MOTOR_ID[1]);
+      logFile.println("#motor2_can_bus,2");
+      logFile.print("#kp_Nm_per_deg,"); logFile.println(Config::KP_NM_PER_DEG, 9);
+      logFile.print("#kd_Nm_per_rad_s,"); logFile.println(Config::KD_NM_PER_RAD_S, 9);
+      logFile.print("#torque_limit_Nm,"); logFile.println(Config::TORQUE_LIMIT_NM, 6);
+      logFile.println("#MIT_position_command,0");
+      logFile.println("#MIT_velocity_command,0");
+      logFile.println("#MIT_kp,0");
+      logFile.println("#MIT_kd,0");
+      logFile.println("#angle_zeroing,none; target is each motor's first feedback angle after S");
+      if (logFile.getWriteError() || !logFile.sync()) { logFile.close(); return false; }
+      logHead = logTail = 0;
+      logDropped = 0;
+      recording = true;
+      return true;
+    }
+  }
+  return false;
+}
+
+static void appendSample(const Sample &sample) {
+  if (!recording) return;
+  if (logHead - logTail >= Config::LOG_RING_ROWS) {
+    ++logDropped;
+    stopRequested = true;
+    return;
+  }
+  logRing[logHead % Config::LOG_RING_ROWS] = sample;
+  asm volatile("" ::: "memory");
+  ++logHead;
+}
+
+static bool writeSample(const Sample &s) {
+  char row[240];
+  const int n = snprintf(row, sizeof(row),
+      "%lu,%.8g,%.8g,%.8g,%.8g,%.8g,%.8g,%.8g,%.8g\n",
+      (unsigned long)s.timeUs,
+      s.angleRad[0], s.velocityRadS[0], s.commandNm[0], s.feedbackNm[0],
+      s.angleRad[1], s.velocityRadS[1], s.commandNm[1], s.feedbackNm[1]);
+  return n > 0 && size_t(n) < sizeof(row) &&
+         logFile.write(reinterpret_cast<const uint8_t *>(row), size_t(n)) == size_t(n);
+}
+
+static void finalizeLog() {
+  if (!finalizeRequested || logTail != logHead) return;
+  logFile.print("#rows,"); logFile.println(logHead);
+  logFile.print("#log_dropped_rows,"); logFile.println(logDropped);
+  logFile.print("#stop_reason,"); logFile.println(faultCode);
+  const bool ok = !logFile.getWriteError() && logFile.sync();
+  logFile.close();
+  finalizeRequested = false;
+  Serial.print("SAVED,"); Serial.print(latestFile); Serial.print(",STATUS,"); Serial.println(ok ? faultCode : 99);
+}
+
+static void serviceLog() {
+  if (!recording && !finalizeRequested) return;
+  const uint32_t pending = logHead - logTail;
+  if (recording && !finalizeRequested && pending < Config::LOG_BATCH_ROWS) return;
+  uint8_t count = 0;
+  while (logTail != logHead && count < Config::LOG_BATCH_ROWS) {
+    Sample sample = logRing[logTail % Config::LOG_RING_ROWS];
+    if (!writeSample(sample)) {
+      const bool wasActive = active;
+      noInterrupts();
+      recording = false;
+      finalizeRequested = true;
+      faultCode = 4;
+      active = false;
+      captureFeedback = false;
+      logDropped += logHead - logTail;
+      logTail = logHead;
+      interrupts();
+      if (wasActive) {
+        sendCommand(0, 0.0f); sendCommand(1, 0.0f);
+        sendSpecial(0, 0xfd); sendSpecial(1, 0xfd);
+      }
+      break;
+    }
+    ++logTail;
+    ++count;
+  }
+  if (count && !logFile.sync()) {
+    const bool wasActive = active;
+    noInterrupts(); recording = false; finalizeRequested = true; faultCode = 4; active = false;
+    captureFeedback = false; logDropped += logHead - logTail; logTail = logHead; interrupts();
+    if (wasActive) {
+      sendCommand(0, 0.0f); sendCommand(1, 0.0f);
+      sendSpecial(0, 0xfd); sendSpecial(1, 0xfd);
+    }
+  }
+  finalizeLog();
+}
+
+static void stopFromIsr(uint32_t reason) {
+  // CAN_debug v4: stop periodic torque immediately in ISR; issue the best-
+  // effort zero + MIT-exit frames from loop(), outside the timer interrupt.
+  active = false;
+  faultCode = reason;
+  commandTorqueNm[0] = commandTorqueNm[1] = 0.0f;
+  captureFeedback = false;
+  recording = false;
+  finalizeRequested = true;
+  stopCanPending = true;
+}
+
+static void controlTick() {
+  if (!active) return;
+  const uint32_t now = micros();
+  Feedback f[2];
+  for (uint8_t i = 0; i < 2; ++i) {
+    f[i].angleRad = feedback[i].angleRad; f[i].velocityRadS = feedback[i].velocityRadS;
+    f[i].torqueNm = feedback[i].torqueNm; f[i].rxUs = feedback[i].rxUs;
+    f[i].error = feedback[i].error; f[i].valid = feedback[i].valid;
+  }
+  float tau[2] = {0.0f, 0.0f};
+  for (uint8_t i = 0; i < 2; ++i) {
+    if (!f[i].valid || uint32_t(now - f[i].rxUs) > Config::FEEDBACK_TIMEOUT_US) {
+      stopFromIsr(6); return;
+    }
+    if (f[i].error != 0) { stopFromIsr(7); return; }
+    if (!isfinite(f[i].angleRad) || !isfinite(f[i].velocityRadS) || !isfinite(f[i].torqueNm)) {
+      stopFromIsr(8); return;
+    }
+    const float errorDeg = (float(targetAngleRad[i]) - f[i].angleRad) * 57.2957795131f;
+    tau[i] = Config::KP_NM_PER_DEG * errorDeg - Config::KD_NM_PER_RAD_S * f[i].velocityRadS;
+    if (!isfinite(tau[i])) { stopFromIsr(8); return; }
+    tau[i] = constrain(tau[i], -Config::TORQUE_LIMIT_NM, Config::TORQUE_LIMIT_NM);
+  }
+  commandTorqueNm[0] = tau[0];
+  commandTorqueNm[1] = tau[1];
+  // Always attempt TX to both independent buses, even if the first fails.
+  const bool tx1 = sendCommand(0, tau[0]);
+  const bool tx2 = sendCommand(1, tau[1]);
+  if (!tx1 || !tx2) { stopFromIsr(2); return; }
+
+  Sample sample = {};
+  sample.timeUs = now - runStartUs;
+  for (uint8_t i = 0; i < 2; ++i) {
+    sample.angleRad[i] = f[i].angleRad;
+    sample.velocityRadS[i] = f[i].velocityRadS;
+    sample.commandNm[i] = tau[i];
+    sample.feedbackNm[i] = f[i].torqueNm;
+  }
+  appendSample(sample);
+  if (stopRequested) stopFromIsr(3);
+}
+
+// v4's 100-us ISR owns all startup zero-torque TX (every 500 us).
+static void canPollingTimerTick() {
+  pollCanMotor(0);
+  pollCanMotor(1);
+  if (++txDivider < Config::CONTROL_PERIOD_US / Config::RX_POLL_PERIOD_US) return;
+  txDivider = 0;
+  if (startupZeroTx) {
+    const bool tx1 = sendCommand(0, 0.0f);
+    const bool tx2 = sendCommand(1, 0.0f);
+    if (!tx1 || !tx2) {
+      startupZeroTx = false;
+      startupTxError = true;
+      startupCause = START_ZERO_TX_FAIL;
+      stopCanPending = true;
+    }
+  } else if (active) {
+    controlTick();
+  }
+}
+
+static bool waitForInitialFeedback(uint32_t started) {
+  while (uint32_t(micros() - started) < Config::STARTUP_TIMEOUT_US) {
+    if (startupTxError) return false;
+    noInterrupts();
+    Feedback f1, f2;
+    f1.angleRad = feedback[0].angleRad; f1.velocityRadS = feedback[0].velocityRadS;
+    f1.torqueNm = feedback[0].torqueNm; f1.rxUs = feedback[0].rxUs;
+    f1.error = feedback[0].error; f1.valid = feedback[0].valid;
+    f2.angleRad = feedback[1].angleRad; f2.velocityRadS = feedback[1].velocityRadS;
+    f2.torqueNm = feedback[1].torqueNm; f2.rxUs = feedback[1].rxUs;
+    f2.error = feedback[1].error; f2.valid = feedback[1].valid;
+    interrupts();
+    if (f1.valid && f2.valid) {
+      if (f1.error || f2.error) { startupCause = START_MOTOR_ERROR; return false; }
+      if (!isfinite(f1.angleRad) || !isfinite(f2.angleRad)) {
+        startupCause = START_INVALID_ANGLE; return false;
+      }
+      noInterrupts();
+      targetAngleRad[0] = f1.angleRad;
+      targetAngleRad[1] = f2.angleRad;
+      runStartUs = micros();
+      interrupts();
+      logFile.print("#target_angle_m1_rad,"); logFile.println(f1.angleRad, 9);
+      logFile.print("#target_angle_m2_rad,"); logFile.println(f2.angleRad, 9);
+      logFile.println("time_us,m1_angle_rad,m1_velocity_rad_s,m1_command_torque_Nm,m1_feedback_torque_Nm,m2_angle_rad,m2_velocity_rad_s,m2_command_torque_Nm,m2_feedback_torque_Nm");
+      if (logFile.getWriteError() || !logFile.sync()) {
+        startupCause = START_SD_HEADER_FAIL; return false;
+      }
+      return true;
+    }
+    if (Serial.available()) {
+      const int c = Serial.peek();
+      if (c == 'x' || c == 'X') {
+        Serial.read(); startupCause = START_INTERRUPTED; return false;
+      }
+    }
+    yield();
+  }
+  startupCause = START_RX_TIMEOUT;
+  return false;
+}
+
+// The 100-us timer is stopped before the S startup sequence, as in CAN_debug
+// v4. This prevents concurrent FlexCAN_T4 read() and enable write() calls.
+// Printing is intentionally done only after torque transmission has stopped.
+static StartupSnapshot captureStartupDiagnostics(uint32_t startUs) {
+  StartupSnapshot snap = {};
+  noInterrupts();
+  snap.cause = startupCause;
+  snap.snapshotUs = micros();
+  snap.elapsedMs = (snap.snapshotUs - startUs) / 1000;
+  for (uint8_t i = 0; i < 2; ++i) {
+    snap.f[i].angleRad = feedback[i].angleRad;
+    snap.f[i].velocityRadS = feedback[i].velocityRadS;
+    snap.f[i].torqueNm = feedback[i].torqueNm;
+    snap.f[i].error = feedback[i].error;
+    snap.f[i].rxUs = feedback[i].rxUs;
+    snap.f[i].valid = feedback[i].valid;
+    snap.raw[i] = rxRaw[i]; snap.accepted[i] = rxAccepted[i];
+    snap.rejected[i] = rxRejected[i]; snap.overrun[i] = rxHwOverrun[i];
+    snap.txOk[i] = txAccepted[i]; snap.txFail[i] = txFailed[i];
+    snap.txLast[i] = lastTxResult[i]; snap.rejectId[i] = lastRejectedId[i];
+    snap.rejectPayload[i] = lastRejectedPayloadId[i];
+    snap.rejectDlc[i] = lastRejectedDlc[i];
+    const uint32_t bus = i == 0 ? CAN1 : CAN2;
+    snap.ecr[i] = FLEXCANb_ECR(bus);
+    snap.esr[i] = FLEXCANb_ESR1(bus);
+    snap.txQueue[i] = i == 0 ? can1.getTXQueueCount() : can2.getTXQueueCount();
+  }
+  interrupts();
+  return snap;
+}
+
+static void printStartupDiagnostics(const StartupSnapshot &snap) {
+  Serial.print("START_DIAG,CAUSE,"); Serial.print(startupCauseName(snap.cause));
+  Serial.print(",ELAPSED_MS,"); Serial.println(snap.elapsedMs);
+  for (uint8_t i = 0; i < 2; ++i) {
+    Serial.print("START_DIAG,M"); Serial.print(i + 1);
+    Serial.print(",RX_RAW,"); Serial.print(snap.raw[i]);
+    Serial.print(",RX_VALID,"); Serial.print(snap.accepted[i]);
+    Serial.print(",RX_REJECT,"); Serial.print(snap.rejected[i]);
+    Serial.print(",RX_HW_OVERRUN,"); Serial.print(snap.overrun[i]);
+    Serial.print(",FB_VALID,"); Serial.print(snap.f[i].valid ? 1 : 0);
+    Serial.print(",FB_ERROR,"); Serial.print(snap.f[i].error);
+    Serial.print(",FB_AGE_US,");
+    if (snap.f[i].valid) Serial.print(uint32_t(snap.snapshotUs - snap.f[i].rxUs));
+    else Serial.print("NEVER");
+    Serial.print(",TX_ACCEPTED,"); Serial.print(snap.txOk[i]);
+    Serial.print(",TX_FAIL,"); Serial.print(snap.txFail[i]);
+    Serial.print(",TX_RESULT_LAST,"); Serial.print(snap.txLast[i]);
+    Serial.print(",TX_QUEUE,"); Serial.print(snap.txQueue[i]);
+    Serial.print(",TEC,"); Serial.print(snap.ecr[i] & 255U);
+    Serial.print(",REC,"); Serial.print((snap.ecr[i] >> 8) & 255U);
+    Serial.print(",ESR1,0x"); Serial.print(snap.esr[i], HEX);
+    Serial.print(",REJECT_LAST_ID,0x"); Serial.print(snap.rejectId[i], HEX);
+    Serial.print(",REJECT_LAST_DLC,"); Serial.print(snap.rejectDlc[i]);
+    Serial.print(",REJECT_LAST_PAYLOAD_ID,"); Serial.println(snap.rejectPayload[i]);
+  }
+}
+
+static void startRun() {
+  if (active || recording || finalizeRequested) { Serial.println("ERROR,BUSY"); return; }
+  if (!timerReady) { Serial.println("ERROR,TIMER_NOT_READY"); return; }
+  if (!openNewLog()) { Serial.println("ERROR,SD_OPEN"); return; }
+
+  // The v4 debugger stops the IDLE RX poller before issuing MIT ENABLE.
+  // This also removes a possible read()/write() race in FlexCAN_T4.
+  controlTimer.end();
+  timerReady = false;
+  noInterrupts();
+  for (uint8_t i = 0; i < 2; ++i) {
+    feedback[i].angleRad = 0.0f; feedback[i].velocityRadS = 0.0f;
+    feedback[i].torqueNm = 0.0f; feedback[i].rxUs = 0;
+    feedback[i].error = 0; feedback[i].valid = false;
+    rxRaw[i] = rxAccepted[i] = rxRejected[i] = rxHwOverrun[i] = 0;
+    txAccepted[i] = txFailed[i] = 0;
+    lastTxResult[i] = 0; lastRejectedId[i] = 0;
+    lastRejectedPayloadId[i] = lastRejectedDlc[i] = 0;
+  }
+  captureFeedback = false;
+  startupZeroTx = false;
+  startupTxError = false;
+  startupCause = START_OK;
+  stopCanPending = false;
+  stopRequested = false;
+  faultCode = 0;
+  txDivider = 0;
+  interrupts();
+
+  // v4 drains both mailboxes before ENABLE and does not send ZERO until
+  // the newly started timer reaches its first 500-us TX tick.
+  for (uint8_t i = 0; i < 2; ++i) {
+    for (uint8_t n = 0; n < Config::RX_BUDGET_PER_TICK; ++n) {
+      CAN_message_t message = {};
+      if (!(i == 0 ? can1.read(message) : can2.read(message))) break;
+    }
+  }
+  const uint32_t startupBegin = micros();
+  const bool enabled1 = sendSpecial(0, 0xfc);
+  const bool enabled2 = sendSpecial(1, 0xfc);
+  const bool enabled = enabled1 && enabled2;
+  if (!enabled) startupCause = START_ENABLE_TX_FAIL;
+
+  if (enabled) {
+    noInterrupts();
+    captureFeedback = true;
+    startupZeroTx = true;
+    interrupts();
+    controlTimer.priority(Config::TIMER_ISR_PRIORITY);
+    timerReady = controlTimer.begin(canPollingTimerTick, Config::RX_POLL_PERIOD_US);
+    if (!timerReady) {
+      noInterrupts();
+      startupZeroTx = false;
+      startupCause = START_TIMER_FAIL;
+      interrupts();
+    }
+  }
+
+  const bool gotFeedback = enabled && timerReady && waitForInitialFeedback(startupBegin);
+  // Atomic handover: a startup TX failure must not enter PD mode.
+  noInterrupts();
+  const bool ready = gotFeedback && startupZeroTx && !startupTxError;
+  startupZeroTx = false;
+  if (ready) {
+    logHead = logTail = 0;
+    runStartUs = micros();
+    active = true;
+  } else {
+    active = false;
+    captureFeedback = false;
+    stopCanPending = false;
+    recording = false;
+    finalizeRequested = true;
+    if (!faultCode) faultCode = startupTxError || !enabled ? 2 : 6;
+    if (startupCause == START_OK) startupCause = START_RX_TIMEOUT;
+  }
+  interrupts();
+
+  if (!ready) {
+    // Snapshot the failure BEFORE issuing stop frames, so failure counters
+    // and CAN error state describe startup rather than subsequent STOP TX.
+    const StartupSnapshot diag = captureStartupDiagnostics(startupBegin);
+    // No timer-driven TX is active here. Stop frames take precedence over
+    // diagnostics or SD writes. TX return does not prove CAN delivery.
+    sendCommand(0, 0.0f); sendCommand(1, 0.0f);
+    sendSpecial(0, 0xfd); sendSpecial(1, 0xfd);
+    // Stop the timer before serial output/diagnostics, then resume IDLE drain.
+    if (timerReady) { controlTimer.end(); timerReady = false; }
+    printStartupDiagnostics(diag);
+    controlTimer.priority(Config::TIMER_ISR_PRIORITY);
+    timerReady = controlTimer.begin(canPollingTimerTick, Config::RX_POLL_PERIOD_US);
+    if (!timerReady) Serial.println("ERROR,IDLE_RX_TIMER_START_FAILED");
+    serviceLog();
+    Serial.println("ERROR,STARTUP_FEEDBACK");
+    return;
+  }
+  Serial.print("RUNNING,TARGET_M1_RAD,"); Serial.print(float(targetAngleRad[0]), 8);
+  Serial.print(",TARGET_M2_RAD,"); Serial.println(float(targetAngleRad[1]), 8);
+}
+
+static void stopRun(uint32_t reason) {
+  noInterrupts();
+  const bool wasActive = active || startupZeroTx;
+  const bool pendingStop = stopCanPending;
+  const bool hadLog = recording || finalizeRequested;
+  active = false;
+  startupZeroTx = false;
+  stopCanPending = false;
+  if (wasActive || (!pendingStop && faultCode == 0)) faultCode = reason;
+  // Keep the ISR fault code if periodic TX already stopped on an error.
+  commandTorqueNm[0] = commandTorqueNm[1] = 0.0f;
+  captureFeedback = false;
+  interrupts();
+  if (!wasActive && !pendingStop && !hadLog) return;
+  if (wasActive || pendingStop) {
+    sendCommand(0, 0.0f); sendCommand(1, 0.0f);
+    sendSpecial(0, 0xfd); sendSpecial(1, 0xfd);
+  }
+  noInterrupts(); recording = false; finalizeRequested = true; interrupts();
+  serviceLog();
+}
+
+static void servicePendingCanStop() {
+  if (!stopCanPending) return;
+  noInterrupts();
+  const bool pending = stopCanPending;
+  stopCanPending = false;
+  interrupts();
+  if (!pending) return;
+  // Match CAN_debug v4: send both zero commands before both MIT exits.
+  sendCommand(0, 0.0f); sendCommand(1, 0.0f);
+  sendSpecial(0, 0xfd); sendSpecial(1, 0xfd);
+}
+
+static void fetchLog(bool previous) {
+  if (active || recording || finalizeRequested || !latestFile[0]) {
+    Serial.println("LOG,1,ERROR,NO_FILE_OR_BUSY"); return;
+  }
+  if (previous) { Serial.println("LOG,1,ERROR,PREVIOUS_UNSUPPORTED"); return; }
+  FsFile file;
+  if (!file.open(latestFile, O_RDONLY)) { Serial.println("LOG,1,ERROR,OPEN"); return; }
+  SDlog::sendFile(file, "gravity_estimate_PD", "GRAVPD1", latestFile);
+  file.close();
+}
+
+void setup() {
+  Serial.begin(Config::SERIAL_BAUD);
+  configureCan(can1); configureCan(can2);
+  // No CAN RX callbacks / mailbox IRQs. CAN IRQs remain for TX completion.
+  NVIC_SET_PRIORITY(IRQ_CAN1, Config::CAN_IRQ_PRIORITY);
+  NVIC_SET_PRIORITY(IRQ_CAN2, Config::CAN_IRQ_PRIORITY);
+  cardReady = sd.begin(SdioConfig(FIFO_SDIO));
+  controlTimer.priority(Config::TIMER_ISR_PRIORITY);
+  timerReady = controlTimer.begin(canPollingTimerTick, Config::RX_POLL_PERIOD_US);
+  Serial.print("READY,SD,"); Serial.print(cardReady ? "OK" : "ERROR");
+  Serial.print(",TIMER,"); Serial.println(timerReady ? "OK" : "ERROR");
+  Serial.print("CAN_V4_POLLING_DIAG2,RX_US,"); Serial.print(Config::RX_POLL_PERIOD_US);
+  Serial.print(",TX_US,"); Serial.println(Config::CONTROL_PERIOD_US);
+  Serial.println("Commands: S=start PD hold, X=stop, STATUS, D=fetch latest CSV, LOG,1,FETCH,LATEST");
+}
+
+void loop() {
+  // Handle ISR faults before any SD writes or serial commands.
+  servicePendingCanStop();
+  static char line[32];
+  static size_t used = 0;
+  while (Serial.available()) {
+    const char c = char(Serial.read());
+    if (SDlog::consumeCommandByte(c, "gravity_estimate_PD", "GRAVPD1", fetchLog)) continue;
+    if ((c == 'x' || c == 'X') && used == 0) { stopRun(1); continue; }
+    if (c == '\r' || c == '\n') {
+      line[used] = 0;
+      if (!strcmp(line, "S") || !strcmp(line, "s")) startRun();
+      else if (!strcmp(line, "STATUS") || !strcmp(line, "status")) {
+        noInterrupts(); const bool running = active; const uint32_t reason = faultCode;
+        const float t1 = targetAngleRad[0], t2 = targetAngleRad[1];
+        const float c1 = commandTorqueNm[0], c2 = commandTorqueNm[1]; interrupts();
+        Serial.print("STATUS,RUNNING,"); Serial.print(running ? 1 : 0);
+        Serial.print(",FAULT,"); Serial.print(reason);
+        Serial.print(",M1_TARGET_RAD,"); Serial.print(t1, 8);
+        Serial.print(",M1_TAU_CMD_NM,"); Serial.print(c1, 8);
+        Serial.print(",M2_TARGET_RAD,"); Serial.print(t2, 8);
+        Serial.print(",M2_TAU_CMD_NM,"); Serial.println(c2, 8);
+      } else if (!strcmp(line, "D") || !strcmp(line, "d")) fetchLog(false);
+      else if (used) Serial.println("ERROR,UNKNOWN_COMMAND");
+      used = 0;
+    } else if (used < sizeof(line) - 1) line[used++] = c;
+  }
+  servicePendingCanStop();
+  if (stopRequested && active) stopRun(3);
+  serviceLog();
+}
