@@ -35,7 +35,7 @@ constexpr float MIT_KP_MIN = 0.0f, MIT_KP_MAX = 500.0f;
 constexpr float MIT_KD_MIN = 0.0f, MIT_KD_MAX = 5.0f;
 
 // External PD gains. Angle error is in degrees; velocity is rad/s.
-constexpr float KP_NM_PER_DEG = 0.9f; //0.00278
+constexpr float KP_NM_PER_DEG = 0.0f; //0.00278
 constexpr float KD_NM_PER_RAD_S = 0.1f;
 constexpr float TORQUE_LIMIT_NM = 3.0f;
 }
