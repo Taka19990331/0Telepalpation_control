@@ -44,27 +44,15 @@ constexpr float MAX_REPORTED_TORQUE_NM = 2.5f;
 
 // ==================== GRAVITY MODEL (ANGLES IN rad) ====================
 // Keep calibration constants separate so each can be modified independently.
-constexpr double M1E       = -2.424051669779;
-constexpr double q1E       = -0.304722561563;
-constexpr double M2E       = -0.825322046438;
-constexpr double q2E       =  0.735973234422;
-constexpr double theta_off =  0.075099896878;
+constexpr float M1E       = -0.825322046f;
+constexpr float M2E       = -2.424051670f;
+constexpr float q1E       = -0.304722562f;
+constexpr float q2E       =  0.735973234f;
+constexpr float theta_off =  0.075099897f;
 
-// Measured raw motor angles at the reference pose [rad].
-constexpr double M1g_meas = -0.501276014465;
-constexpr double M2g_meas =  2.551200127518;
-
-// Measured torques at the reference pose [Nm].
-constexpr double tau_M1g_meas = +0.691;
-constexpr double tau_M2g_meas = -3.173;
-
-// Reference-pose link angles [rad].
-constexpr double theta1_g = -M2g_meas - (M1E + q1E);
-constexpr double theta2_g =  M1g_meas - (M2E + q2E) - theta_off;
-
-// Calculated once at startup from measured torques; Nm.
-static float G1 = 0.0f;
-static float G2 = 0.0f;
+// Gravity coefficients [Nm].
+constexpr float G1 = 2.6215f;
+constexpr float G2 = 0.0542f;
 static bool gravityCoefficientsValid = false;
 
 // ==================== FIXED COMMUNICATION SETTINGS ====================
@@ -182,16 +170,6 @@ static CAN_message_t makeTorqueFrame(uint8_t i, float torqueNm) {
 }
 
 static void initializeGravityModel() {
-  const double c1 = cos(theta1_g);
-  const double c2 = cos(theta2_g);
-  if (!isfinite(c1) || !isfinite(c2) || fabs(c1) < 1e-3 || fabs(c2) < 1e-3) {
-    gravityCoefficientsValid = false;
-    return;
-  }
-  // G1 = -tau_M2g_meas / cos(theta1_g)
-  // G2 =  tau_M1g_meas / cos(theta2_g)
-  G1 = static_cast<float>(-tau_M2g_meas / c1);
-  G2 = static_cast<float>( tau_M1g_meas / c2);
   const float maxTarget = K_G * fmaxf(fabsf(G1), fabsf(G2));
   gravityCoefficientsValid = isfinite(G1) && isfinite(G2) &&
                              isfinite(maxTarget) &&
@@ -304,11 +282,9 @@ static bool calculateGravityTorques(float &tauM1, float &tauM2) {
   const float M1raw = motor[0].positionRad;  // AK80 M1 feedback [rad]
   const float M2raw = motor[1].positionRad;  // AK80 M2 feedback [rad]
 
-  // theta1 = -M2raw - (M1E + q1E)
-  // theta2 =  M1raw - (M2E + q2E) - theta_off
-  const float theta1 = -M2raw - static_cast<float>(M1E + q1E);
-  const float theta2 =  M1raw - static_cast<float>(M2E + q2E) -
-                        static_cast<float>(theta_off);
+  // AK80 feedback angles -> link angles [rad].
+  const float theta1 = -(M2raw - M2E) + q1E;
+  const float theta2 =  (M1raw - M1E) - q2E - theta_off;
   if (!isfinite(theta1) || !isfinite(theta2)) return false;
 
   // Exact requested steady-state gravity compensation [Nm]:

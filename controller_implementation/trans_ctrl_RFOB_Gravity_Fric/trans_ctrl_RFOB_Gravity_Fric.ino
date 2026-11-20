@@ -31,14 +31,15 @@ constexpr MotorFriction FRICTION[2] = {
 };
 
 // Gravity model calibration copied from AK80_GravityCompensation.ino.
-constexpr double M1E=-2.424051669779, q1E=-0.304722561563;
-constexpr double M2E=-0.825322046438, q2E=0.735973234422;
-constexpr double theta_off=0.075099896878;
-constexpr double M1g_meas=-0.501276014465, M2g_meas=2.551200127518;
-constexpr double tau_M1g_meas=+0.691, tau_M2g_meas=-3.173;
-constexpr double theta1_g=-M2g_meas-(M1E+q1E);
-constexpr double theta2_g=M1g_meas-(M2E+q2E)-theta_off;
-static float G1=0.0f, G2=0.0f;
+constexpr float M1E       = -0.825322046f;
+constexpr float M2E       = -2.424051670f;
+constexpr float q1E       = -0.304722562f;
+constexpr float q2E       =  0.735973234f;
+constexpr float theta_off =  0.075099897f;
+
+// Gravity coefficients [Nm].
+constexpr float G1 = 2.6215f;
+constexpr float G2 = 0.0542f;
 static bool gravityModelValid=false;
 
 constexpr uint8_t MOTOR_ID[2]={1,2};
@@ -200,8 +201,8 @@ static void checkControlSafety(uint32_t now) {
   }
 }
 static bool calculateGravity(float &tauM1,float &tauM2) {
-  const float theta1=-motor[1].position-static_cast<float>(M1E+q1E);
-  const float theta2= motor[0].position-static_cast<float>(M2E+q2E)-static_cast<float>(theta_off);
+  const float theta1=-(motor[1].position-M2E)+q1E;
+  const float theta2= (motor[0].position-M1E)-q2E-theta_off;
   if(!isfinite(theta1)||!isfinite(theta2)) return false;
   tauM1= G2*cosf(theta2)*K_G;
   tauM2=-G1*cosf(theta1)*K_G;
@@ -433,11 +434,7 @@ static void serviceCanErrors() {
 
 void setup() {
   Serial.begin(ControlConfig::SERIAL_BAUD);
-  const double c1=cos(theta1_g),c2=cos(theta2_g);
-  if(isfinite(c1)&&isfinite(c2)&&fabs(c1)>=1e-3&&fabs(c2)>=1e-3) {
-    G1=float(-tau_M2g_meas/c1); G2=float(tau_M1g_meas/c2);
-    gravityModelValid=isfinite(G1)&&isfinite(G2)&&K_G*fmaxf(fabsf(G1),fabsf(G2))<=MAX_ABS_COMMAND_TORQUE_NM;
-  }
+  gravityModelValid=isfinite(G1)&&isfinite(G2)&&K_G*fmaxf(fabsf(G1),fabsf(G2))<=MAX_ABS_COMMAND_TORQUE_NM;
   for(uint8_t i=0;i<2;++i) zeroFrame[i]=makeZeroFrame(i);
   can1.begin(); can1.setBaudRate(ControlConfig::CAN_BAUD); NVIC_SET_PRIORITY(IRQ_CAN1,ControlConfig::CAN_IRQ_PRIORITY);
   can2.begin(); can2.setBaudRate(ControlConfig::CAN_BAUD); NVIC_SET_PRIORITY(IRQ_CAN2,ControlConfig::CAN_IRQ_PRIORITY);
