@@ -22,6 +22,7 @@ static bool timerReady=false;
 static bool awaitingFirstFeedback=true;
 ControlAlgorithm::Controller controller;
 IntervalTimer controlTimer;
+static uint8_t controlDivider=0;
 
 void stopRun(uint32_t reason) {
   CanProtocol::capture=false;
@@ -47,6 +48,7 @@ void handleFeedback(const CanProtocol::Feedback &f) {
 }
 void controlISR() {
   const uint32_t now=micros();
+  CanProtocol::pollReceive(); // 100 us Jia RX polling, including IDLE queue drain
   if(startRequest) {
     startRequest=false; runStart=now;
     // Before active, the original observer ignored startup replies. Do not feed
@@ -55,18 +57,21 @@ void controlISR() {
     CanProtocol::rxTail=CanProtocol::rxHead;
     active=true;
   }
+  if(++controlDivider < ControlConfig::CONTROL_PERIOD_US / ControlConfig::RX_POLL_PERIOD_US) return;
+  controlDivider=0;
   if(!active) return;
   CanDiagnostics::enter(now);
   struct TimingGuard { ~TimingGuard() { CanDiagnostics::leave(); } } timingGuard;
   if(!SaveData::recording) { stopRun(4); return; }
   for(uint32_t n=0;n<ControlConfig::RX_BUDGET && CanProtocol::processFeedback(now);++n) {}
   if(CanProtocol::rxHead!=CanProtocol::rxTail) ++CanDiagnostics::rxBudgetHits;
+  CanProtocol::sampleBusErrors();
   const auto &f=CanProtocol::feedback;
   const uint32_t age=f.valid ? uint32_t(now-f.rxUs) : uint32_t(now-runStart);
   uint32_t fault=0;
   if(CanProtocol::motorFault) fault=7;
   else if(CanDiagnostics::rxOverflow || CanDiagnostics::rxHardwareOverruns) fault=9;
-  else if(CanProtocol::communicationFault || age>ControlConfig::FEEDBACK_TIMEOUT_US) fault=6;
+  else if(CanProtocol::communicationFault || CanDiagnostics::busOffObserved || age>ControlConfig::FEEDBACK_TIMEOUT_US) fault=6;
   if(CanProtocol::numericFault || controller.faulted() ||
      (f.valid && (!isfinite(f.position)||!isfinite(f.velocity)||!isfinite(f.torque)))) {
     controller.trip(); fault=8;
@@ -145,7 +150,8 @@ void processCommand(char *line) {
     interrupts(); // Keep observer running while OFF.
   } else if(!strcmp(line,"BIAS")) {
     noInterrupts();
-    const auto &f=CanProtocol::feedback;
+    CanProtocol::sampleBusErrors();
+  const auto &f=CanProtocol::feedback;
     const bool allowed=active && !runtime.enabled && !controller.faulted() && f.valid &&
       !CanProtocol::motorFault && !CanProtocol::communicationFault && !CanProtocol::numericFault &&
       uint32_t(micros()-f.rxUs)<=ControlConfig::FEEDBACK_TIMEOUT_US && isfinite(f.torque) &&
@@ -166,7 +172,7 @@ void setup() {
   Serial.begin(ControlConfig::SERIAL_BAUD); CanProtocol::feedbackHandler=handleFeedback; CanProtocol::begin();
   const bool cardReady=SaveData::begin();
   controlTimer.priority(ControlConfig::ISR_PRIORITY);
-  timerReady=controlTimer.begin(controlISR,ControlConfig::CONTROL_PERIOD_US);
+  timerReady=controlTimer.begin(controlISR,ControlConfig::RX_POLL_PERIOD_US);
   Serial.print("READY,ID,"); Serial.print(ControlConfig::MOTOR_ID); Serial.print(",CAN,"); Serial.print(ControlConfig::CAN_BUS);
   Serial.print(",SD,"); Serial.print(!ControlConfig::SD_LOGGING?"DISABLED":(cardReady?"OK":"ERROR")); Serial.print(",TIMER,"); Serial.println(timerReady?"OK":"ERROR");
   Serial.println("Commands: S, ON, OFF, KR <value>, KF <value>, STATUS, BIAS, X, D (newline; X immediate)");

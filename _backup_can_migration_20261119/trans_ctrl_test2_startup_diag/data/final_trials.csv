@@ -1,0 +1,4 @@
+"label","trial","s_to_start_reply_ms","s_to_saved_ms","start_accepted","reject_reason","saved","active_timing","start_sd_phases","stop_reason","fault_code","can_write_success","sd_write_failures","boot_timing","boot_sd","saved_line"
+"final","1","31.802","390.493","True",,"True","START_ACTIVE,elapsed_us,5011","START_PHASE,search_us,1952,create_us,1392,metadata_us,90,sync_us,1116","STOP,reason,2","0","24","0",,,"SAVED,TC0098.BIN,STATUS,2"
+"final","2","18.046","401.603","True",,"True","START_ACTIVE,elapsed_us,6548","START_PHASE,search_us,3564,create_us,1385,metadata_us,90,sync_us,1115","STOP,reason,2","0","24","0",,,"SAVED,TC0099.BIN,STATUS,2"
+"final","3","16.148","394.014","True",,"True","START_ACTIVE,elapsed_us,6241","START_PHASE,search_us,3567,create_us,1376,metadata_us,89,sync_us,1117","STOP,reason,2","0","24","0",,,"SAVED,TC0100.BIN,STATUS,2"

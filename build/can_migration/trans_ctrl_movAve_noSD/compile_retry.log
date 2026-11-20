@@ -1,0 +1,13 @@
+internal error in mingw32_gt_pch_use_address, at config/i386/host-mingw32.cc:186: MapViewOfFileEx: Attempt to access invalid address. 
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\cores\teensy4\AudioStream.cpp:1: sorry, unimplemented: PCH allocation failure
+    1 | /* Teensyduino Core Library
+internal error in mingw32_gt_pch_use_address, at config/i386/host-mingw32.cc:186: MapViewOfFileEx: Attempt to access invalid address. 
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\cores\teensy4\Blink.cc:1: sorry, unimplemented: PCH allocation failure
+    1 | // Only for testing with the Makefile - not actually part of the core library
+Error during build: exit status 1
+
+Used library Version Path
+FlexCAN_T4           C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4
+
+Used platform Version Path
+teensy:avr    1.62.0  C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0

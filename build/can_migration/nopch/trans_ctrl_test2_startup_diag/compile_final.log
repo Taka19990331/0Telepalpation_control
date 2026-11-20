@@ -1,0 +1,20 @@
+In file included from C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.h:561,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2_startup_diag\can_protocol.h:5,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2_startup_diag\trans_ctrl_test2_startup_diag.ino:5:
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp: In member function 'bool FlexCAN_T4<_bus, _rxSize, _txSize>::error(CAN_error_t&, bool) [with CAN_DEV_TABLE _bus = CAN2; FLEXCAN_RXQUEUE_TABLE _rxSize = RX_SIZE_256; FLEXCAN_TXQUEUE_TABLE _txSize = TX_SIZE_16]':
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp:1363:12: warning: 'char* strncpy(char*, const char*, size_t)' output truncated before terminating nul copying 13 bytes from a string of the same length [-Wstringop-truncation]
+ 1363 |     strncpy((char*)error.FLT_CONF, "Error Passive", (sizeof(error.FLT_CONF) - 1));
+      |     ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2_startup_diag\trans_ctrl_test2_startup_diag.ino:7:
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2_startup_diag\save_data.h: In function 'void SaveData::sendCommon(bool)':
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2_startup_diag\save_data.h:267:50: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  267 |       snprintf(selectedName,sizeof(selectedName),"TC%04d.BIN",n);
+      |                                                  ^~~~~~~~~~~~
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_test2_startup_diag\save_data.h:267:15: note: 'snprintf' output between 11 and 17 bytes into a destination of size 16
+  267 |       snprintf(selectedName,sizeof(selectedName),"TC%04d.BIN",n);
+      |       ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Memory Usage on Teensy 4.1:
+  FLASH: code:104708, data:13256, headers:9008   free for files:7999492
+   RAM1: variables:46016, code:102152, padding:28920   free for local variables:347200
+   RAM2: variables:241792  free for malloc/new:282496
+

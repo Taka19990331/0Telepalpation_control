@@ -1,0 +1,24 @@
+In file included from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test3_LOGtest\trans_ctrl_test3_LOGtest.ino:7:
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_test3_LOGtest\save_data.h: In function 'void SaveData::dumpCsv()':
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_test3_LOGtest\save_data.h:268:18: warning: unused variable 'dataOffset' [-Wunused-variable]
+  268 |   const uint32_t dataOffset=f.curPosition();
+      |                  ^~~~~~~~~~
+In file included from C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.h:561,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test3_LOGtest\can_protocol.h:4,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_test3_LOGtest\trans_ctrl_test3_LOGtest.ino:5:
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp: In member function 'bool FlexCAN_T4<_bus, _rxSize, _txSize>::error(CAN_error_t&, bool) [with CAN_DEV_TABLE _bus = CAN2; FLEXCAN_RXQUEUE_TABLE _rxSize = RX_SIZE_256; FLEXCAN_TXQUEUE_TABLE _txSize = TX_SIZE_16]':
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp:1363:12: warning: 'char* strncpy(char*, const char*, size_t)' output truncated before terminating nul copying 13 bytes from a string of the same length [-Wstringop-truncation]
+ 1363 |     strncpy((char*)error.FLT_CONF, "Error Passive", (sizeof(error.FLT_CONF) - 1));
+      |     ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_test3_LOGtest\save_data.h: In function 'void SaveData::sendCommon(bool)':
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_test3_LOGtest\save_data.h:234:50: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  234 |       snprintf(selectedName,sizeof(selectedName),"TC%04d.BIN",n);
+      |                                                  ^~~~~~~~~~~~
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_test3_LOGtest\save_data.h:234:15: note: 'snprintf' output between 11 and 17 bytes into a destination of size 16
+  234 |       snprintf(selectedName,sizeof(selectedName),"TC%04d.BIN",n);
+      |       ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Memory Usage on Teensy 4.1:
+  FLASH: code:100100, data:11208, headers:8496   free for files:8006660
+   RAM1: variables:34400, code:97544, padding:760   free for local variables:391584
+   RAM2: variables:241792  free for malloc/new:282496
+

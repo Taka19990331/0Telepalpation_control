@@ -96,7 +96,7 @@ inline void receiveFeedback(const CAN_message_t &m) {
   using namespace CanDiagnostics;
   ++rxFrames;
   if(m.flags.overrun) ++rxHardwareOverruns;
-  if(m.flags.remote || m.flags.extended || m.len!=8 || m.buf[0]!=ControlConfig::MOTOR_ID) ++rxRejected;
+  if(m.flags.remote || m.flags.extended || m.len<6 || m.len>8 || (m.id!=ControlConfig::MOTOR_ID && m.buf[0]!=ControlConfig::MOTOR_ID)) ++rxRejected;
   else {
     ++rxAccepted;
     if(haveRxTime) {
@@ -125,18 +125,23 @@ inline bool processFeedback(uint32_t now) {
   feedback.position=decode((uint32_t(m.buf[1])<<8)|m.buf[2],POSITION_MIN,POSITION_MAX,16);
   feedback.velocity=decode((uint32_t(m.buf[3])<<4)|(m.buf[4]>>4),VELOCITY_MIN,VELOCITY_MAX,12);
   feedback.torque=decode(((uint32_t(m.buf[4])&15)<<8)|m.buf[5],TORQUE_MIN,TORQUE_MAX,12);
-  feedback.error=m.buf[7]; motorFault=motorFault || feedback.error!=0;
+  feedback.error=m.len>=8 ? m.buf[7] : 0; motorFault=motorFault || feedback.error!=0;
   numericFault=numericFault || !isfinite(feedback.position) || !isfinite(feedback.velocity) || !isfinite(feedback.torque);
   feedback.rxUs=r.rxUs; ++feedback.sequence; feedback.valid=true;
   ++CanDiagnostics::rxProcessed;
   if(feedbackHandler) feedbackHandler(feedback);
   return true;
 }
+inline void pollReceive() {
+  for(uint8_t n=0;n<ControlConfig::CAN_RX_BUDGET;++n) {
+    CAN_message_t m{};
+    if(!can.read(m)) break;
+    receiveFeedback(m);
+  }
+}
 inline void begin() {
   can.begin(); can.setBaudRate(ControlConfig::CAN_BAUD);
-  can.setMaxMB(16); can.setMB(MB0,RX,STD);
-  can.setMBFilter(REJECT_ALL); can.setMBFilter(MB0,ACCEPT_ALL);
-  can.onReceive(MB0,receiveFeedback); can.enableMBInterrupt(MB0);
-  NVIC_SET_PRIORITY(ControlConfig::CAN_BUS==1 ? IRQ_CAN1 : (ControlConfig::CAN_BUS==2 ? IRQ_CAN2 : IRQ_CAN3),ControlConfig::ISR_PRIORITY);
+  // Jia polling mailbox configuration: no RX callbacks or mailbox IRQs.
+  NVIC_SET_PRIORITY(ControlConfig::CAN_BUS==1 ? IRQ_CAN1 : (ControlConfig::CAN_BUS==2 ? IRQ_CAN2 : IRQ_CAN3),128);
 }
 }

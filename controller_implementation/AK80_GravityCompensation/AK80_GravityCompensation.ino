@@ -26,7 +26,7 @@ constexpr bool MOTOR1_ON = true;  // CAN1 / MotorID 1
 constexpr bool MOTOR2_ON = true;  // CAN2 / MotorID 2
 
 // Gravity compensation torque scale. Use 0.5 at the initial test.
-constexpr float K_G = 0.5f;
+constexpr float K_G = 0.75f;
 
 // The user-specified gravity torques are the STEADY-STATE targets.
 // On the initial switch from zero to gravity mode, ramp actual commands
@@ -36,7 +36,7 @@ constexpr uint32_t GRAVITY_RAMP_MS = 1000;
 // Independent protection against unexpectedly large torque commands.
 // With the specified geometry and K_G=0.5, the theoretical maxima are
 // approximately M1=0.391 Nm and M2=1.612 Nm, so 2.0 Nm does not clip them.
-constexpr float MAX_ABS_COMMAND_TORQUE_NM = 2.0f;
+constexpr float MAX_ABS_COMMAND_TORQUE_NM = 5.0f;
 
 // Preserve the source program's feedback-torque safety option.
 constexpr bool TORQUE_FEEDBACK_LIMIT_ENABLED = false;

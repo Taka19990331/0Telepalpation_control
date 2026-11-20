@@ -1,0 +1,8 @@
+.tools/
+__pycache__/
+tests/__pycache__/
+verification/zig_cache/
+verification/*.exe
+verification/*.pdb
+verification/input.txt
+verification/filtered_*.txt

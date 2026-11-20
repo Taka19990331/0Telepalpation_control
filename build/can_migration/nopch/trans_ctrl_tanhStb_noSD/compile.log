@@ -1,0 +1,29 @@
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_tanhStb_noSD\trans_ctrl_tanhStb_noSD.ino:122:13: warning: 'void loop()' was declared 'extern' and later 'static' [-fpermissive]
+  122 | void loop(){static char line[ControlConfig::COMMAND_BUFFER_BYTES];static size_t used=0;static bool overflow=false;while(Serial.available()){const char c=Serial.read();if((c=='x'||c=='X')&&used==0&&!overflow){noInterrupts();stopRun(1);interrupts();}else if(c=='\r'||c=='\n'){if(overflow)Serial.println("ERROR,command too long");else if(used){line[used]=0;processCommand(line);}used=0;overflow=false;}else if(used<sizeof(line)-1&&!overflow)line[used++]=c;else overflow=true;}static uint32_t lastDiagnosticUs=0;if(active&&uint32_t(micros()-lastDiagnosticUs)>=100000){noInterrupts();for(uint8_t i=0;i<2;++i)CanDiagnostics::latest[i]=CanProtocol::snapshot(i);interrupts();lastDiagnosticUs=micros();}CanProtocol::serviceDiagnostics();}
+      |             ^~~~
+In file included from C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\cores\teensy4/WProgram.h:46,
+                 from C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\cores\teensy4/Arduino.h:6,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_tanhStb_noSD\trans_ctrl_tanhStb_noSD.ino:1:
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\cores\teensy4/wiring.h:225:6: note: previous declaration of 'void loop()'
+  225 | void loop(void);
+      |      ^~~~
+In file included from C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.h:561,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_tanhStb_noSD\can_protocol.h:4,
+                 from C:\0Telepalpation_control\controller_implementation\trans_ctrl_tanhStb_noSD\trans_ctrl_tanhStb_noSD.ino:6:
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp: In member function 'bool FlexCAN_T4<_bus, _rxSize, _txSize>::error(CAN_error_t&, bool) [with CAN_DEV_TABLE _bus = CAN1; FLEXCAN_RXQUEUE_TABLE _rxSize = RX_SIZE_256; FLEXCAN_TXQUEUE_TABLE _txSize = TX_SIZE_16]':
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp:1363:12: warning: 'char* strncpy(char*, const char*, size_t)' output truncated before terminating nul copying 13 bytes from a string of the same length [-Wstringop-truncation]
+ 1363 |     strncpy((char*)error.FLT_CONF, "Error Passive", (sizeof(error.FLT_CONF) - 1));
+      |     ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp: In member function 'bool FlexCAN_T4<_bus, _rxSize, _txSize>::error(CAN_error_t&, bool) [with CAN_DEV_TABLE _bus = CAN2; FLEXCAN_RXQUEUE_TABLE _rxSize = RX_SIZE_256; FLEXCAN_TXQUEUE_TABLE _txSize = TX_SIZE_16]':
+C:\Users\Miyam\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.62.0\libraries\FlexCAN_T4/FlexCAN_T4.tpp:1363:12: warning: 'char* strncpy(char*, const char*, size_t)' output truncated before terminating nul copying 13 bytes from a string of the same length [-Wstringop-truncation]
+ 1363 |     strncpy((char*)error.FLT_CONF, "Error Passive", (sizeof(error.FLT_CONF) - 1));
+      |     ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_tanhStb_noSD\can_protocol.h: At global scope:
+C:\0Telepalpation_control\controller_implementation\trans_ctrl_tanhStb_noSD\can_protocol.h:17:13: warning: 'bool CanProtocol::selectedId(uint8_t)' defined but not used [-Wunused-function]
+   17 | static bool selectedId(uint8_t id) { const int8_t i=ControlConfig::indexForId(id); return i>=0 && ControlConfig::selected(uint8_t(i)); }
+      |             ^~~~~~~~~~
+Memory Usage on Teensy 4.1:
+  FLASH: code:68516, data:11208, headers:8336   free for files:8038404
+   RAM1: variables:301088, code:65960, padding:32344   free for local variables:124896
+   RAM2: variables:12416  free for malloc/new:511872
+

@@ -1,0 +1,746 @@
+===== trans_ctrl_tanhStb_noSD.ino =====
+#include <Arduino.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <errno.h>
+#include <string.h>
+#include "can_protocol.h"
+#include "control_algorithm.h"
+#include "control_log.h"
+#if !defined(ARDUINO_TEENSY41)
+#error "Select Teensy 4.1"
+#endif
+struct RuntimeSettings {
+  bool enabled=ControlConfig::INITIAL_ENABLED;
+  float Kr[2]={ControlConfig::INITIAL_K_R1,ControlConfig::INITIAL_K_R2};
+  float Kf[2]={ControlConfig::INITIAL_K_F1,ControlConfig::INITIAL_K_F2};
+};
+static volatile RuntimeSettings runtime;
+static volatile float tau_cmd[2]={0,0};
+static volatile bool active=false,startRequest=false;
+static volatile uint32_t runStart=0,statusCode=0;
+static bool timerReady=false, awaitingFirstFeedback[2]={true,true};
+static ControlAlgorithm::Controller controllers[2]={
+  ControlAlgorithm::Controller(ControlConfig::MOTORS[0],ControlConfig::CONTROL_PERIOD_US),
+  ControlAlgorithm::Controller(ControlConfig::MOTORS[1],ControlConfig::CONTROL_PERIOD_US)
+};
+static IntervalTimer controlTimer;
+static uint32_t commandTicks[2]={0,0},lastTxUs[2]={0,0},txIntervalUs[2]={0,0};
+static bool stopZeroResult[2]={false,false},stopDisableResult[2]={false,false};
+void stopRun(uint32_t reason) {
+  CanProtocol::capture=false; active=false; startRequest=false; runtime.enabled=false; tau_cmd[0]=tau_cmd[1]=0; statusCode=reason;
+  for(uint8_t i=0;i<2;++i) if(ControlConfig::selected(i)) {
+    controllers[i].zeroOutput(); stopZeroResult[i]=CanProtocol::command(ControlConfig::MOTOR_IDS[i],0);
+    stopDisableResult[i]=CanProtocol::disable(ControlConfig::MOTOR_IDS[i]);
+  }
+  for(uint8_t i=0;i<2;++i) { CanDiagnostics::stopZero[i]=stopZeroResult[i];CanDiagnostics::stopDisable[i]=stopDisableResult[i];CanDiagnostics::latest[i]=CanProtocol::snapshot(i,true); }
+  CanDiagnostics::stopUs=micros()-CanDiagnostics::origin; CanDiagnostics::stopReason=reason;
+}
+void handleFeedback(uint8_t id,const CanProtocol::Feedback &f) {
+  const int8_t ix=ControlConfig::indexForId(id); if(ix<0) return; const uint8_t i=uint8_t(ix);
+  if(!ControlConfig::selected(i)||!active||CanProtocol::motorFault[i]||CanProtocol::communicationFault[i]) return;
+  if(awaitingFirstFeedback[i]&&uint32_t(f.rxUs-runStart)>ControlConfig::FEEDBACK_TIMEOUT_US) { CanProtocol::communicationFault[i]=true; return; }
+  awaitingFirstFeedback[i]=false;
+  if(CanProtocol::numericFault[i]||!isfinite(f.position)) { controllers[i].trip(); return; }
+  ControlLog::append(id,uint32_t(f.rxUs-runStart),f.position,f.velocity);
+  controllers[i].feedback(f.position,f.velocity,f.torque,f.rxUs);
+}
+void controlISR() {
+  const uint32_t now=micros(); if(startRequest){startRequest=false;active=true;} if(!active) return;
+  CanDiagnostics::enter(now); struct TimingGuard{~TimingGuard(){CanDiagnostics::leave();}} timingGuard;
+  for(uint8_t i=0;i<2;++i) if(ControlConfig::selected(i)) {
+    for(uint32_t n=0;n<ControlConfig::RX_BUDGET&&CanProtocol::processFeedback(i,now);++n){}
+    if(CanProtocol::rxHead[i]!=CanProtocol::rxTail[i])++CanDiagnostics::rxBudgetHits[i];
+  }
+  uint32_t fault=0;
+  if(CanDiagnostics::rxOverflowTotal||CanDiagnostics::rxHardwareOverruns[0]||CanDiagnostics::rxHardwareOverruns[1]) fault=9;
+  for(uint8_t i=0;i<2;++i) if(ControlConfig::selected(i)) {
+    const auto &f=CanProtocol::feedback[i]; const uint32_t age=f.valid?uint32_t(now-f.rxUs):uint32_t(now-runStart);
+    if(awaitingFirstFeedback[i]&&age>ControlConfig::FEEDBACK_TIMEOUT_US) CanProtocol::communicationFault[i]=true;
+    if(f.valid&&age>ControlConfig::FEEDBACK_TIMEOUT_US) CanProtocol::communicationFault[i]=true;
+    if(CanProtocol::motorFault[i]) fault=7;
+    else if(CanProtocol::communicationFault[i]) fault=6;
+    else if(CanProtocol::numericFault[i]||controllers[i].faulted()||
+      (f.valid&&(!isfinite(f.position)||!isfinite(f.velocity)||!isfinite(f.torque)))) { controllers[i].trip(); fault=8; }
+    tau_cmd[i]=controllers[i].command(runtime.enabled&&f.valid&&!fault,runtime.Kr[i],runtime.Kf[i]);
+    if(controllers[i].faulted()||!isfinite(tau_cmd[i])) { controllers[i].trip();tau_cmd[i]=0;fault=8; }
+  }
+  for(uint8_t i=0;i<2;++i) if(ControlConfig::selected(i)) {
+    ++commandTicks[i];if(lastTxUs[i])txIntervalUs[i]=now-lastTxUs[i];lastTxUs[i]=now;
+    const bool txOK=CanProtocol::command(ControlConfig::MOTOR_IDS[i],fault?0:tau_cmd[i]);
+    if(!txOK&&!fault)fault=2;
+  }
+  if(fault) stopRun(fault);
+}
+void startRun() {
+  if(!ControlConfig::ANY_MOTOR_ON) { Serial.println("ERROR,S requires at least one selected motor"); return; }
+  if(!timerReady||active||startRequest) return;
+  noInterrupts(); CanDiagnostics::reset(micros());ControlLog::reset();CanProtocol::resetRx(true);runStart=micros();
+  for(uint8_t i=0;i<2;++i) { if(ControlConfig::selected(i)) controllers[i].reset(); awaitingFirstFeedback[i]=ControlConfig::selected(i);tau_cmd[i]=0;commandTicks[i]=0;lastTxUs[i]=txIntervalUs[i]=0;CanProtocol::txAttempts[i]=CanProtocol::txFailures[i]=0;CanProtocol::feedback[i]=CanProtocol::Feedback{};CanProtocol::motorFault[i]=CanProtocol::communicationFault[i]=CanProtocol::numericFault[i]=false; }
+  runtime.Kr[0]=ControlConfig::INITIAL_K_R1;runtime.Kr[1]=ControlConfig::INITIAL_K_R2;
+  runtime.Kf[0]=ControlConfig::INITIAL_K_F1;runtime.Kf[1]=ControlConfig::INITIAL_K_F2;
+  runtime.enabled=ControlConfig::INITIAL_ENABLED;statusCode=0;
+  bool ok=true; for(uint8_t i=0;i<2;++i) if(ControlConfig::selected(i)) { ok=CanProtocol::enable(ControlConfig::MOTOR_IDS[i])&&ok;ok=CanProtocol::command(ControlConfig::MOTOR_IDS[i],0)&&ok; }
+  if(!ok) stopRun(2); else startRequest=true; interrupts();
+}
+void printStatus() {
+  noInterrupts(); const bool enabled=runtime.enabled,running=active;const uint32_t fault=statusCode;interrupts();
+  Serial.print("STATUS,ON,");Serial.print(enabled?1:0);
+  Serial.print(",RUNNING,");Serial.print(running?1:0);Serial.print(",MOTOR1_SELECTED,");Serial.print(ControlConfig::MOTOR1_ON?1:0);Serial.print(",MOTOR2_SELECTED,");Serial.print(ControlConfig::MOTOR2_ON?1:0);Serial.print(",FAULT,");Serial.println(fault);
+  for(uint8_t i=0;i<2;++i) {
+    noInterrupts();const auto f=CanProtocol::feedback[i];const auto busDiag=CanProtocol::snapshot(i,true);const bool ready=controllers[i].ready(),numeric=controllers[i].faulted()||CanProtocol::numericFault[i];const float tau=tau_cmd[i],bias=controllers[i].torqueBias,kr=runtime.Kr[i],kf=runtime.Kf[i];const uint32_t rxAge=f.valid?uint32_t(micros()-f.rxUs):UINT32_MAX;const bool mf=CanProtocol::motorFault[i],cf=CanProtocol::communicationFault[i];const float as=controllers[i].angleStartDeg(),af=controllers[i].angleFullDeg();const uint8_t nm=uint8_t(controllers[i].notchMode());interrupts();
+    Serial.print("MOTOR,ID,");Serial.print(unsigned(ControlConfig::MOTOR_IDS[i]));Serial.print(",CAN,");Serial.print(i+1);Serial.print(",SELECTED,");Serial.print(ControlConfig::selected(i)?1:0);Serial.print(",KR,");Serial.print(kr,7);Serial.print(",KF,");Serial.print(kf,7);Serial.print(",FB_VALID,");Serial.print(f.valid?1:0);Serial.print(",RX_AGE_us,");Serial.print(rxAge);Serial.print(",RX_INTERVAL_us,");Serial.print(CanProtocol::rxLastIntervalUs[i]);Serial.print(",RX_ISR_MAX_us,");Serial.print(CanDiagnostics::rxIsrMax[i]);Serial.print(",RX_QUEUE_MAX,");Serial.print(CanDiagnostics::rxQueueMax[i]);Serial.print(",RX_OVERFLOW,");Serial.print(CanDiagnostics::rxOverflow[i]);Serial.print(",RFOB_READY,");Serial.print(ready?1:0);Serial.print(",RFOB_FAULT,");Serial.print(numeric?1:0);Serial.print(",MOTOR_ERROR,");Serial.print(mf?1:0);Serial.print(",TIMEOUT,");Serial.print(cf?1:0);Serial.print(",TAU_CMD_Nm,");Serial.print(tau,7);Serial.print(",BIAS_Nm,");Serial.print(bias,7);Serial.print(",TX_COUNT,");Serial.print(commandTicks[i]);Serial.print(",TX_INTERVAL_us,");Serial.print(txIntervalUs[i]);Serial.print(",TX_QUEUE,");Serial.print(busDiag.queue);Serial.print(",TX_QUEUE_MAX,");Serial.print(CanDiagnostics::queueMax[i]);Serial.print(",TX_FREE_MB,");Serial.print(busDiag.freeMB);Serial.print(",TX_PENDING_MB,");Serial.print(busDiag.pendingMB);Serial.print(",CAN_ESR,");Serial.print(busDiag.esr,HEX);Serial.print(",CAN_ECR,");Serial.print(busDiag.ecr,HEX);Serial.print(",CAN_ERROR_RECORDS,");Serial.print(CanDiagnostics::errorRecords[i]);Serial.print(",TX_ERRORS,");Serial.print(CanProtocol::txFailures[i]);Serial.print(",STOP_ZERO_QUEUE_ACCEPTED,");Serial.print(stopZeroResult[i]?1:0);Serial.print(",STOP_DISABLE_QUEUE_ACCEPTED,");Serial.print(stopDisableResult[i]?1:0);Serial.print(",NOTCH_MODE,");Serial.print(unsigned(nm));Serial.print(",ANGLE_START_deg_RMS,");Serial.print(as,5);Serial.print(",ANGLE_FULL_deg_RMS,");Serial.println(af,5);
+  }
+  Serial.print("CONTROL,ISR_MAX_us,");Serial.print(CanDiagnostics::durationMax);Serial.print(",ISR_INTERVAL_MAX_us,");Serial.print(CanDiagnostics::intervalMax);Serial.print(",ISR_OVERRUNS,");Serial.println(CanDiagnostics::executionOverruns);
+}
+void processCommand(char *line) {
+  while(isspace((unsigned char)*line))++line;char *endLine=line+strlen(line);while(endLine>line&&isspace((unsigned char)endLine[-1]))*--endLine=0;for(char *p=line;*p;++p)*p=toupper((unsigned char)*p);
+  if(!strcmp(line,"S")) startRun();
+  else if(!strcmp(line,"STATUS")) printStatus();
+  else if(!strcmp(line,"D")){noInterrupts();const bool allowed=!active&&!startRequest;interrupts();if(allowed)ControlLog::dump();else Serial.println("ERROR,D requires a stopped control session");}
+  else if(!strcmp(line,"ON")) { if(!ControlConfig::ANY_MOTOR_ON){Serial.println("ERROR,ON requires at least one selected motor");return;}noInterrupts();const bool allowed=active&&!statusCode&&!CanProtocol::anyMotorFault();if(allowed)runtime.enabled=true;interrupts();if(!allowed)Serial.println("ERROR,ON requires healthy running session; use S to initialize"); }
+  else if(!strcmp(line,"OFF")){noInterrupts();runtime.enabled=false;tau_cmd[0]=tau_cmd[1]=0;for(uint8_t i=0;i<2;++i)if(ControlConfig::selected(i)){controllers[i].zeroOutput();if(active&&!CanProtocol::command(ControlConfig::MOTOR_IDS[i],0))stopRun(2);}interrupts();}
+  else if(!strcmp(line,"BIAS")){noInterrupts();bool allowed=active&&!runtime.enabled&&!CanProtocol::anyMotorFault();for(uint8_t i=0;i<2;++i)if(ControlConfig::selected(i)){const auto &f=CanProtocol::feedback[i];allowed=allowed&&f.valid&&uint32_t(micros()-f.rxUs)<=ControlConfig::FEEDBACK_TIMEOUT_US&&isfinite(f.torque)&&fabsf(f.velocity)<ControlConfig::BIAS_STATIONARY_SPEED&&!controllers[i].faulted();}if(allowed)for(uint8_t i=0;i<2;++i)if(ControlConfig::selected(i)){controllers[i].torqueBias=CanProtocol::feedback[i].torque;controllers[i].reset();}interrupts();if(!allowed)Serial.println("ERROR,BIAS requires all selected motors OFF, healthy, and stationary");}
+  else if(!strncmp(line,"NOTCH ",6)){ControlConfig::NotchMode mode;if(!strcmp(line+6,"OFF"))mode=ControlConfig::NOTCH_OFF;else if(!strcmp(line+6,"FIXED"))mode=ControlConfig::NOTCH_FIXED;else if(!strcmp(line+6,"ADAPTIVE"))mode=ControlConfig::NOTCH_ADAPTIVE;else{Serial.println("ERROR,NOTCH expects OFF, FIXED, or ADAPTIVE");return;}noInterrupts();const bool allowed=!runtime.enabled;if(allowed)for(uint8_t i=0;i<2;++i)if(ControlConfig::selected(i))controllers[i].setNotchMode(mode);interrupts();if(!allowed)Serial.println("ERROR,NOTCH mode can only change while control is OFF");}
+  else if(!strncmp(line,"ANGLE_START ",12)||!strncmp(line,"ANGLE_FULL ",11)){const bool isStart=line[6]=='S';const char *arg=line+(isStart?12:11);char *end=nullptr;errno=0;const float value=strtof(arg,&end);while(end&&isspace((unsigned char)*end))++end;if(end==arg||!end||*end||errno==ERANGE||!isfinite(value)){Serial.println("ERROR,invalid angle threshold");return;}noInterrupts();bool changed=true;for(uint8_t i=0;i<2;++i)if(ControlConfig::selected(i)){const float st=isStart?value:controllers[i].angleStartDeg(),fn=isStart?controllers[i].angleFullDeg():value;changed=controllers[i].setAngleThresholds(st,fn)&&changed;}interrupts();if(!changed)Serial.println("ERROR,require 0 < ANGLE_START < ANGLE_FULL");}
+  else if(!strncmp(line,"KR",2)||!strncmp(line,"KF",2)) {
+    const bool isKr=line[1]=='R'; const char *arg=line+2;
+    if(*arg!='1'&&*arg!='2'){Serial.println("ERROR,use KR1, KR2, KF1, or KF2 <finite value>");return;}
+    const uint8_t target=uint8_t(*arg-'1');++arg;
+    if(!isspace((unsigned char)*arg)){Serial.println("ERROR,gain syntax: KR1|KR2|KF1|KF2 <finite value>");return;}
+    while(isspace((unsigned char)*arg))++arg;
+    char *end=nullptr;errno=0;const float value=strtof(arg,&end);
+    while(end&&isspace((unsigned char)*end))++end;
+    if(end==arg||!end||*end||errno==ERANGE||!isfinite(value)){Serial.println("ERROR,invalid gain; finite float required");return;}
+    if(!ControlConfig::selected(target)){Serial.println("ERROR,target motor is not selected");return;}
+    noInterrupts();if(isKr)runtime.Kr[target]=value;else runtime.Kf[target]=value;interrupts();
+  }
+  else Serial.println("ERROR,unknown command");
+}
+void setup(){Serial.begin(ControlConfig::SERIAL_BAUD);CanProtocol::feedbackHandler=handleFeedback;CanProtocol::begin();controlTimer.priority(ControlConfig::ISR_PRIORITY);timerReady=controlTimer.begin(controlISR,ControlConfig::CONTROL_PERIOD_US);Serial.print("READY,CAN1,1,M1,");Serial.print(ControlConfig::MOTOR1_ON?1:0);Serial.print(",CAN2,2,M2,");Serial.print(ControlConfig::MOTOR2_ON?1:0);Serial.print(",TIMER,");Serial.println(timerReady?"OK":"ERROR");Serial.println("Commands: S, ON, OFF, KR1 <value>, KR2 <value>, KF1 <value>, KF2 <value>, NOTCH OFF|FIXED|ADAPTIVE, ANGLE_START <deg_RMS>, ANGLE_FULL <deg_RMS>, STATUS, BIAS, D, X");}
+void loop(){static char line[ControlConfig::COMMAND_BUFFER_BYTES];static size_t used=0;static bool overflow=false;while(Serial.available()){const char c=Serial.read();if((c=='x'||c=='X')&&used==0&&!overflow){noInterrupts();stopRun(1);interrupts();}else if(c=='\r'||c=='\n'){if(overflow)Serial.println("ERROR,command too long");else if(used){line[used]=0;processCommand(line);}used=0;overflow=false;}else if(used<sizeof(line)-1&&!overflow)line[used++]=c;else overflow=true;}static uint32_t lastDiagnosticUs=0;if(active&&uint32_t(micros()-lastDiagnosticUs)>=100000){noInterrupts();for(uint8_t i=0;i<2;++i)CanDiagnostics::latest[i]=CanProtocol::snapshot(i);interrupts();lastDiagnosticUs=micros();}CanProtocol::serviceDiagnostics();}
+
+
+===== can_diagnostics.h =====
+#pragma once
+// Fixed-size RAM diagnostics. No formatting or Serial in interrupt context.
+namespace CanDiagnostics {
+struct Snapshot {
+  uint32_t us=0, queue=0, esr=0, ecr=0, freeMB=0, pendingMB=0;
+};
+struct Failure {
+  bool valid=false; uint8_t kind=0, motorId=0; float torque=0;
+  uint32_t age=0, interval=0, previousDuration=0, toWrite=0, duration=0, failures=0;
+  uint32_t rxPending=0, rxOverflow=0, rxMax=0;
+  Snapshot bus;
+};
+static uint32_t origin=0;
+static uint32_t success[2]={0,0},failures[2]={0,0},queueMax[2]={0,0};
+static uint32_t interval=0, intervalMax=0, duration=0, durationMax=0;
+static uint32_t intervalOverruns=0, executionOverruns=0, lastEntry=0, entry=0;
+static uint32_t errorRecords[2]={0,0},errorBits=0,txErrorMax=0,rxErrorMax=0,busOffObserved=0;
+static uint32_t intervalMin=UINT32_MAX,rxIsrMax[2]={0,0};
+static uint32_t rxFrames[2]={0,0},rxAccepted[2]={0,0},rxRejected[2]={0,0},rxOverflow[2]={0,0},rxOverflowTotal=0,rxQueueMax[2]={0,0};
+static uint32_t rxHardwareOverruns[2]={0,0},rxStale[2]={0,0},rxAbnormal[2]={0,0},rxProcessed[2]={0,0},rxBudgetHits[2]={0,0};
+static uint32_t rxStartupDiscarded[2]={0,0};
+static bool measuring=false,failureInIsr[2]={false,false};
+static Snapshot latest[2];
+static Failure firstFailure[2];
+static bool stopZero[2]={false,false},stopDisable[2]={false,false};
+static uint32_t stopUs=0, stopReason=0;
+inline void reset(uint32_t now) {
+  origin=now;
+  for(uint8_t i=0;i<2;++i){success[i]=failures[i]=queueMax[i]=errorRecords[i]=rxIsrMax[i]=0;rxFrames[i]=rxAccepted[i]=rxRejected[i]=rxOverflow[i]=rxQueueMax[i]=0;rxHardwareOverruns[i]=rxStale[i]=rxAbnormal[i]=rxProcessed[i]=rxBudgetHits[i]=rxStartupDiscarded[i]=0;failureInIsr[i]=false;latest[i]=Snapshot{};firstFailure[i]=Failure{};stopZero[i]=stopDisable[i]=false;}
+  interval=intervalMax=duration=durationMax=intervalOverruns=executionOverruns=0;
+  lastEntry=entry=0; errorBits=txErrorMax=rxErrorMax=busOffObserved=0;
+  measuring=false; intervalMin=UINT32_MAX; rxOverflowTotal=0; stopUs=stopReason=0;
+}
+inline void observe(uint32_t esr,uint32_t ecr) {
+  errorBits|=esr; txErrorMax=max(txErrorMax,ecr&255U); rxErrorMax=max(rxErrorMax,(ecr>>8)&255U);
+  if((esr&0x30U)==0x20U || (esr&0x04U)) busOffObserved=1;
+}
+inline void enter(uint32_t now) {
+  entry=now; measuring=true;
+  interval=lastEntry ? uint32_t(now-lastEntry):0; lastEntry=now;
+  intervalMax=max(intervalMax,interval);
+  if(interval) intervalMin=min(intervalMin,interval);
+  if(interval>ControlConfig::CONTROL_PERIOD_US) ++intervalOverruns;
+}
+inline void leave() {
+  duration=micros()-entry; durationMax=max(durationMax,duration);
+  if(duration>ControlConfig::CONTROL_PERIOD_US) ++executionOverruns;
+  for(uint8_t i=0;i<2;++i) if(failureInIsr[i]) firstFailure[i].duration=duration;
+  failureInIsr[0]=failureInIsr[1]=false;
+  measuring=false;
+}
+}
+
+
+
+
+===== can_protocol.h =====
+#pragma once
+#include <Arduino.h>
+#include <math.h>
+#include <FlexCAN_T4.h>
+#include <IntervalTimer.h>
+#include "control_config.h"
+#include "can_diagnostics.h"
+namespace CanProtocol {
+using CanType1=FlexCAN_T4<CAN1,RX_SIZE_256,TX_SIZE_16>;
+using CanType2=FlexCAN_T4<CAN2,RX_SIZE_256,TX_SIZE_16>;
+static CanType1 can1;
+static CanType2 can2;
+struct Feedback { float position=0, velocity=0, torque=0; uint32_t rxUs=0, sequence=0; uint8_t error=0; bool valid=false; };
+static Feedback feedback[ControlConfig::MOTOR_COUNT];
+static bool motorFault[2]={false,false}, communicationFault[2]={false,false}, numericFault[2]={false,false};
+static uint32_t txAttempts[2]={0,0},txFailures[2]={0,0};
+static bool selectedId(uint8_t id) { const int8_t i=ControlConfig::indexForId(id); return i>=0 && ControlConfig::selected(uint8_t(i)); }
+inline bool anyMotorFault() { for(uint8_t i=0;i<2;++i) if(ControlConfig::selected(i) && (motorFault[i]||communicationFault[i]||numericFault[i])) return true; return false; }
+inline CanDiagnostics::Snapshot snapshot(uint8_t index,bool mailboxes=false) {
+  CanDiagnostics::Snapshot s; const uint32_t base=index==0?CAN1:CAN2;
+  s.us=micros()-CanDiagnostics::origin;
+  s.queue=index==0?can1.getTXQueueCount():can2.getTXQueueCount();
+  s.esr=FLEXCANb_ESR1(base); s.ecr=FLEXCANb_ECR(base);
+  if(mailboxes) for(unsigned i=8;i<16;++i) {
+    const unsigned code=FLEXCAN_get_code(FLEXCANb_MBn_CS(base,i));
+    if(code==FLEXCAN_MB_CODE_TX_INACTIVE) ++s.freeMB;
+    if(code==FLEXCAN_MB_CODE_TX_ONCE) ++s.pendingMB;
+  }
+  CanDiagnostics::queueMax[index]=max(CanDiagnostics::queueMax[index],s.queue);
+  CanDiagnostics::observe(s.esr,s.ecr); return s;
+}
+inline bool writeDiagnosed(const CAN_message_t &m,float torque,uint8_t kind,uint8_t id) {
+  using namespace CanDiagnostics;
+  const int8_t ix=ControlConfig::indexForId(id); if(ix<0) return false;
+  const uint8_t index=uint8_t(ix); const uint32_t q=index==0?can1.getTXQueueCount():can2.getTXQueueCount();
+  queueMax[index]=max(queueMax[index],q);
+  const uint32_t toWrite=measuring?uint32_t(micros()-entry):0;
+  const int result=index==0?can1.write(m):can2.write(m);
+  const uint32_t after=index==0?can1.getTXQueueCount():can2.getTXQueueCount(); queueMax[index]=max(queueMax[index],after);
+  ++txAttempts[index];
+  if(result) ++success[index]; else {
+    ++txFailures[index]; ++failures[index];
+    if(!firstFailure[index].valid) {
+      auto &fail=firstFailure[index]; fail.valid=true; fail.kind=kind; fail.motorId=id; fail.torque=torque;
+      failureInIsr[index]=measuring; fail.bus=snapshot(index,true); fail.failures=failures[index];
+      const auto &f=feedback[index]; fail.age=f.valid?uint32_t(micros()-f.rxUs):UINT32_MAX;
+      fail.interval=interval; fail.previousDuration=duration; fail.toWrite=toWrite;
+    }
+  }
+  return result!=0;
+}
+inline void serviceDiagnostics() {
+  CAN_error_t e;
+  for(unsigned i=0;i<4&&can1.error(e,false);++i) { noInterrupts(); ++CanDiagnostics::errorRecords[0]; CanDiagnostics::observe(e.ESR1,e.ECR); interrupts(); }
+  for(unsigned i=0;i<4&&can2.error(e,false);++i) { noInterrupts(); ++CanDiagnostics::errorRecords[1]; CanDiagnostics::observe(e.ESR1,e.ECR); interrupts(); }
+}
+static void (*feedbackHandler)(uint8_t,const Feedback &)=nullptr;
+inline uint32_t encode(float x,float lo,float hi,uint8_t bits) { x=constrain(x,lo,hi); return uint32_t((x-lo)*float((1UL<<bits)-1)/(hi-lo)); }
+inline float decode(uint32_t x,float lo,float hi,uint8_t bits) { return float(x)*(hi-lo)/float((1UL<<bits)-1)+lo; }
+inline bool sendSpecial(uint8_t id,uint8_t code) {
+  CAN_message_t m={}; m.id=id; m.len=8; for(uint8_t i=0;i<7;++i)m.buf[i]=0xff; m.buf[7]=code;
+  return writeDiagnosed(m,0,code,id);
+}
+inline bool enable(uint8_t id) { return sendSpecial(id,0xfc); }
+inline bool disable(uint8_t id) { return sendSpecial(id,0xfd); }
+inline bool command(uint8_t id,float tau) {
+  using namespace ControlConfig;
+  const int8_t ix=indexForId(id); if(ix<0) return false;
+  if(!isfinite(tau)) { numericFault[uint8_t(ix)]=true; tau=0; }
+  const uint32_t pi=encode(0,POSITION_MIN,POSITION_MAX,16),vi=encode(0,VELOCITY_MIN,VELOCITY_MAX,12);
+  const uint32_t kpi=encode(0,0,MIT_KP_MAX,12),kdi=encode(0,0,MIT_KD_MAX,12),ti=encode(tau,TORQUE_MIN,TORQUE_MAX,12);
+  CAN_message_t m={}; m.id=id; m.len=8;
+  m.buf[0]=pi>>8; m.buf[1]=pi; m.buf[2]=vi>>4; m.buf[3]=((vi&15)<<4)|(kpi>>8); m.buf[4]=kpi;
+  m.buf[5]=kdi>>4; m.buf[6]=((kdi&15)<<4)|(ti>>8); m.buf[7]=ti;
+  return writeDiagnosed(m,tau,0,id);
+}
+struct ReceivedFrame { CAN_message_t frame; uint32_t rxUs; };
+static ReceivedFrame received[2][ControlConfig::RX_QUEUE_ROWS];
+static volatile uint32_t rxHead[2]={0,0},rxTail[2]={0,0};
+static bool capture=false,haveRxTime[2]={false,false};
+static uint32_t previousRxUs[2]={0,0},rxGapMin[2]={UINT32_MAX,UINT32_MAX},rxGapMax[2]={0,0},rxLastIntervalUs[2]={0,0};
+inline void resetRx(bool enableCapture) {
+  capture=enableCapture;
+  for(uint8_t i=0;i<2;++i){rxHead[i]=rxTail[i]=0;haveRxTime[i]=false;previousRxUs[i]=0;rxGapMin[i]=UINT32_MAX;rxGapMax[i]=rxLastIntervalUs[i]=0;}
+}
+inline void receiveFeedbackForBus(uint8_t index,const CAN_message_t &m) {
+  const uint32_t now=micros(); if(!capture)return;
+  using namespace CanDiagnostics; ++rxFrames[index]; if(m.flags.overrun)++rxHardwareOverruns[index];
+  if(m.flags.remote||m.flags.extended||m.len!=8||m.buf[0]!=ControlConfig::MOTOR_IDS[index]||!ControlConfig::selected(index))++rxRejected[index];
+  else {
+    ++rxAccepted[index];
+    if(haveRxTime[index]) { const uint32_t gap=now-previousRxUs[index]; rxLastIntervalUs[index]=gap;rxGapMin[index]=min(rxGapMin[index],gap);rxGapMax[index]=max(rxGapMax[index],gap);if(gap<ControlConfig::RX_INTERVAL_MIN_US||gap>ControlConfig::RX_INTERVAL_MAX_US)++rxAbnormal[index]; }
+    haveRxTime[index]=true;previousRxUs[index]=now;
+    if(rxHead[index]-rxTail[index]>=ControlConfig::RX_QUEUE_ROWS){++rxOverflow[index];++rxOverflowTotal;}
+    else { auto &r=received[index][rxHead[index]%ControlConfig::RX_QUEUE_ROWS];r.frame=m;r.rxUs=now;asm volatile("" ::: "memory");++rxHead[index];rxQueueMax[index]=max(rxQueueMax[index],uint32_t(rxHead[index]-rxTail[index])); }
+  }
+  rxIsrMax[index]=max(rxIsrMax[index],uint32_t(micros()-now));
+}
+inline void receiveCAN1(const CAN_message_t &m) { receiveFeedbackForBus(0,m); }
+inline void receiveCAN2(const CAN_message_t &m) { receiveFeedbackForBus(1,m); }
+inline bool processFeedback(uint8_t index,uint32_t now) {
+  if(rxTail[index]==rxHead[index])return false;
+  const ReceivedFrame r=received[index][rxTail[index]%ControlConfig::RX_QUEUE_ROWS];asm volatile("" ::: "memory");++rxTail[index];
+  const auto &m=r.frame;using namespace ControlConfig;auto &f=feedback[index];
+  if(uint32_t(now-r.rxUs)>RX_STALE_US)++CanDiagnostics::rxStale[index];
+  if(f.valid&&uint32_t(r.rxUs-f.rxUs)>FEEDBACK_TIMEOUT_US)communicationFault[index]=true;
+  f.position=decode((uint32_t(m.buf[1])<<8)|m.buf[2],POSITION_MIN,POSITION_MAX,16);
+  f.velocity=decode((uint32_t(m.buf[3])<<4)|(m.buf[4]>>4),VELOCITY_MIN,VELOCITY_MAX,12);
+  f.torque=decode(((uint32_t(m.buf[4])&15)<<8)|m.buf[5],TORQUE_MIN,TORQUE_MAX,12);
+  f.error=m.buf[7];motorFault[index]=motorFault[index]||f.error!=0;
+  numericFault[index]=numericFault[index]||!isfinite(f.position)||!isfinite(f.velocity)||!isfinite(f.torque);
+  f.rxUs=r.rxUs;++f.sequence;f.valid=true;++CanDiagnostics::rxProcessed[index];
+  if(feedbackHandler)feedbackHandler(MOTOR_IDS[index],f);return true;
+}
+template<typename Bus> inline void configureBus(Bus &can) {
+  can.begin();can.setBaudRate(ControlConfig::CAN_BAUD);can.setMaxMB(16);can.setMB(MB0,RX,STD);
+  can.setMBFilter(REJECT_ALL);can.setMBFilter(MB0,ACCEPT_ALL);
+}
+inline void begin() {
+  configureBus(can1);configureBus(can2);
+  can1.onReceive(MB0,receiveCAN1);can1.enableMBInterrupt(MB0);
+  can2.onReceive(MB0,receiveCAN2);can2.enableMBInterrupt(MB0);
+  NVIC_SET_PRIORITY(IRQ_CAN1,ControlConfig::ISR_PRIORITY);NVIC_SET_PRIORITY(IRQ_CAN2,ControlConfig::ISR_PRIORITY);
+}
+}
+
+
+===== control_algorithm.h =====
+#pragma once
+#include <stdint.h>
+#include <math.h>
+#include "control_config.h"
+#include "fixed_notch.h"
+namespace ControlAlgorithm {
+struct Signals {
+  float velocity=0, friction=0, input=0, state=0, external=0;
+  float torqueR=0, torqueF=0, torqueGFF=0, unsaturated=0, command=0;
+  float angleBpf=0, angleRms=0, meanSpeed=0, gammaTheta=0, gammaSpeed=1, gamma=0;
+  float notchInput=0, notchOutput=0;
+  uint8_t notchMode=ControlConfig::INITIAL_NOTCH_MODE;
+  bool saturated=false;
+};
+// Bilinear-transform Butterworth biquad, transposed direct-form II.
+class Biquad {
+ public:
+  Biquad(float cutoff,float q,bool highpass,uint32_t samplePeriodUs=ControlConfig::CONTROL_PERIOD_US) {
+    const double w=6.2831853071795864769*cutoff*samplePeriodUs*1e-6;
+    const double c=cos(w), s=sin(w), alpha=s/(2*q), a0=1+alpha;
+    if(highpass) { b0=(1+c)/(2*a0); b1=-(1+c)/a0; b2=b0; }
+    else { b0=(1-c)/(2*a0); b1=(1-c)/a0; b2=b0; }
+    a1=-2*c/a0; a2=(1-alpha)/a0;
+  }
+  void reset() { z1=z2=0; initialized=false; }
+  double update(double x) {
+    if(!initialized) {
+      const double dc=(b0+b1+b2)/(1+a1+a2);
+      const double y=dc*x; z1=y-b0*x; z2=b2*x-a2*y; initialized=true;
+    }
+    const double y=b0*x+z1; z1=b1*x-a1*y+z2; z2=b2*x-a2*y; return y;
+  }
+  double magnitude(double w) const {
+    const double zr=cos(w),zi=-sin(w),z2r=cos(2*w),z2i=-sin(2*w);
+    const double nr=b0+b1*zr+b2*z2r,ni=b1*zi+b2*z2i;
+    const double dr=1+a1*zr+a2*z2r,di=a1*zi+a2*z2i;
+    return sqrt((nr*nr+ni*ni)/(dr*dr+di*di));
+  }
+  bool finiteState() const { return isfinite(z1)&&isfinite(z2); }
+ private: double b0=0,b1=0,b2=0,a1=0,a2=0,z1=0,z2=0; bool initialized=false;
+};
+class AngleDetector {
+ public:
+  explicit AngleDetector(uint32_t samplePeriodUs=ControlConfig::CONTROL_PERIOD_US): hp1(ControlConfig::ANGLE_BPF_LOW_HZ,0.541196100146197,true,samplePeriodUs), hp2(ControlConfig::ANGLE_BPF_LOW_HZ,1.306562964876377,true,samplePeriodUs),
+    lp1(ControlConfig::ANGLE_BPF_HIGH_HZ,0.541196100146197,false,samplePeriodUs), lp2(ControlConfig::ANGLE_BPF_HIGH_HZ,1.306562964876377,false,samplePeriodUs), samplePeriodUs(samplePeriodUs) {
+    const double fc=sqrt(double(ControlConfig::ANGLE_BPF_LOW_HZ)*ControlConfig::ANGLE_BPF_HIGH_HZ);
+    const double w=6.2831853071795864769*fc*samplePeriodUs*1e-6;
+    const double h=hp1.magnitude(w)*hp2.magnitude(w)*lp1.magnitude(w)*lp2.magnitude(w);
+    normalization=1.0/h;
+  }
+  void reset() { hp1.reset();hp2.reset();lp1.reset();lp2.reset();initialized=false;unwrapped=0;rms2=meanSpeed=0; }
+  void update(float position,float velocity,uint32_t dtUs) {
+    using namespace ControlConfig;
+    if(!initialized) { unwrapped=position; initialized=true; }
+    else {
+      double d=double(position)-lastPosition, span=ANGLE_WRAP_MAX_RAD-ANGLE_WRAP_MIN_RAD;
+      if(d>span*.5) d-=span; else if(d< -span*.5) d+=span;
+      unwrapped+=d;
+    }
+    lastPosition=position;
+    double y=hp1.update(unwrapped); y=hp2.update(y); y=lp1.update(y); y=lp2.update(y)*normalization;
+    const double dt=double(dtUs ? dtUs : samplePeriodUs)*1e-6;
+    const double ar=exp(-dt/ANGLE_RMS_TAU_S); rms2=ar*rms2+(1-ar)*y*y;
+    const double av=exp(-6.2831853071795864769*MEAN_SPEED_LPF_HZ*double(dtUs)*1e-6);
+    meanSpeed=av*meanSpeed+(1-av)*double(velocity);
+    bpf=float(y); rms=float(sqrt(rms2)); speed=float(fabs(meanSpeed));
+  }
+  bool finiteState() const { return hp1.finiteState()&&hp2.finiteState()&&lp1.finiteState()&&lp2.finiteState()&&isfinite(unwrapped)&&isfinite(rms2)&&isfinite(meanSpeed)&&isfinite(normalization); }
+  float bpf=0,rms=0,speed=0;
+ private:
+  Biquad hp1,hp2,lp1,lp2; uint32_t samplePeriodUs; bool initialized=false; double lastPosition=0,unwrapped=0,rms2=0,meanSpeed=0,normalization=1;
+};
+class Controller {
+ public:
+  explicit Controller(const ControlConfig::MotorParameters &parameters, uint32_t feedbackPeriodUs=ControlConfig::CONTROL_PERIOD_US)
+    : motor(parameters), detector(feedbackPeriodUs) {}
+  Signals signals;
+  float torqueBias=0;
+  void reset() { mode=ControlConfig::INITIAL_NOTCH_MODE; signals=Signals{}; signals.notchMode=uint8_t(mode); initialized=false; numericFault=false; lastUs=0; notch.reset(); velocityNotch.reset(); detector.reset(); latestRawVelocity=0; for(uint8_t i=0;i<ControlConfig::VELOCITY_MOVING_AVERAGE_SAMPLES;++i) velocitySamples[i]=0; velocitySum=0; velocityIndex=0; velocityCount=0; appliedGamma=0; holdSeconds=0; }
+  bool ready() const { return initialized && !numericFault; }
+  bool faulted() const { return numericFault; }
+  void zeroOutput() { signals.torqueR=signals.torqueF=signals.torqueGFF=signals.unsaturated=signals.command=0; signals.saturated=false; }
+  void trip() { numericFault=true; zeroOutput(); }
+  void setNotchMode(ControlConfig::NotchMode m) { mode=m; signals.notchMode=uint8_t(m); appliedGamma=0; holdSeconds=0; }
+  ControlConfig::NotchMode notchMode() const { return mode; }
+  bool setAngleThresholds(float startDeg,float fullDeg) {
+    if(!isfinite(startDeg)||!isfinite(fullDeg)||startDeg<=0||fullDeg<=startDeg) return false;
+    angleStartThresholdDeg=startDeg; angleFullThresholdDeg=fullDeg; return true;
+  }
+  float angleStartDeg() const { return angleStartThresholdDeg; }
+  float angleFullDeg() const { return angleFullThresholdDeg; }
+  float friction(float w,ControlConfig::FrictionModel model) const {
+    if(!isfinite(w)) return NAN;
+    const auto &p=w>0 ? motor.positive : motor.negative;
+    if(model==ControlConfig::FRICTION_STRIBECK) {
+      const float r=w/p.vs;
+      return tanhf(w/ControlConfig::OMEGA_0)*
+        (p.tc+(p.ts-p.tc)*expf(-r*r)+p.b*fabsf(w));
+    }
+    return p.tc*tanhf(w/ControlConfig::OMEGA_0)+p.b*w;
+  }
+  bool finiteState() const {
+    return notch.finiteState()&&velocityNotch.finiteState()&&detector.finiteState()&&
+      isfinite(torqueBias)&&isfinite(latestRawVelocity)&&isfinite(velocitySum)&&isfinite(appliedGamma)&&isfinite(holdSeconds)&&
+      isfinite(signals.velocity)&&isfinite(signals.friction)&&isfinite(signals.input)&&isfinite(signals.state)&&isfinite(signals.external)&&
+      isfinite(signals.torqueR)&&isfinite(signals.torqueF)&&isfinite(signals.torqueGFF)&&isfinite(signals.unsaturated)&&isfinite(signals.command)&&
+      isfinite(signals.angleBpf)&&isfinite(signals.angleRms)&&isfinite(signals.meanSpeed)&&isfinite(signals.gammaTheta)&&isfinite(signals.gammaSpeed)&&isfinite(signals.gamma)&&isfinite(signals.notchInput)&&isfinite(signals.notchOutput);
+  }
+  // Called exactly once per new CAN feedback frame; BPF is designed for 2 kHz sampling.
+  void feedback(float position,float rawVelocity,float motorTorque,uint32_t rxUs) {
+    using namespace ControlConfig;
+    if(numericFault) return;
+    if(!isfinite(position)||!isfinite(rawVelocity)||!isfinite(motorTorque)||!finiteState()) { trip(); return; }
+    if(initialized && uint32_t(rxUs-lastUs)==0) return;
+    const uint32_t dtUs=initialized?uint32_t(rxUs-lastUs):CONTROL_PERIOD_US;
+    detector.update(position,rawVelocity,dtUs);
+    constexpr float VELOCITY_DEADZONE_RAD_S=0.08f;
+    const float velocityMagnitude=fabsf(rawVelocity);
+    const float velocityForAverage=velocityMagnitude<=VELOCITY_DEADZONE_RAD_S ? 0.0f :
+      (rawVelocity>0.0f ? 1.0f : -1.0f)*(velocityMagnitude-VELOCITY_DEADZONE_RAD_S);
+    const float filteredVelocity=updateVelocityMovingAverage(velocityForAverage);
+    if(!initialized) {
+      signals.velocity=filteredVelocity; signals.friction=friction(signals.velocity,RFOB_FRICTION_MODEL);
+      signals.input=motorTorque-torqueBias-signals.friction+motor.J*G*signals.velocity;
+      signals.state=motor.J*G*signals.velocity; initialized=true;
+    } else {
+      const float dt=float(dtUs)*US_TO_SECONDS;
+      signals.velocity=filteredVelocity;
+      signals.friction=friction(signals.velocity,RFOB_FRICTION_MODEL);
+      signals.input=motorTorque-torqueBias-signals.friction+motor.J*G*signals.velocity;
+      signals.state+=(1.0f-expf(-G*dt))*(signals.input-signals.state);
+    }
+    lastUs=rxUs; latestRawVelocity=rawVelocity;
+    signals.external=motor.J*G*signals.velocity-signals.state;
+    signals.angleBpf=detector.bpf; signals.angleRms=detector.rms; signals.meanSpeed=detector.speed;
+    if(!finiteState()) trip();
+  }
+  // Called once per 500 us command tick. Both notch instances run continuously.
+  // notch: diagnostics only. velocityNotch: damping branch.
+  float command(bool enabled,float Kr,float Kf) {
+    using namespace ControlConfig;
+    if(numericFault) { zeroOutput(); return 0; }
+    if(!isfinite(Kr)||!isfinite(Kf)||!finiteState()) { trip(); return 0; }
+    const float raw=signals.external, filtered=notch.update(raw);
+    // Sample-and-hold the latest raw CAN velocity. Do not reuse the RFOB 5-point moving average.
+    // The notch includes NOTCH_DEPTH internally; do not multiply depth again.
+    const float velocityNotched=velocityNotch.update(latestRawVelocity);
+    const float oscillationVelocity=latestRawVelocity-velocityNotched;
+    const double dt=CONTROL_PERIOD_US*1e-6;
+    float gt=0,gv=1;
+    if(mode==NOTCH_FIXED) { gt=gv=1; }
+    else if(mode==NOTCH_ADAPTIVE) {
+      const float ar=angleStartThresholdDeg*0.01745329251994329577f;
+      const float full=angleFullThresholdDeg*0.01745329251994329577f;
+      gt=fmaxf(0,fminf(1,(signals.angleRms-ar)/(full-ar)));
+      if(ENABLE_SPEED_GATE) gv=fmaxf(0,fminf(1,(SPEED_GATE_ZERO_RAD_S-signals.meanSpeed)/(SPEED_GATE_ZERO_RAD_S-SPEED_GATE_FULL_RAD_S)));
+    }
+    float target=gt*gv;
+    if(mode==NOTCH_ADAPTIVE) {
+      if(target>appliedGamma) holdSeconds=NOTCH_HOLD_S;
+      else if(holdSeconds>0) { holdSeconds=fmaxf(0,float(holdSeconds-dt)); target=fmaxf(target,appliedGamma); }
+      const float tau=(target>appliedGamma)?NOTCH_ATTACK_S:NOTCH_RELEASE_S;
+      appliedGamma+=float(1-exp(-dt/tau))*(target-appliedGamma);
+    } else { appliedGamma=target; holdSeconds=0; }
+    signals.gammaTheta=gt; signals.gammaSpeed=gv; signals.gamma=appliedGamma;
+    signals.notchInput=raw; signals.notchOutput=filtered; signals.notchMode=uint8_t(mode);
+    // NOTE: RFOB torque is no longer attenuated at any frequency.
+    // OFF/FIXED/ADAPTIVE now select OFF/full/adaptive band-limited VELOCITY damping.
+    const float dampingRequested=-DAMPING_GAIN*appliedGamma*oscillationVelocity;
+    const float dampingTorque=fmaxf(-DAMPING_TORQUE_LIMIT_NM,
+                              fminf(DAMPING_TORQUE_LIMIT_NM,dampingRequested));
+    if(!isfinite(dampingTorque)||!finiteState()) { trip(); return 0; }
+    if(!enabled||!ready()) { zeroOutput(); return 0; }
+    signals.torqueR=Kr*raw;
+    signals.torqueF=Kf*friction(signals.velocity,FF_FRICTION_MODEL);
+    signals.torqueGFF=(motor.id==1 ? G_FF1 : G_FF2);
+    signals.unsaturated=signals.torqueR+signals.torqueF+dampingTorque+signals.torqueGFF;
+    if(!finiteState()) { trip(); return 0; }
+    signals.command=fmaxf(-TORQUE_LIMIT,fminf(TORQUE_LIMIT,signals.unsaturated));
+    signals.saturated=signals.command!=signals.unsaturated;
+    if(!isfinite(signals.command)) trip();
+    return signals.command;
+  }
+ private:
+  float updateVelocityMovingAverage(float rawVelocity) {
+    if(velocityCount<ControlConfig::VELOCITY_MOVING_AVERAGE_SAMPLES) {
+      velocitySamples[velocityIndex]=rawVelocity;
+      velocitySum+=rawVelocity;
+      ++velocityCount;
+    } else {
+      velocitySum-=velocitySamples[velocityIndex];
+      velocitySamples[velocityIndex]=rawVelocity;
+      velocitySum+=rawVelocity;
+    }
+    velocityIndex=uint8_t((velocityIndex+1)%ControlConfig::VELOCITY_MOVING_AVERAGE_SAMPLES);
+    return velocitySum/float(velocityCount);
+  }
+  const ControlConfig::MotorParameters &motor;
+  float velocitySamples[ControlConfig::VELOCITY_MOVING_AVERAGE_SAMPLES]={};
+  float velocitySum=0;
+  uint8_t velocityIndex=0,velocityCount=0;
+  FixedNotch notch,velocityNotch; AngleDetector detector; bool initialized=false,numericFault=false;
+  uint32_t lastUs=0; float latestRawVelocity=0;
+  ControlConfig::NotchMode mode=ControlConfig::INITIAL_NOTCH_MODE;
+  float appliedGamma=0,holdSeconds=0;
+  float angleStartThresholdDeg=ControlConfig::ANGLE_NOTCH_START_DEG_RMS;
+  float angleFullThresholdDeg=ControlConfig::ANGLE_NOTCH_FULL_DEG_RMS;
+};
+}
+
+
+
+
+===== control_config.h =====
+#pragma once
+#include <stdint.h>
+#ifndef TRANS_ENABLE_FIXED_NOTCH
+#define TRANS_ENABLE_FIXED_NOTCH 0
+#endif
+
+namespace ControlConfig {
+// ==================== MOTOR SELECTION ====================
+constexpr bool MOTOR1_ON = true;
+constexpr bool MOTOR2_ON = true;
+constexpr uint8_t MOTOR_COUNT = 2;
+constexpr bool ANY_MOTOR_ON = MOTOR1_ON || MOTOR2_ON;
+constexpr bool BOTH_MOTORS_ON = MOTOR1_ON && MOTOR2_ON;
+constexpr uint8_t MOTOR_IDS[MOTOR_COUNT] = {1, 2};
+constexpr uint32_t RX_QUEUE_ROWS=64;
+constexpr uint32_t RX_BUDGET=4; // Bounded observer updates per 500 us tick.
+constexpr uint32_t RX_STALE_US=2000; // Diagnostic only; timeout remains 100 ms.
+constexpr uint32_t RX_INTERVAL_MIN_US=250, RX_INTERVAL_MAX_US=1000;
+// ==================== USER SETTINGS / ユーザー設定 ====================
+constexpr bool INITIAL_ENABLED=false; // 初期透明化制御ON/OFF [bool]
+// 起動時とS開始時に以下を自動適用。KR/KFコマンドの送信は不要。
+constexpr float INITIAL_K_R1=0.95f; // Motor ID1 RFOBフィードバックゲイン初期設定 [無次元]
+constexpr float INITIAL_K_R2=0.95f; // Motor ID2 RFOBフィードバックゲイン初期設定 [無次元]
+constexpr float INITIAL_K_F1=0.0f; // Motor ID1 摩擦FFゲイン初期設定 [無次元]
+constexpr float INITIAL_K_F2=0.0f; // Motor ID2 摩擦FFゲイン初期設定 [無次元]
+constexpr float G_FF1=0.01182f; // Motor ID1 重力補償FFトルク [Nm]
+constexpr float G_FF2=-1.60443f; // Motor ID2 重力補償FFトルク [Nm]
+// KR/KF: 有限なfloat値のみ許可。追加のゲイン範囲制限なし。
+constexpr float TORQUE_LIMIT=2.0f; // 指令トルク絶対値上限 [Nm]（M2バイアスFFを出力可能な値）
+constexpr uint32_t CONTROL_PERIOD_US=500; // MIT指令周期 [us] 500 for 2kHz
+constexpr float Q_HZ=400.0f; // RFOB Qフィルタ遮断周波数 [Hz]
+constexpr uint8_t VELOCITY_MOVING_AVERAGE_SAMPLES=5; // 角速度5点移動平均のサンプル数
+constexpr bool NOTCH_ENABLED=TRANS_ENABLE_FIXED_NOTCH!=0;
+constexpr double NOTCH_CENTER_HZ=12.0;
+constexpr double NOTCH_LOW_SIDE_HZ=10.0; // lower -3 dB offset [Hz]: edge=center-low. Coefficients are calculated once at startup.
+constexpr double NOTCH_HIGH_SIDE_HZ=35.0; // upper -3 dB offset [Hz]: edge=center+high.
+constexpr double NOTCH_DEPTH=0.95; // center amplitude = 1-depth = 0.05
+// Velocity-based damping using the COMPLEMENT of the same notch: omega - N(z)*omega.
+// The RFOB external torque is NOT notched. Adaptive gamma still gates the damping.
+constexpr float DAMPING_GAIN=0.8f; // [Nm s/rad]; start low and tune after on-device tests
+constexpr float DAMPING_TORQUE_LIMIT_NM=0.80f; // separate safety cap before total +/-TORQUE_LIMIT
+enum NotchMode : uint8_t { NOTCH_OFF=0, NOTCH_FIXED=1, NOTCH_ADAPTIVE=2 };
+constexpr NotchMode INITIAL_NOTCH_MODE = NOTCH_OFF;
+constexpr float ANGLE_BPF_LOW_HZ=8.0f, ANGLE_BPF_HIGH_HZ=20.0f;
+constexpr float ANGLE_RMS_TAU_S=0.2f;
+constexpr float ANGLE_NOTCH_START_DEG_RMS=0.1f, ANGLE_NOTCH_FULL_DEG_RMS=1.5f;
+constexpr bool ENABLE_SPEED_GATE=true;
+constexpr float SPEED_GATE_FULL_RAD_S=0.3f, SPEED_GATE_ZERO_RAD_S=0.5f;
+constexpr float MEAN_SPEED_LPF_HZ=2.0f;
+constexpr float NOTCH_ATTACK_S=0.05f, NOTCH_RELEASE_S=0.5f, NOTCH_HOLD_S=0.25f;
+constexpr float ANGLE_WRAP_MIN_RAD=-12.5f, ANGLE_WRAP_MAX_RAD=12.5f;
+static_assert(DAMPING_GAIN>=0.0f && DAMPING_TORQUE_LIMIT_NM>0.0f && DAMPING_TORQUE_LIMIT_NM<=TORQUE_LIMIT,"Invalid damping settings");
+static_assert(NOTCH_CENTER_HZ>0 && NOTCH_CENTER_HZ<500000.0/CONTROL_PERIOD_US,"Invalid notch frequency");
+static_assert(NOTCH_LOW_SIDE_HZ>0 && NOTCH_LOW_SIDE_HZ<NOTCH_CENTER_HZ && NOTCH_HIGH_SIDE_HZ>0 && NOTCH_CENTER_HZ+NOTCH_HIGH_SIDE_HZ<500000.0/CONTROL_PERIOD_US && NOTCH_DEPTH>=0 && NOTCH_DEPTH<=1,"Invalid notch bandwidth/depth");
+static_assert(ANGLE_BPF_LOW_HZ>0 && ANGLE_BPF_HIGH_HZ>ANGLE_BPF_LOW_HZ && ANGLE_BPF_HIGH_HZ<500000.0/CONTROL_PERIOD_US,"Invalid angle BPF frequencies");
+static_assert(ANGLE_NOTCH_FULL_DEG_RMS>ANGLE_NOTCH_START_DEG_RMS && SPEED_GATE_ZERO_RAD_S>SPEED_GATE_FULL_RAD_S,"Invalid adaptive notch thresholds");
+static_assert(NOTCH_ATTACK_S>0 && NOTCH_RELEASE_S>0 && ANGLE_RMS_TAU_S>0,"Invalid adaptive notch time constants");
+constexpr float OMEGA_0=0.3f; // 摩擦モデルのゼロ近傍平滑化速度 [rad/s]
+enum FrictionModel : uint8_t { FRICTION_STRIBECK=0, FRICTION_TANH=1 };
+// Select the observer and feed-forward models independently for both motors.
+constexpr FrictionModel RFOB_FRICTION_MODEL=FRICTION_STRIBECK;
+constexpr FrictionModel FF_FRICTION_MODEL=FRICTION_STRIBECK;
+struct FrictionParameters { float tc, ts, vs, b; };
+// tc: クーロン摩擦 [Nm], ts: 静止摩擦 [Nm], vs: Stribeck速度 [rad/s], b: 粘性 [Nm s/rad]
+struct MotorParameters { uint8_t id; float J; FrictionParameters positive, negative; };
+constexpr MotorParameters MOTORS[MOTOR_COUNT] = {
+  {1, 0.0118484f, {0.16417f,0.45324f,0.2f,0.001727f}, {0.16417f,0.45324f,0.2f,0.001727f}},
+  {2, 0.0116806f, {0.459212f,0.526341f,0.474762f,0.00218903f}, {0.410719f,0.527041f,0.473325f,0.00341074f}}
+};
+inline constexpr bool selected(uint8_t index) { return index==0 ? MOTOR1_ON : (index==1 ? MOTOR2_ON : false); }
+inline constexpr int8_t indexForId(uint8_t id) { return id==1 ? 0 : (id==2 ? 1 : -1); }
+constexpr unsigned MOTOR_CAN_BUS[MOTOR_COUNT]={1,2}; // ID1->CAN1, ID2->CAN2; independent physical buses
+constexpr uint32_t CAN_BAUD=1000000; // CAN通信速度 [bit/s]
+constexpr float POSITION_MIN=-12.5f, POSITION_MAX=12.5f; // MIT位置エンコード範囲 [rad]
+constexpr float VELOCITY_MIN=-37.5f, VELOCITY_MAX=37.5f; // MIT速度エンコード範囲 [rad/s]
+constexpr float TORQUE_MIN=-32.0f, TORQUE_MAX=32.0f; // MITトルクエンコード範囲 [Nm]
+constexpr float MIT_KP_MAX=500.0f; // MIT内部位置ゲインのエンコード上限 [Nm/rad], 指令は0
+constexpr float MIT_KD_MAX=5.0f; // MIT内部速度ゲインのエンコード上限 [Nm s/rad], 指令は0
+constexpr uint32_t FEEDBACK_TIMEOUT_US=500000; // 受信開始待ち・途絶タイムアウト [us]
+constexpr uint8_t ISR_PRIORITY=192; // CAN/制御タイマ共通割込み優先度 [0..255]
+constexpr uint32_t SERIAL_BAUD=115200; // USBシリアル表示用ボーレート [bit/s]
+constexpr float BIAS_STATIONARY_SPEED=0.05f; // OFF中bias取得時の静止判定 [rad/s]（制御デッドバンドではない）
+constexpr unsigned COMMAND_BUFFER_BYTES=48; // シリアルコマンド最大バッファ [byte]
+// ==================== DERIVED CONSTANTS / 設定から算出 ====================
+constexpr float RADIANS_PER_REVOLUTION=6.283185307179586f; // 円周率の2倍 [rad/rev]
+constexpr float US_TO_SECONDS=1.0e-6f; // 時刻単位換算 [s/us]
+constexpr float G=RADIANS_PER_REVOLUTION*Q_HZ; // RFOB帯域 [rad/s]
+static_assert(CONTROL_PERIOD_US>0,"Invalid control period");
+static_assert(MOTOR_CAN_BUS[0]==1 && MOTOR_CAN_BUS[1]==2,"Motor CAN bus mapping is fixed: ID1=CAN1, ID2=CAN2");
+static_assert(TORQUE_LIMIT>0 && TORQUE_LIMIT<=TORQUE_MAX && -TORQUE_LIMIT>=TORQUE_MIN,"Invalid torque limit");
+}
+
+
+
+
+===== control_log.h =====
+#pragma once
+#include <Arduino.h>
+
+namespace ControlLog {
+constexpr uint32_t CAPACITY=16384; // About 8.2 s at 2 kHz; oldest samples are overwritten when full.
+struct Sample {
+  uint8_t motorId=0;
+  uint32_t timestampUs=0;
+  float position=0, velocity=0;
+};
+static Sample samples[CAPACITY];
+static uint32_t head=0, count=0;
+
+inline void reset() {
+  head=0;
+  count=0;
+}
+
+// Called from the control ISR once for each accepted CAN feedback frame.
+inline void append(uint8_t motorId,uint32_t timestampUs,float position,float velocity) {
+  samples[head].motorId=motorId;
+  samples[head].timestampUs=timestampUs;
+  samples[head].position=position;
+  samples[head].velocity=velocity;
+  head=(head+1)%CAPACITY;
+  if(count<CAPACITY) ++count;
+}
+
+// Call only while the control session is stopped; serial output is blocking.
+inline void dump() {
+  Serial.print("LOG_BEGIN,"); Serial.println(count);
+  Serial.println("motor_id,timestamp_us,position_rad,velocity_raw_rad_s");
+  const uint32_t oldest=(head+CAPACITY-count)%CAPACITY;
+  for(uint32_t i=0;i<count;++i) {
+    const Sample &s=samples[(oldest+i)%CAPACITY];
+    Serial.print(s.motorId); Serial.print(','); Serial.print(s.timestampUs); Serial.print(',');
+    Serial.print(s.position,7); Serial.print(',');
+    Serial.println(s.velocity,7);
+  }
+  Serial.println("LOG_END");
+}
+}
+
+
+===== fixed_notch.h =====
+#pragma once
+#include <math.h>
+#include "control_config.h"
+#include "notch_coefficients.h"
+namespace ControlAlgorithm {
+// Asymmetric pole-shift biquad: H=(1-depth)+depth*Hnotch.
+// MATLAB fitted coefficients; two states, no added block delay.
+// Double states avoid cancellation at low f0/fs. No trigonometry in update().
+class FixedNotch {
+ public:
+  FixedNotch() {
+    b0=NotchCoefficients::COEF_B0; b1=NotchCoefficients::COEF_B1; b2=NotchCoefficients::COEF_B2;
+    a1=NotchCoefficients::COEF_A1; a2=NotchCoefficients::COEF_A2;
+  }
+  void reset() { z1=z2=0; initialized=false; }
+  bool finiteState() const { return isfinite(z1)&&isfinite(z2)&&isfinite(b0)&&isfinite(b1)&&isfinite(b2)&&isfinite(a1)&&isfinite(a2); }
+  float update(float input) {
+    const double x=input;
+    if(!initialized) { z1=(1-b0)*x; z2=(b2-a2)*x; initialized=true; }
+    const double y=b0*x+z1;
+    z1=b1*x-a1*y+z2; z2=b2*x-a2*y;
+    return float(x+ControlConfig::NOTCH_DEPTH*(y-x));
+  }
+  double b0=0,b1=0,b2=0,a1=0,a2=0;
+ private:
+  double z1=0,z2=0;
+  bool initialized=false;
+};
+}
+
+
+
+
+
+===== notch_coefficients.h =====
+#pragma once
+// Generated by verification/design_asymmetric_notch.m; regenerate after setting changes.
+static_assert(ControlConfig::NOTCH_CENTER_HZ==12 && ControlConfig::NOTCH_LOW_SIDE_HZ==10 && ControlConfig::NOTCH_HIGH_SIDE_HZ==35 && ControlConfig::NOTCH_DEPTH==0.95 && ControlConfig::CONTROL_PERIOD_US==500,"Regenerate notch coefficients with MATLAB");
+namespace NotchCoefficients { constexpr double COEF_B0=0.95500701398957999, COEF_B1=-1.9086569107554223, COEF_B2=0.95500701398957999, COEF_A1=-1.9086569107554223, COEF_A2=0.91001402797915998; }
+
+
+===== position_direction.h =====
+#pragma once
+#include <stdint.h>
+#include "control_config.h"
+
+namespace PositionDirection {
+enum Direction { UNKNOWN, POSITIVE, NEGATIVE };
+class Estimator {
+ public:
+  void reset() { head=0; count=0; result=UNKNOWN; }
+  Direction direction() const { return result; }
+  void update(float position,uint32_t rxUs) {
+    using namespace ControlConfig;
+    if(count && rxUs==samples[(head+count-1)%CAPACITY].us) return;
+    // Keep the latest received sample at or before now - 50 ms, plus newer samples.
+    while(count>1 && uint32_t(rxUs-samples[(head+1)%CAPACITY].us)>=POSITION_DIRECTION_WINDOW_US) {
+      head=(head+1)%CAPACITY; --count;
+    }
+    // Capacity exceeds the number of accepted frames possible in 50 ms at 1 Mbit/s.
+    // If exhausted, discard incomplete history and require a fresh full window.
+    if(count==CAPACITY) reset();
+    samples[(head+count)%CAPACITY]={position,rxUs}; ++count;
+    result=UNKNOWN;
+    if(uint32_t(rxUs-samples[head].us)<POSITION_DIRECTION_WINDOW_US) return;
+    float delta=position-samples[head].position;
+    const float range=POSITION_MAX-POSITION_MIN;
+    if(delta>range*0.5f) delta-=range;
+    else if(delta<-range*0.5f) delta+=range;
+    if(delta>POSITION_DIRECTION_THRESHOLD_RAD) result=POSITIVE;
+    else if(delta<-POSITION_DIRECTION_THRESHOLD_RAD) result=NEGATIVE;
+  }
+ private:
+  static constexpr uint32_t CAPACITY=1024;
+  struct Sample { float position; uint32_t us; };
+  Sample samples[CAPACITY];
+  uint32_t head=0, count=0;
+  Direction result=UNKNOWN;
+};
+}
+
+

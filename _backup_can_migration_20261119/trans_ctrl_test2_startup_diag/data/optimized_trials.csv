@@ -1,0 +1,4 @@
+"label","trial","s_to_on_ms","s_to_saved_ms","saved","status_running","fault_code","can_write_success","sd_write_failures","saved_line"
+"optimized","1","10.496","654.522","True","0","2","24","0","SAVED,TC0089.BIN,STATUS,2"
+"optimized","2","16.821","","False","0","2","24","0","SAVED,TC0089.BIN,STATUS,2"
+"optimized","3","16.265","","False","0","2","24","0","SAVED,TC0089.BIN,STATUS,2"

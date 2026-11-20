@@ -57,6 +57,7 @@ inline void serviceDiagnostics() {
 static void (*feedbackHandler)(uint8_t,const Feedback &)=nullptr;
 inline uint32_t encode(float x,float lo,float hi,uint8_t bits) { x=constrain(x,lo,hi); return uint32_t((x-lo)*float((1UL<<bits)-1)/(hi-lo)); }
 inline float decode(uint32_t x,float lo,float hi,uint8_t bits) { return float(x)*(hi-lo)/float((1UL<<bits)-1)+lo; }
+inline void sampleBusErrors() { const uint32_t bases[2]={CAN1,CAN2}; for(uint8_t i=0;i<2;++i) if(ControlConfig::selected(i)) CanDiagnostics::observe(FLEXCANb_ESR1(bases[i]),FLEXCANb_ECR(bases[i])); }
 inline bool sendSpecial(uint8_t id,uint8_t code) {
   CAN_message_t m={}; m.id=id; m.len=8; for(uint8_t i=0;i<7;++i)m.buf[i]=0xff; m.buf[7]=code;
   return writeDiagnosed(m,0,code,id);
@@ -86,7 +87,7 @@ inline void resetRx(bool enableCapture) {
 inline void receiveFeedbackForBus(uint8_t index,const CAN_message_t &m) {
   const uint32_t now=micros(); if(!capture)return;
   using namespace CanDiagnostics; ++rxFrames[index]; if(m.flags.overrun)++rxHardwareOverruns[index];
-  if(m.flags.remote||m.flags.extended||m.len!=8||m.buf[0]!=ControlConfig::MOTOR_IDS[index]||!ControlConfig::selected(index))++rxRejected[index];
+  if(m.flags.remote||m.flags.extended||m.len<6||m.len>8||(m.id!=ControlConfig::MOTOR_IDS[index]&&m.buf[0]!=ControlConfig::MOTOR_IDS[index])||!ControlConfig::selected(index))++rxRejected[index];
   else {
     ++rxAccepted[index];
     if(haveRxTime[index]) { const uint32_t gap=now-previousRxUs[index]; rxLastIntervalUs[index]=gap;rxGapMin[index]=min(rxGapMin[index],gap);rxGapMax[index]=max(rxGapMax[index],gap);if(gap<ControlConfig::RX_INTERVAL_MIN_US||gap>ControlConfig::RX_INTERVAL_MAX_US)++rxAbnormal[index]; }
@@ -96,8 +97,10 @@ inline void receiveFeedbackForBus(uint8_t index,const CAN_message_t &m) {
   }
   rxIsrMax[index]=max(rxIsrMax[index],uint32_t(micros()-now));
 }
-inline void receiveCAN1(const CAN_message_t &m) { receiveFeedbackForBus(0,m); }
-inline void receiveCAN2(const CAN_message_t &m) { receiveFeedbackForBus(1,m); }
+inline void pollReceive() {
+  for(uint8_t n=0;n<ControlConfig::CAN_RX_BUDGET;++n) { CAN_message_t m{}; if(!can1.read(m)) break; receiveFeedbackForBus(0,m); }
+  for(uint8_t n=0;n<ControlConfig::CAN_RX_BUDGET;++n) { CAN_message_t m{}; if(!can2.read(m)) break; receiveFeedbackForBus(1,m); }
+}
 inline bool processFeedback(uint8_t index,uint32_t now) {
   if(rxTail[index]==rxHead[index])return false;
   const ReceivedFrame r=received[index][rxTail[index]%ControlConfig::RX_QUEUE_ROWS];asm volatile("" ::: "memory");++rxTail[index];
@@ -107,19 +110,17 @@ inline bool processFeedback(uint8_t index,uint32_t now) {
   f.position=decode((uint32_t(m.buf[1])<<8)|m.buf[2],POSITION_MIN,POSITION_MAX,16);
   f.velocity=decode((uint32_t(m.buf[3])<<4)|(m.buf[4]>>4),VELOCITY_MIN,VELOCITY_MAX,12);
   f.torque=decode(((uint32_t(m.buf[4])&15)<<8)|m.buf[5],TORQUE_MIN,TORQUE_MAX,12);
-  f.error=m.buf[7];motorFault[index]=motorFault[index]||f.error!=0;
+  f.error=m.len>=8?m.buf[7]:0;motorFault[index]=motorFault[index]||f.error!=0;
   numericFault[index]=numericFault[index]||!isfinite(f.position)||!isfinite(f.velocity)||!isfinite(f.torque);
   f.rxUs=r.rxUs;++f.sequence;f.valid=true;++CanDiagnostics::rxProcessed[index];
   if(feedbackHandler)feedbackHandler(MOTOR_IDS[index],f);return true;
 }
 template<typename Bus> inline void configureBus(Bus &can) {
-  can.begin();can.setBaudRate(ControlConfig::CAN_BAUD);can.setMaxMB(16);can.setMB(MB0,RX,STD);
-  can.setMBFilter(REJECT_ALL);can.setMBFilter(MB0,ACCEPT_ALL);
+  can.begin(); can.setBaudRate(ControlConfig::CAN_BAUD);
 }
 inline void begin() {
   configureBus(can1);configureBus(can2);
-  can1.onReceive(MB0,receiveCAN1);can1.enableMBInterrupt(MB0);
-  can2.onReceive(MB0,receiveCAN2);can2.enableMBInterrupt(MB0);
-  NVIC_SET_PRIORITY(IRQ_CAN1,ControlConfig::ISR_PRIORITY);NVIC_SET_PRIORITY(IRQ_CAN2,ControlConfig::ISR_PRIORITY);
+  // Jia polling mailbox configuration: no RX callbacks or mailbox IRQs.
+  NVIC_SET_PRIORITY(IRQ_CAN1,128);NVIC_SET_PRIORITY(IRQ_CAN2,128);
 }
 }

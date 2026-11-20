@@ -24,6 +24,7 @@ static ControlAlgorithm::Controller controllers[2]={
   ControlAlgorithm::Controller(ControlConfig::MOTORS[1],ControlConfig::CONTROL_PERIOD_US)
 };
 static IntervalTimer controlTimer;
+static uint8_t controlDivider=0;
 static uint32_t commandTicks[2]={0,0},lastTxUs[2]={0,0},txIntervalUs[2]={0,0};
 static bool stopZeroResult[2]={false,false},stopDisableResult[2]={false,false};
 void stopRun(uint32_t reason) {
@@ -45,14 +46,16 @@ void handleFeedback(uint8_t id,const CanProtocol::Feedback &f) {
   controllers[i].feedback(f.position,f.velocity,f.torque,f.rxUs);
 }
 void controlISR() {
-  const uint32_t now=micros(); if(startRequest){startRequest=false;active=true;} if(!active) return;
+  const uint32_t now=micros(); CanProtocol::pollReceive(); if(startRequest){startRequest=false;active=true;} if(++controlDivider < ControlConfig::CONTROL_PERIOD_US / ControlConfig::RX_POLL_PERIOD_US) return; controlDivider=0; if(!active) return;
   CanDiagnostics::enter(now); struct TimingGuard{~TimingGuard(){CanDiagnostics::leave();}} timingGuard;
   for(uint8_t i=0;i<2;++i) if(ControlConfig::selected(i)) {
     for(uint32_t n=0;n<ControlConfig::RX_BUDGET&&CanProtocol::processFeedback(i,now);++n){}
     if(CanProtocol::rxHead[i]!=CanProtocol::rxTail[i])++CanDiagnostics::rxBudgetHits[i];
   }
+  CanProtocol::sampleBusErrors();
   uint32_t fault=0;
   if(CanDiagnostics::rxOverflowTotal||CanDiagnostics::rxHardwareOverruns[0]||CanDiagnostics::rxHardwareOverruns[1]) fault=9;
+  else if(CanDiagnostics::busOffObserved) fault=6;
   for(uint8_t i=0;i<2;++i) if(ControlConfig::selected(i)) {
     const auto &f=CanProtocol::feedback[i]; const uint32_t age=f.valid?uint32_t(now-f.rxUs):uint32_t(now-runStart);
     if(awaitingFirstFeedback[i]&&age>ControlConfig::FEEDBACK_TIMEOUT_US) CanProtocol::communicationFault[i]=true;
@@ -116,5 +119,5 @@ void processCommand(char *line) {
   }
   else Serial.println("ERROR,unknown command");
 }
-void setup(){Serial.begin(ControlConfig::SERIAL_BAUD);CanProtocol::feedbackHandler=handleFeedback;CanProtocol::begin();controlTimer.priority(ControlConfig::ISR_PRIORITY);timerReady=controlTimer.begin(controlISR,ControlConfig::CONTROL_PERIOD_US);Serial.print("READY,CAN1,1,M1,");Serial.print(ControlConfig::MOTOR1_ON?1:0);Serial.print(",CAN2,2,M2,");Serial.print(ControlConfig::MOTOR2_ON?1:0);Serial.print(",TIMER,");Serial.println(timerReady?"OK":"ERROR");Serial.println("Commands: S, ON, OFF, KR1 <value>, KR2 <value>, KF1 <value>, KF2 <value>, NOTCH OFF|FIXED|ADAPTIVE, ANGLE_START <deg_RMS>, ANGLE_FULL <deg_RMS>, STATUS, BIAS, D, X");}
+void setup(){Serial.begin(ControlConfig::SERIAL_BAUD);CanProtocol::feedbackHandler=handleFeedback;CanProtocol::begin();controlTimer.priority(ControlConfig::ISR_PRIORITY);timerReady=controlTimer.begin(controlISR,ControlConfig::RX_POLL_PERIOD_US);Serial.print("READY,CAN1,1,M1,");Serial.print(ControlConfig::MOTOR1_ON?1:0);Serial.print(",CAN2,2,M2,");Serial.print(ControlConfig::MOTOR2_ON?1:0);Serial.print(",TIMER,");Serial.println(timerReady?"OK":"ERROR");Serial.println("Commands: S, ON, OFF, KR1 <value>, KR2 <value>, KF1 <value>, KF2 <value>, NOTCH OFF|FIXED|ADAPTIVE, ANGLE_START <deg_RMS>, ANGLE_FULL <deg_RMS>, STATUS, BIAS, D, X");}
 void loop(){static char line[ControlConfig::COMMAND_BUFFER_BYTES];static size_t used=0;static bool overflow=false;while(Serial.available()){const char c=Serial.read();if((c=='x'||c=='X')&&used==0&&!overflow){noInterrupts();stopRun(1);interrupts();}else if(c=='\r'||c=='\n'){if(overflow)Serial.println("ERROR,command too long");else if(used){line[used]=0;processCommand(line);}used=0;overflow=false;}else if(used<sizeof(line)-1&&!overflow)line[used++]=c;else overflow=true;}static uint32_t lastDiagnosticUs=0;if(active&&uint32_t(micros()-lastDiagnosticUs)>=100000){noInterrupts();for(uint8_t i=0;i<2;++i)CanDiagnostics::latest[i]=CanProtocol::snapshot(i);interrupts();lastDiagnosticUs=micros();}CanProtocol::serviceDiagnostics();}

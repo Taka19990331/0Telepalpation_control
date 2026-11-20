@@ -1,0 +1,156 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch3\\verification\\offline_results.json"
+{
+  "free_rotation": {
+    "source": "trans_ctrl_test1_20261102_122211.csv",
+    "rows": 78501,
+    "valid_feedback_rows": 78500,
+    "interval_us_min": 499.999999995282,
+    "interval_us_max": 500.0000000023874,
+    "replayed_samples_2khz": 78500,
+    "angle_only_and_speed_gate": {
+      "angle_only": {
+        "active_fraction_gamma_gt_0_5": 0.0,
+        "mean_gamma": 0.0,
+        "peak_angle_rms_deg": 0.12205938880052518,
+        "peak_mean_speed_rad_s": 5.431600556073601,
+        "latency_after_raw_target_crossing_s": null,
+        "last_gamma_above_0_5_time_s": null,
+        "gamma_threshold_onsets": 0
+      },
+      "angle_plus_speed": {
+        "active_fraction_gamma_gt_0_5": 0.0,
+        "mean_gamma": 0.0,
+        "peak_angle_rms_deg": 0.12205938880052518,
+        "peak_mean_speed_rad_s": 5.431600556073601,
+        "latency_after_raw_target_crossing_s": null,
+        "last_gamma_above_0_5_time_s": null,
+        "gamma_threshold_onsets": 0
+      }
+    },
+    "attack_release_hold_candidates": [
+      {
+        "attack_s": 0.03,
+        "release_s": 0.2,
+        "hold_s": 0.1,
+        "mean_gamma": 0.0,
+        "active_fraction_gamma_gt_0_5": 0.0
+      },
+      {
+        "attack_s": 0.05,
+        "release_s": 0.5,
+        "hold_s": 0.25,
+        "mean_gamma": 0.0,
+        "active_fraction_gamma_gt_0_5": 0.0
+      },
+      {
+        "attack_s": 0.1,
+        "release_s": 1.0,
+        "hold_s": 0.5,
+        "mean_gamma": 0.0,
+        "active_fraction_gamma_gt_0_5": 0.0
+      }
+    ]
+  },
+  "no_operation": {
+    "source": "trans_ctrl_test1_20261102_122519.csv",
+    "rows": 47243,
+    "valid_feedback_rows": 47241,
+    "interval_us_min": 499.9999999988347,
+    "interval_us_max": 500.0000000023874,
+    "replayed_samples_2khz": 47240,
+    "angle_only_and_speed_gate": {
+      "angle_only": {
+        "active_fraction_gamma_gt_0_5": 0.0,
+        "mean_gamma": 0.0,
+        "peak_angle_rms_deg": 0.001626207124261409,
+        "peak_mean_speed_rad_s": 0.01920489290838224,
+        "latency_after_raw_target_crossing_s": null,
+        "last_gamma_above_0_5_time_s": null,
+        "gamma_threshold_onsets": 0
+      },
+      "angle_plus_speed": {
+        "active_fraction_gamma_gt_0_5": 0.0,
+        "mean_gamma": 0.0,
+        "peak_angle_rms_deg": 0.001626207124261409,
+        "peak_mean_speed_rad_s": 0.01920489290838224,
+        "latency_after_raw_target_crossing_s": null,
+        "last_gamma_above_0_5_time_s": null,
+        "gamma_threshold_onsets": 0
+      }
+    },
+    "attack_release_hold_candidates": [
+      {
+        "attack_s": 0.03,
+        "release_s": 0.2,
+        "hold_s": 0.1,
+        "mean_gamma": 0.0,
+        "active_fraction_gamma_gt_0_5": 0.0
+      },
+      {
+        "attack_s": 0.05,
+        "release_s": 0.5,
+        "hold_s": 0.25,
+        "mean_gamma": 0.0,
+        "active_fraction_gamma_gt_0_5": 0.0
+      },
+      {
+        "attack_s": 0.1,
+        "release_s": 1.0,
+        "hold_s": 0.5,
+        "mean_gamma": 0.0,
+        "active_fraction_gamma_gt_0_5": 0.0
+      }
+    ]
+  },
+  "grip_vibration": {
+    "source": "trans_ctrl_test1_20261102_123759.csv",
+    "rows": 28159,
+    "valid_feedback_rows": 28158,
+    "interval_us_min": 498.00000000000017,
+    "interval_us_max": 501.99999999999983,
+    "replayed_samples_2khz": 28157,
+    "angle_only_and_speed_gate": {
+      "angle_only": {
+        "active_fraction_gamma_gt_0_5": 0.8756259544695812,
+        "mean_gamma": 0.8589349647346474,
+        "peak_angle_rms_deg": 0.29839821457193677,
+        "peak_mean_speed_rad_s": 0.21859779342977712,
+        "latency_after_raw_target_crossing_s": 0.062000000000000055,
+        "last_gamma_above_0_5_time_s": 14.078500000000002,
+        "gamma_threshold_onsets": 1
+      },
+      "angle_plus_speed": {
+        "active_fraction_gamma_gt_0_5": 0.8756259544695812,
+        "mean_gamma": 0.8589349647346474,
+        "peak_angle_rms_deg": 0.29839821457193677,
+        "peak_mean_speed_rad_s": 0.21859779342977712,
+        "latency_after_raw_target_crossing_s": 0.062000000000000055,
+        "last_gamma_above_0_5_time_s": 14.078500000000002,
+        "gamma_threshold_onsets": 1
+      }
+    },
+    "attack_release_hold_candidates": [
+      {
+        "attack_s": 0.03,
+        "release_s": 0.2,
+        "hold_s": 0.1,
+        "mean_gamma": 0.8422398745667318,
+        "active_fraction_gamma_gt_0_5": 0.8765493482970487
+      },
+      {
+        "attack_s": 0.05,
+        "release_s": 0.5,
+        "hold_s": 0.25,
+        "mean_gamma": 0.8589349647346474,
+        "active_fraction_gamma_gt_0_5": 0.8756259544695812
+      },
+      {
+        "attack_s": 0.1,
+        "release_s": 1.0,
+        "hold_s": 0.5,
+        "mean_gamma": 0.8623535265064551,
+        "active_fraction_gamma_gt_0_5": 0.872607166956707
+      }
+    ]
+  }
+}

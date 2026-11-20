@@ -20,7 +20,9 @@ constexpr float INITIAL_K_R=0.75f; // RFOBフィードバックゲイン初期�
 constexpr float INITIAL_K_F=0.0f; // 摩擦FFゲイン初期設定 [無次元]
 // KR/KF: 有限なfloat値のみ許可。追加のゲイン範囲制限なし。
 constexpr float TORQUE_LIMIT=1.0f; // 指令トルク絶対値上限 [Nm]
-constexpr uint32_t CONTROL_PERIOD_US=500; // MIT指令周期 [us]
+constexpr uint32_t CONTROL_PERIOD_US=500;
+constexpr uint32_t RX_POLL_PERIOD_US=100; // Jia CAN RX polling period [us]
+constexpr uint8_t CAN_RX_BUDGET=4; // Maximum frames per CAN bus per 100 us poll
 constexpr float Q_HZ=400.0f; // RFOB Qフィルタ遮断周波数 [Hz]
 constexpr float VELOCITY_HZ=1000.0f; // 角速度LPF遮断周波数 [Hz]
 constexpr bool NOTCH_ENABLED=TRANS_ENABLE_FIXED_NOTCH!=0;
@@ -59,7 +61,7 @@ constexpr float TORQUE_MIN=-32.0f, TORQUE_MAX=32.0f; // MITトルクエンコー
 constexpr float MIT_KP_MAX=500.0f; // MIT内部位置ゲインのエンコード上限 [Nm/rad], 指令は0
 constexpr float MIT_KD_MAX=5.0f; // MIT内部速度ゲインのエンコード上限 [Nm s/rad], 指令は0
 constexpr uint32_t FEEDBACK_TIMEOUT_US=100000; // 受信開始待ち・途絶タイムアウト [us]
-constexpr uint8_t ISR_PRIORITY=192; // CAN/制御タイマ共通割込み優先度 [0..255]
+constexpr uint8_t ISR_PRIORITY=96; // Jia Timer ISR priority; CAN IRQ priority is 128
 constexpr uint32_t SERIAL_BAUD=115200; // USBシリアル表示用ボーレート [bit/s]
 constexpr float BIAS_STATIONARY_SPEED=0.05f; // OFF中bias取得時の静止判定 [rad/s]（制御デッドバンドではない）
 constexpr uint32_t LOG_PERIOD_US=CONTROL_PERIOD_US; // microSDサンプル記録周期 [us], 制御周期の整数倍

@@ -67,6 +67,14 @@ verification/results.json、offline.csv、response.csvを参照。
 - C++テストはノッチON/OFFともコンパイル成功。ただし生成exeはWindows Application Control
   (WinError4551)で実行できず、C++実行テスト合格とは扱わない。
 - 既存バイナリ変換テスト3件（29列、CRC/連番、完了/回復）合格。
+- Teensy 4.1公式コア1.60.0 / GCC11.3.1でSD ON/OFFともクリーンビルド・リンク成功。
+  SD ON: FLASH code95156/data11208、RAM1変数34464、RAM2変数241792 byte。
+  SD OFF: FLASH code54852/data8136、RAM1変数22304、RAM2変数12416 byte。
+  HEXはworkspace/build/trans_ctrl_notch1_sd_onおよび_sd_offに生成。
+  ビルドログは同buildフォルダのtrans_ctrl_notch1_build_sd_on.txtおよび_sd_off.txt。
+  FlexCAN_T4内部の既存strncpy警告あり。新規ノッチコードの警告はない。
+  最初のコア1.62.0ではctags/DLL、続いてcollect2起動に失敗したため、
+  既存TEENSYDUINO=160設定に対応する1.60.0へ切替して成功した。
 
 実機書込み・モータ運転は未実施。ISR所要時間、2 kHz実測周期、実機ON/OFFのトルク過渡、
 12 Hz振動抑制効果、SD記録中の動作、安全停止の実動作は未確認。

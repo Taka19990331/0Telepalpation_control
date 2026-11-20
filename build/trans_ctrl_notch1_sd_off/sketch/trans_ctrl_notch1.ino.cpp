@@ -23,24 +23,25 @@ static bool timerReady=false;
 static bool awaitingFirstFeedback=true;
 ControlAlgorithm::Controller controller;
 IntervalTimer controlTimer;
+static uint8_t controlDivider=0;
 
-#line 26 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
+#line 27 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
 void stopRun(uint32_t reason);
-#line 37 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
+#line 38 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
 void handleFeedback(const CanProtocol::Feedback &f);
-#line 48 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
+#line 49 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
 void controlISR();
-#line 96 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
+#line 100 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
 void startRun();
-#line 111 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
+#line 115 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
 void printStatus();
-#line 124 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
+#line 128 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
 void processCommand(char *line);
-#line 162 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
+#line 169 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
 void setup();
-#line 171 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
+#line 178 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
 void loop();
-#line 26 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
+#line 27 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\trans_ctrl_notch1.ino"
 void stopRun(uint32_t reason) {
   CanProtocol::capture=false;
   active=false; startRequest=false; runtime.enabled=false; tau_cmd=0; statusCode=reason;
@@ -65,6 +66,7 @@ void handleFeedback(const CanProtocol::Feedback &f) {
 }
 void controlISR() {
   const uint32_t now=micros();
+  CanProtocol::pollReceive(); // 100 us Jia RX polling, including IDLE queue drain
   if(startRequest) {
     startRequest=false; runStart=now;
     // Before active, the original observer ignored startup replies. Do not feed
@@ -73,6 +75,8 @@ void controlISR() {
     CanProtocol::rxTail=CanProtocol::rxHead;
     active=true;
   }
+  if(++controlDivider < ControlConfig::CONTROL_PERIOD_US / ControlConfig::RX_POLL_PERIOD_US) return;
+  controlDivider=0;
   if(!active) return;
   CanDiagnostics::enter(now);
   struct TimingGuard { ~TimingGuard() { CanDiagnostics::leave(); } } timingGuard;
@@ -84,7 +88,7 @@ void controlISR() {
   uint32_t fault=0;
   if(CanProtocol::motorFault) fault=7;
   else if(CanDiagnostics::rxOverflow || CanDiagnostics::rxHardwareOverruns) fault=9;
-  else if(CanProtocol::communicationFault || age>ControlConfig::FEEDBACK_TIMEOUT_US) fault=6;
+  else if(CanProtocol::communicationFault || CanDiagnostics::busOffObserved || age>ControlConfig::FEEDBACK_TIMEOUT_US) fault=6;
   if(CanProtocol::numericFault || controller.faulted() ||
      (f.valid && (!isfinite(f.position)||!isfinite(f.velocity)||!isfinite(f.torque)))) {
     controller.trip(); fault=8;
@@ -144,6 +148,9 @@ void processCommand(char *line) {
   char *endLine=line+strlen(line);
   while(endLine>line && isspace((unsigned char)endLine[-1])) *--endLine=0;
   for(char *p=line;*p;++p) *p=toupper((unsigned char)*p);
+  if(!strcmp(line,"LOG,1,IDENTIFY")) SaveData::identifyCommon();
+  else if(!strcmp(line,"LOG,1,FETCH,LATEST")) SaveData::sendCommon(false);
+  else if(!strcmp(line,"LOG,1,FETCH,PREVIOUS")) SaveData::sendCommon(true);
   if(!strcmp(line,"S")) startRun(); // Explicit reinitialization/recovery after stop.
   else if(!strcmp(line,"D")) { if(!active && !startRequest) SaveData::dumpCsv(); }
   else if(!strcmp(line,"STATUS")) printStatus();
@@ -181,7 +188,7 @@ void setup() {
   Serial.begin(ControlConfig::SERIAL_BAUD); CanProtocol::feedbackHandler=handleFeedback; CanProtocol::begin();
   const bool cardReady=SaveData::begin();
   controlTimer.priority(ControlConfig::ISR_PRIORITY);
-  timerReady=controlTimer.begin(controlISR,ControlConfig::CONTROL_PERIOD_US);
+  timerReady=controlTimer.begin(controlISR,ControlConfig::RX_POLL_PERIOD_US);
   Serial.print("READY,ID,"); Serial.print(ControlConfig::MOTOR_ID); Serial.print(",CAN,"); Serial.print(ControlConfig::CAN_BUS);
   Serial.print(",SD,"); Serial.print(!ControlConfig::SD_LOGGING?"DISABLED":(cardReady?"OK":"ERROR")); Serial.print(",TIMER,"); Serial.println(timerReady?"OK":"ERROR");
   Serial.println("Commands: S, ON, OFF, KR <value>, KF <value>, STATUS, BIAS, X, D (newline; X immediate)");

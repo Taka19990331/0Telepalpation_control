@@ -1,0 +1,19 @@
+#line 1 "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_notch1\\verification\\results.json"
+{
+  "source": "C:\\0Telepalpation_control\\controller_implementation\\trans_ctrl_test1\\data\\trans_ctrl_test1_20261102_123759.csv",
+  "source_sha256": "03af49756ca390743125f131a42580da13117ea16d79adc1e3fbe559fd5bdea2",
+  "rows": 28159,
+  "uniform_rows": 28158,
+  "recorded_interval_us": {
+    "min": 498.00000000000017,
+    "max": 501.99999999999983
+  },
+  "dc_gain": 1.0000000000000746,
+  "center_db": -26.02059991328155,
+  "pole_radius": 0.9937379093908977,
+  "band_10_14_power_db": -10.725218928420105,
+  "input_rms": 0.786260238998065,
+  "output_rms": 0.7580430620285561,
+  "max_possible_OFF_ON_step_Nm": 1.0,
+  "reference_checks": "finite states, DC initial condition, warm OFF/ON, exact bypass arithmetic; production execution blocked"
+}

@@ -1,0 +1,438 @@
+/*
+ * Dual AK80 RFOB transparency + gravity compensation.
+ * Teensy 4.1, Jia Mode1 MIT, CAN1/ID1 + CAN2/ID2.
+ * 100 us receive polling and 500 us (2 kHz) control/transmit.
+ */
+#include <Arduino.h>
+#include <FlexCAN_T4.h>
+#include <IntervalTimer.h>
+#include <math.h>
+#include <ctype.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include "control_config.h"
+#include "control_algorithm.h"
+
+#if !defined(ARDUINO_TEENSY41)
+#error "Select Teensy 4.1"
+#endif
+
+// User-adjustable gravity compensation scale.
+constexpr float K_G = 0.75f;
+constexpr uint32_t GRAVITY_RAMP_MS = 1000;
+constexpr float MAX_ABS_COMMAND_TORQUE_NM = 5.0f;
+
+// Gravity model calibration copied from AK80_GravityCompensation.ino.
+constexpr double M1E=-2.424051669779, q1E=-0.304722561563;
+constexpr double M2E=-0.825322046438, q2E=0.735973234422;
+constexpr double theta_off=0.075099896878;
+constexpr double M1g_meas=-0.501276014465, M2g_meas=2.551200127518;
+constexpr double tau_M1g_meas=+0.691, tau_M2g_meas=-3.173;
+constexpr double theta1_g=-M2g_meas-(M1E+q1E);
+constexpr double theta2_g=M1g_meas-(M2E+q2E)-theta_off;
+static float G1=0.0f, G2=0.0f;
+static bool gravityModelValid=false;
+
+constexpr uint8_t MOTOR_ID[2]={1,2};
+using Can1Type=FlexCAN_T4<CAN1,RX_SIZE_256,TX_SIZE_16>;
+using Can2Type=FlexCAN_T4<CAN2,RX_SIZE_256,TX_SIZE_16>;
+static Can1Type can1;
+static Can2Type can2;
+static IntervalTimer canTimer;
+
+enum RunState : uint8_t { IDLE, RUNNING, FAULT_STATE };
+enum FaultReason : uint8_t {
+  NO_FAULT=0, TX_FAILED=2, TX_BACKLOG=3, RX_TIMEOUT=6,
+  MOTOR_ERROR=7, NUMERIC_FAULT=8, RX_OVERRUN=9,
+  CAN_BUS_OFF=10, ISR_OVERRUN=11, TORQUE_LIMIT=12, TIMER_START_FAILED=13
+};
+
+struct MotorFeedback {
+  uint32_t rxValid=0;
+  uint32_t lastRxUs=0;
+  uint32_t sequence=0;
+  float position=0.0f, velocity=0.0f, torque=0.0f;
+  uint8_t motorError=0;
+  bool haveRx=false;
+};
+struct RuntimeSettings {
+  bool enabled=ControlConfig::INITIAL_ENABLED;
+  float Kr=ControlConfig::INITIAL_K_R;
+  float Kf=ControlConfig::INITIAL_K_F;
+};
+
+static MotorFeedback motor[2];
+static ControlAlgorithm::Controller controller[2];
+static RuntimeSettings runtime;
+static CAN_message_t zeroFrame[2];
+static volatile RunState state=IDLE;
+static volatile FaultReason faultReason=NO_FAULT;
+static volatile int8_t faultMotor=-1;
+static bool timerActive=false, timerReady=false;
+static uint32_t sessionStartUs=0, gravityStartUs=0;
+static uint8_t txDivider=0;
+static uint32_t processedSequence[2]={0,0};
+static volatile float tauR[2]={0.0f,0.0f};
+static volatile float tauG[2]={0.0f,0.0f};
+static volatile float tauCommand[2]={0.0f,0.0f};
+
+// Low-cost counters are updated in the ISR and printed only in loop().
+static volatile uint32_t rxSeen[2]={0,0}, rxRejected[2]={0};
+static volatile uint32_t txFailures[2]={0}, txBacklogs[2]={0};
+static volatile uint32_t rxBudgetHits[2]={0};
+static volatile uint32_t isrOverruns=0, isrMaxUs=0;
+
+static uint32_t encodeFloat(float x,float lo,float hi,uint8_t bits) {
+  x=constrain(x,lo,hi);
+  return uint32_t((x-lo)*float((1UL<<bits)-1)/(hi-lo));
+}
+static float decodeFloat(uint32_t raw,float lo,float hi,uint8_t bits) {
+  return float(raw)*(hi-lo)/float((1UL<<bits)-1)+lo;
+}
+static CAN_message_t makeZeroFrame(uint8_t i) {
+  CAN_message_t m{};
+  m.id=MOTOR_ID[i]; m.len=8; m.flags.extended=0; m.flags.remote=0;
+  const uint16_t p=encodeFloat(0,ControlConfig::POSITION_MIN,ControlConfig::POSITION_MAX,16);
+  const uint16_t v=encodeFloat(0,ControlConfig::VELOCITY_MIN,ControlConfig::VELOCITY_MAX,12);
+  const uint16_t kp=encodeFloat(0,0,ControlConfig::MIT_KP_MAX,12);
+  const uint16_t kd=encodeFloat(0,0,ControlConfig::MIT_KD_MAX,12);
+  const uint16_t t=encodeFloat(0,ControlConfig::TORQUE_MIN,ControlConfig::TORQUE_MAX,12);
+  m.buf[0]=p>>8; m.buf[1]=p;
+  m.buf[2]=v>>4; m.buf[3]=((v&0x0f)<<4)|(kp>>8); m.buf[4]=kp;
+  m.buf[5]=kd>>4; m.buf[6]=((kd&0x0f)<<4)|(t>>8); m.buf[7]=t;
+  return m;
+}
+static CAN_message_t makeTorqueFrame(uint8_t i,float torqueNm) {
+  CAN_message_t m=zeroFrame[i];
+  const uint16_t t=uint16_t(encodeFloat(torqueNm,ControlConfig::TORQUE_MIN,ControlConfig::TORQUE_MAX,12));
+  m.buf[6]=(m.buf[6]&0xf0)|(t>>8); m.buf[7]=t&0xff;
+  return m;
+}
+static int writeFrame(uint8_t i,const CAN_message_t &m) {
+  return i==0?can1.write(m):can2.write(m);
+}
+static bool writeChecked(uint8_t i,const CAN_message_t &m) {
+  const int result=writeFrame(i,m);
+  if(result==1||result==-1) return true;
+  ++txFailures[i]; return false;
+}
+static uint32_t txQueue(uint8_t i) {
+  return i==0?can1.getTXQueueCount():can2.getTXQueueCount();
+}
+static uint32_t esr1(uint8_t i) { return FLEXCANb_ESR1(i==0?CAN1:CAN2); }
+static int readFrame(uint8_t i,CAN_message_t &m) { return i==0?can1.read(m):can2.read(m); }
+static bool sendSpecial(uint8_t i,uint8_t code) {
+  CAN_message_t m{}; m.id=MOTOR_ID[i]; m.len=8;
+  for(uint8_t j=0;j<7;++j) m.buf[j]=0xff;
+  m.buf[7]=code; // Jia MIT ENTER=0xFC, EXIT=0xFD
+  return writeChecked(i,m);
+}
+static bool sendPeriodFrame(uint8_t i,const CAN_message_t &m) {
+  const int result=writeFrame(i,m);
+  if(result!=1&&result!=-1) { ++txFailures[i]; return false; }
+  if(txQueue(i)>=ControlConfig::TX_QUEUE_FAULT_COUNT) { ++txBacklogs[i]; return false; }
+  return true;
+}
+static void setFault(uint8_t i,FaultReason reason) {
+  if(state==IDLE||state==FAULT_STATE) return;
+  faultMotor=int8_t(i); faultReason=reason;
+  state=FAULT_STATE; // Suppress all further nonzero TX immediately.
+}
+static void drainIdleMotor(uint8_t i) {
+  for(uint8_t n=0;n<ControlConfig::RX_BUDGET_PER_POLL;++n) {
+    CAN_message_t m{}; if(!readFrame(i,m)) break;
+  }
+}
+static void flushStaleFrames(uint8_t i) {
+  // Timer is stopped while starting. Drain the hardware FIFO so no prior
+  // session feedback is mistaken for the first sample in this session.
+  for(uint16_t n=0;n<256;++n) { CAN_message_t m{}; if(!readFrame(i,m)) break; }
+}
+static void parseFeedback(uint8_t i,const CAN_message_t &m,uint32_t now) {
+  ++rxSeen[i];
+  if(m.flags.overrun) { setFault(i,RX_OVERRUN); return; }
+  if(m.flags.extended||m.flags.remote||m.len<6||m.len>8) { ++rxRejected[i]; return; }
+  // Jia firmware may return its node ID in the CAN ID or in payload byte 0.
+  if(m.id!=MOTOR_ID[i]&&m.buf[0]!=MOTOR_ID[i]) { ++rxRejected[i]; return; }
+  MotorFeedback &d=motor[i];
+  d.position=decodeFloat((uint32_t(m.buf[1])<<8)|m.buf[2],ControlConfig::POSITION_MIN,ControlConfig::POSITION_MAX,16);
+  d.velocity=decodeFloat((uint32_t(m.buf[3])<<4)|(m.buf[4]>>4),ControlConfig::VELOCITY_MIN,ControlConfig::VELOCITY_MAX,12);
+  d.torque=decodeFloat(((uint32_t(m.buf[4])&0x0f)<<8)|m.buf[5],ControlConfig::TORQUE_MIN,ControlConfig::TORQUE_MAX,12);
+  d.motorError=m.len>=8?m.buf[7]:0;
+  d.lastRxUs=now; d.haveRx=true; ++d.rxValid; ++d.sequence;
+  if(d.motorError) setFault(i,MOTOR_ERROR);
+  else if(!isfinite(d.position)||!isfinite(d.velocity)||!isfinite(d.torque)) setFault(i,NUMERIC_FAULT);
+}
+static void pollMotor(uint8_t i) {
+  uint8_t count=0;
+  for(;count<ControlConfig::RX_BUDGET_PER_POLL;++count) {
+    CAN_message_t m{}; if(!readFrame(i,m)) break;
+    parseFeedback(i,m,micros());
+    if(state==FAULT_STATE) break;
+  }
+  if(count==ControlConfig::RX_BUDGET_PER_POLL) ++rxBudgetHits[i];
+}
+static void checkControlSafety(uint32_t now) {
+  for(uint8_t i=0;i<2&&state==RUNNING;++i) {
+    if(FLEXCAN_ESR_get_fault_code(esr1(i))==CAN_ERROR_BUS_OFF) { setFault(i,CAN_BUS_OFF); return; }
+    const MotorFeedback &d=motor[i];
+    if(!d.haveRx) {
+      if(uint32_t(now-sessionStartUs)>ControlConfig::INITIAL_RX_TIMEOUT_US) setFault(i,RX_TIMEOUT);
+    } else if(uint32_t(now-d.lastRxUs)>ControlConfig::RX_MAX_AGE_US) {
+      setFault(i,RX_TIMEOUT);
+    }
+  }
+}
+static bool calculateGravity(float &tauM1,float &tauM2) {
+  const float theta1=-motor[1].position-static_cast<float>(M1E+q1E);
+  const float theta2= motor[0].position-static_cast<float>(M2E+q2E)-static_cast<float>(theta_off);
+  if(!isfinite(theta1)||!isfinite(theta2)) return false;
+  tauM1= G2*cosf(theta2)*K_G;
+  tauM2=-G1*cosf(theta1)*K_G;
+  return isfinite(tauM1)&&isfinite(tauM2);
+}
+static void timerISR() {
+  const uint32_t tStart=micros();
+  if(state==IDLE||state==FAULT_STATE) {
+    drainIdleMotor(0); drainIdleMotor(1); return;
+  }
+  pollMotor(0);
+  if(state==RUNNING) pollMotor(1);
+  if(state==RUNNING&&++txDivider>=ControlConfig::CONTROL_PERIOD_US/ControlConfig::RX_POLL_PERIOD_US) {
+    txDivider=0;
+    const uint32_t now=micros();
+    checkControlSafety(now);
+    if(state==RUNNING) {
+      // Startup remains zero-torque until both axes have fresh feedback.
+      if(!motor[0].haveRx||!motor[1].haveRx) {
+        const bool ok1=sendPeriodFrame(0,zeroFrame[0]);
+        const bool ok2=sendPeriodFrame(1,zeroFrame[1]);
+        if(!ok1) setFault(0,txBacklogs[0]?TX_BACKLOG:TX_FAILED);
+        if(!ok2&&state==RUNNING) setFault(1,txBacklogs[1]?TX_BACKLOG:TX_FAILED);
+      } else {
+        for(uint8_t i=0;i<2&&state==RUNNING;++i) {
+          if(motor[i].sequence!=processedSequence[i]) {
+            controller[i].update(motor[i].velocity,motor[i].torque);
+            processedSequence[i]=motor[i].sequence;
+            if(controller[i].faulted()) setFault(i,NUMERIC_FAULT);
+          }
+        }
+        if(state==RUNNING) {
+          float gravity[2]={0.0f,0.0f};
+          if(runtime.enabled&&!calculateGravity(gravity[0],gravity[1])) setFault(0,NUMERIC_FAULT);
+          if(state==RUNNING) {
+            const float ramp=runtime.enabled
+              ? fminf(1.0f,float(uint32_t(now-gravityStartUs))/float(GRAVITY_RAMP_MS*1000UL))
+              : 0.0f;
+            for(uint8_t i=0;i<2;++i) {
+              tauR[i]=controller[i].command(runtime.enabled,runtime.Kr,runtime.Kf);
+              tauG[i]=runtime.enabled?gravity[i]*ramp:0.0f;
+              tauCommand[i]=runtime.enabled?tauR[i]+tauG[i]:0.0f;
+              if(controller[i].faulted()) { setFault(i,NUMERIC_FAULT); break; }
+              if(!isfinite(tauCommand[i])||fabsf(tauCommand[i])>MAX_ABS_COMMAND_TORQUE_NM) {
+                setFault(i,TORQUE_LIMIT); break;
+              }
+            }
+          }
+        }
+        if(state==RUNNING) {
+          const bool ok1=sendPeriodFrame(0,makeTorqueFrame(0,tauCommand[0]));
+          const bool ok2=sendPeriodFrame(1,makeTorqueFrame(1,tauCommand[1]));
+          if(!ok1) setFault(0,txBacklogs[0]?TX_BACKLOG:TX_FAILED);
+          if(!ok2&&state==RUNNING) setFault(1,txBacklogs[1]?TX_BACKLOG:TX_FAILED);
+        }
+      }
+    }
+  }
+  const uint32_t duration=micros()-tStart;
+  if(duration>isrMaxUs) isrMaxUs=duration;
+  if(state==RUNNING&&duration>ControlConfig::RX_POLL_PERIOD_US) {
+    ++isrOverruns; setFault(0,ISR_OVERRUN);
+  }
+}
+static void stopTimer() {
+  if(timerActive) { canTimer.end(); timerActive=false; }
+}
+static bool startTimer() {
+  if(timerActive) return true;
+  canTimer.priority(ControlConfig::ISR_PRIORITY);
+  timerActive=canTimer.begin(timerISR,ControlConfig::RX_POLL_PERIOD_US);
+  timerReady=timerActive;
+  return timerActive;
+}
+static void issueStopFrames() {
+  // Same best-effort sequence as the working Jia dither program: zero, then EXIT.
+  for(uint8_t i=0;i<2;++i) (void)writeChecked(i,zeroFrame[i]);
+  for(uint8_t i=0;i<2;++i) (void)sendSpecial(i,0xfd);
+}
+static const char *faultName(FaultReason reason) {
+  switch(reason) {
+    case TX_FAILED: return "TX_FAILED";
+    case TX_BACKLOG: return "TX_BACKLOG";
+    case RX_TIMEOUT: return "RX_TIMEOUT";
+    case MOTOR_ERROR: return "MOTOR_ERROR";
+    case NUMERIC_FAULT: return "NUMERIC_FAULT";
+    case RX_OVERRUN: return "RX_OVERRUN";
+    case CAN_BUS_OFF: return "BUS_OFF";
+    case ISR_OVERRUN: return "ISR_OVERRUN";
+    case TORQUE_LIMIT: return "TORQUE_LIMIT";
+    case TIMER_START_FAILED: return "TIMER_START_FAILED";
+    default: return "NONE";
+  }
+}
+static void finishSession(bool faulted) {
+  const RunState oldState=state;
+  if(oldState==IDLE) return;
+  const FaultReason reason=faultReason;
+  const int8_t failedMotor=faultMotor;
+  state=IDLE; runtime.enabled=false;
+  stopTimer(); issueStopFrames();
+  if(faulted) {
+    Serial.print("FAULT,M"); Serial.print(failedMotor+1); Serial.print(','); Serial.println(faultName(reason));
+  } else Serial.println("STOPPED,MANUAL");
+  if(!startTimer()) { faultReason=TIMER_START_FAILED; Serial.println("FAULT,TIMER_START_FAILED"); }
+}
+static void resetSessionDiagnostics() {
+  for(uint8_t i=0;i<2;++i) {
+    motor[i]=MotorFeedback{}; processedSequence[i]=0;
+    rxSeen[i]=rxRejected[i]=txFailures[i]=txBacklogs[i]=rxBudgetHits[i]=0;
+    controller[i].resetObserver(); tauR[i]=tauG[i]=tauCommand[i]=0.0f;
+  }
+  isrOverruns=0; isrMaxUs=0; txDivider=0;
+  faultReason=NO_FAULT; faultMotor=-1;
+}
+static void startZeroMode() {
+  if(state!=IDLE) { Serial.println("REJECT,ALREADY_ACTIVE"); return; }
+  if(!timerReady) { Serial.println("ERROR,TIMER_NOT_READY"); return; }
+  stopTimer();
+  resetSessionDiagnostics(); runtime.enabled=ControlConfig::INITIAL_ENABLED;
+  runtime.Kr=ControlConfig::INITIAL_K_R; runtime.Kf=ControlConfig::INITIAL_K_F;
+  flushStaleFrames(0); flushStaleFrames(1);
+  sessionStartUs=micros();
+  // Always attempt ENTER on both buses, as in the working dither sketch.
+  const bool enable1=sendSpecial(0,0xfc);
+  const bool enable2=sendSpecial(1,0xfc);
+  if(!enable1||!enable2) {
+    issueStopFrames();
+    faultReason=TX_FAILED; faultMotor=enable1?1:0;
+    Serial.println("FAULT,MIT_ENABLE_TX_FAILED");
+    if(!startTimer()) { faultReason=TIMER_START_FAILED; Serial.println("FAULT,TIMER_START_FAILED"); }
+    return;
+  }
+  state=RUNNING;
+  if(!startTimer()) {
+    state=IDLE; faultReason=TIMER_START_FAILED; issueStopFrames(); Serial.println("FAULT,TIMER_START_FAILED"); return;
+  }
+  Serial.println("ZERO_STARTED,USE_ON_TO_ENABLE_TRANS_CONTROL");
+}
+static bool bothFeedbackFresh(uint32_t now) {
+  for(uint8_t i=0;i<2;++i)
+    if(!motor[i].haveRx||uint32_t(now-motor[i].lastRxUs)>ControlConfig::RX_MAX_AGE_US) return false;
+  return true;
+}
+static void printStatus() {
+  noInterrupts();
+  const RunState current=state; const FaultReason reason=faultReason; const int8_t failedMotor=faultMotor;
+  const uint32_t now=micros();
+  const uint32_t rx0=motor[0].rxValid,rx1=motor[1].rxValid;
+  const uint32_t age0=motor[0].haveRx?uint32_t(now-motor[0].lastRxUs):UINT32_MAX;
+  const uint32_t age1=motor[1].haveRx?uint32_t(now-motor[1].lastRxUs):UINT32_MAX;
+  const uint32_t seen0=rxSeen[0],seen1=rxSeen[1],rej0=rxRejected[0],rej1=rxRejected[1];
+  const uint32_t txf0=txFailures[0],txf1=txFailures[1],txb0=txBacklogs[0],txb1=txBacklogs[1];
+  const uint32_t budget0=rxBudgetHits[0],budget1=rxBudgetHits[1],overruns=isrOverruns,maxUs=isrMaxUs;
+  const float r0=tauR[0],r1=tauR[1],g0=tauG[0],g1=tauG[1],c0=tauCommand[0],c1=tauCommand[1];
+  const bool enabled=runtime.enabled;
+  interrupts();
+  Serial.print("STATUS,ON,");Serial.print(enabled?1:0);
+  Serial.print(",RUNNING,");Serial.print(current==RUNNING?1:0);
+  Serial.print(",FAULT,");Serial.print(unsigned(reason));Serial.print(',');Serial.print(faultName(reason));
+  Serial.print(",FAULT_MOTOR,");if(failedMotor<0)Serial.print("NONE");else Serial.print(unsigned(failedMotor)+1);
+  Serial.print(",M1_RX_OK,");Serial.print(rx0);Serial.print(",M1_RX_SEEN,");Serial.print(seen0);
+  Serial.print(",M1_RX_REJECT,");Serial.print(rej0);Serial.print(",M1_AGE_US,");if(age0==UINT32_MAX)Serial.print("NEVER");else Serial.print(age0);
+  Serial.print(",M2_RX_OK,");Serial.print(rx1);Serial.print(",M2_RX_SEEN,");Serial.print(seen1);
+  Serial.print(",M2_RX_REJECT,");Serial.print(rej1);Serial.print(",M2_AGE_US,");if(age1==UINT32_MAX)Serial.print("NEVER");else Serial.print(age1);
+  Serial.print(",M1_TX_FAIL,");Serial.print(txf0);Serial.print(",M2_TX_FAIL,");Serial.print(txf1);
+  Serial.print(",M1_TX_BACKLOG,");Serial.print(txb0);Serial.print(",M2_TX_BACKLOG,");Serial.print(txb1);
+  Serial.print(",M1_RX_BUDGET_HIT,");Serial.print(budget0);Serial.print(",M2_RX_BUDGET_HIT,");Serial.print(budget1);
+  Serial.print(",ISR_MAX_US,");Serial.print(maxUs);Serial.print(",ISR_OVERRUNS,");Serial.print(overruns);
+  Serial.print(",M1_RFOB,");Serial.print(r0,6);Serial.print(",M1_GRAVITY,");Serial.print(g0,6);Serial.print(",M1_CMD,");Serial.print(c0,6);
+  Serial.print(",M2_RFOB,");Serial.print(r1,6);Serial.print(",M2_GRAVITY,");Serial.print(g1,6);Serial.print(",M2_CMD,");Serial.println(c1,6);
+}
+static void processCommand(char *line) {
+  while(isspace((unsigned char)*line)) ++line;
+  char *endLine=line+strlen(line); while(endLine>line&&isspace((unsigned char)endLine[-1])) *--endLine=0;
+  for(char *p=line;*p;++p) *p=char(toupper((unsigned char)*p));
+  if(!strcmp(line,"S")) startZeroMode();
+  else if(!strcmp(line,"STATUS")) printStatus();
+  else if(!strcmp(line,"ON")) {
+    noInterrupts();
+    const bool allowed=state==RUNNING&&faultReason==NO_FAULT&&gravityModelValid&&controller[0].ready()&&controller[1].ready()&&bothFeedbackFresh(micros());
+    if(allowed) { runtime.enabled=true; gravityStartUs=micros(); }
+    interrupts();
+    if(!allowed) Serial.println("ERROR,ON requires fresh feedback from both motors; send S and wait");
+  } else if(!strcmp(line,"OFF")) {
+    bool zeroOk1=true,zeroOk2=true;
+    noInterrupts(); runtime.enabled=false;
+    for(uint8_t i=0;i<2;++i) { controller[i].zeroOutput(); tauR[i]=tauG[i]=tauCommand[i]=0.0f; }
+    if(state==RUNNING) { zeroOk1=writeChecked(0,zeroFrame[0]); zeroOk2=writeChecked(1,zeroFrame[1]); }
+    interrupts();
+    if(!zeroOk1||!zeroOk2) { noInterrupts(); setFault(!zeroOk1?0:1,TX_FAILED); interrupts(); }
+  } else if(!strcmp(line,"X")) {
+    const bool wasFault=state==FAULT_STATE; finishSession(wasFault);
+  } else if(!strcmp(line,"BIAS")) {
+    noInterrupts();
+    const uint32_t now=micros();
+    const bool allowed=state==RUNNING&&!runtime.enabled&&faultReason==NO_FAULT&&bothFeedbackFresh(now)&&
+      fabsf(motor[0].velocity)<ControlConfig::BIAS_STATIONARY_SPEED&&fabsf(motor[1].velocity)<ControlConfig::BIAS_STATIONARY_SPEED;
+    if(allowed) for(uint8_t i=0;i<2;++i) { controller[i].torqueBias=motor[i].torque; controller[i].resetObserver(); processedSequence[i]=motor[i].sequence; }
+    interrupts();
+    if(!allowed) Serial.println("ERROR,BIAS requires healthy OFF stationary feedback on both motors");
+  } else if((!strncmp(line,"KR",2)||!strncmp(line,"KF",2))&&isspace((unsigned char)line[2])) {
+    char *end=nullptr; errno=0; const float value=strtof(line+3,&end);
+    while(end&&isspace((unsigned char)*end)) ++end;
+    if(end==line+3||!end||*end||errno==ERANGE||!isfinite(value)) { Serial.println("ERROR,finite gain required"); return; }
+    noInterrupts(); if(line[1]=='R') runtime.Kr=value; else runtime.Kf=value; interrupts();
+  } else Serial.println("COMMANDS,S,ON,OFF,KR <value>,KF <value>,BIAS,STATUS,X");
+}
+static void serviceCanErrors() {
+  for(uint8_t i=0;i<2;++i) for(uint8_t n=0;n<4;++n) {
+    CAN_error_t snapshot{};
+    const bool got=i==0?can1.error(snapshot,false):can2.error(snapshot,false);
+    if(!got) break;
+  }
+}
+
+void setup() {
+  Serial.begin(ControlConfig::SERIAL_BAUD);
+  const double c1=cos(theta1_g),c2=cos(theta2_g);
+  if(isfinite(c1)&&isfinite(c2)&&fabs(c1)>=1e-3&&fabs(c2)>=1e-3) {
+    G1=float(-tau_M2g_meas/c1); G2=float(tau_M1g_meas/c2);
+    gravityModelValid=isfinite(G1)&&isfinite(G2)&&K_G*fmaxf(fabsf(G1),fabsf(G2))<=MAX_ABS_COMMAND_TORQUE_NM;
+  }
+  for(uint8_t i=0;i<2;++i) zeroFrame[i]=makeZeroFrame(i);
+  can1.begin(); can1.setBaudRate(ControlConfig::CAN_BAUD); NVIC_SET_PRIORITY(IRQ_CAN1,ControlConfig::CAN_IRQ_PRIORITY);
+  can2.begin(); can2.setBaudRate(ControlConfig::CAN_BAUD); NVIC_SET_PRIORITY(IRQ_CAN2,ControlConfig::CAN_IRQ_PRIORITY);
+  canTimer.priority(ControlConfig::ISR_PRIORITY);
+  timerReady=canTimer.begin(timerISR,ControlConfig::RX_POLL_PERIOD_US); timerActive=timerReady;
+  Serial.print("READY,TRANS_CTRL_MULTI_MOVAVE_GRAVITY,TIMER,");Serial.println(timerReady?"OK":"ERROR");
+  Serial.print("G1_NM,");Serial.print(G1,6);Serial.print(",G2_NM,");Serial.print(G2,6);
+  Serial.print(",K_G,");Serial.print(K_G,3);Serial.print(",RAMP_MS,");Serial.println(GRAVITY_RAMP_MS);
+  if(!gravityModelValid) Serial.println("FAULT,INVALID_GRAVITY_MODEL");
+  Serial.println("M1=CAN1/ID1,M2=CAN2/ID2; commands:S,ON,OFF,KR,KF,BIAS,STATUS,X");
+}
+void loop() {
+  static char line[ControlConfig::COMMAND_BUFFER_BYTES]; static size_t used=0; static bool overflow=false;
+  while(Serial.available()) {
+    const char c=char(Serial.read());
+    if((c=='x'||c=='X')&&used==0&&!overflow) { char stopCommand[]="X"; processCommand(stopCommand); }
+    else if(c=='\r'||c=='\n') {
+      if(overflow) Serial.println("ERROR,command too long");
+      else if(used) { line[used]=0; processCommand(line); }
+      used=0; overflow=false;
+    } else if(used<sizeof(line)-1&&!overflow) line[used++]=c;
+    else overflow=true;
+  }
+  serviceCanErrors();
+  if(state==FAULT_STATE) finishSession(true);
+}
